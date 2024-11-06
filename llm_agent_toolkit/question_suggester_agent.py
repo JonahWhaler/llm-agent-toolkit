@@ -188,22 +188,3 @@ class QuestionSuggesterAgent(BaseTool):
         if not all(conditions):
             return False
         return True
-
-
-if __name__ == "__main__":
-    questions = [
-        # ("Who is the current president of TAIWAN (ROC) and how's his/her relationship with the USA?", "The current president of Taiwan (ROC) is William Lai, who assumed office on May 20, 2024. His relationship with the United States is characterized by strong cooperation and mutual support, particularly in the areas of security and economic ties. The US has been a key ally of Taiwan, providing diplomatic and military support, despite not having formal diplomatic relations. \nLai's administration is expected to continue strengthening ties with the US, particularly in light of growing tensions with China. The US has expressed its commitment to Taiwan's security and has increased its military presence in the region to deter potential aggression from China. "),
-        # ("Why is the earth not flat?", "The Earth is not flat; it's roughly spherical. Here's why:\n\n* **Photographs from Space:** Images taken from satellites and spacecraft clearly show the Earth's curvature.\n* **Ship Disappearing Over the Horizon:** As a ship sails away, its hull disappears first, then its mast, indicating a curved surface.\n* **Different Time Zones:** The Earth rotates, causing different parts to face the sun at different times, resulting in day and night. This wouldn't be possible on a flat Earth.\n* **Lunar Eclipse:** The Earth's shadow on the Moon during a lunar eclipse is always round, proving the Earth's spherical shape.\n* **Circumnavigation:** Explorers like Magellan circumnavigated the globe, proving it's not flat.\nThese are just a few of the many pieces of evidence that confirm the Earth's spherical shape.\n"),
-        ("You are such a great assistant.", "Appreciate your complement.")
-    ]
-    qs_agent = QuestionSuggesterAgent(ccm=ChatCompletionModel(config=ChatCompletionConfig(temperature=0.7, n=1)))
-    for (q, r) in questions:
-        query = {"query": q, "response": r}
-        agent_response = qs_agent(json.dumps(query))
-        if agent_response.error:
-            print(agent_response.error)
-            continue
-        generated_results = agent_response.result
-        print(f"\n\nQ: {q}")
-        for gr in generated_results:
-            print(f"R: {gr}")

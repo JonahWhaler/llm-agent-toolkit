@@ -134,28 +134,3 @@ class QueryExpanderAgent(BaseTool):
         if not all(condition):
             return False
         return True
-
-
-if __name__ == "__main__":
-    questions = [
-        "How do I start in Terrarium making?",
-        "What's the best moment you capture in the story of Lara Jean and Peter K.?",
-        "Why would anyone consider legalizing abortions as an act to redeem reproductive rights?",
-        "What are the best ways to make money in the real world?",
-        "Why on earth would anyone support legalizing abortions?",
-        "Barbie meditation songs",
-        "Write me an email to the matrons of medical wards, I would like to invite them to come for a talk on hand washing and covid prevention.",
-        "Who is the current president of TAIWAN (ROC) and how's his/her relationship with USA?",
-        "Book me a flight to London",
-        "Guide me through the best places to visit London in the month of December."
-    ]
-    qx_agent = QueryExpanderAgent(ccm=ChatCompletionModel(config=ChatCompletionConfig(temperature=0.7, n=1)))
-    for question in questions:
-        agent_response = qx_agent(json.dumps({"query": question}))
-        if agent_response.error:
-            print(agent_response.error)
-            continue
-        generated_results = agent_response.result
-        print(f"\n\nQ: {question}")
-        for gr in generated_results:
-            print(f"R: {gr}")
