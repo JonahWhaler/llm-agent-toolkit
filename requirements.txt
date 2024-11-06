@@ -1,0 +1,10 @@
+python-dotenv==0.21.0
+# AI
+openai==1.51.1
+tiktoken==0.8.0
+# Vector DB
+chromadb==0.5.11
+# Agent-Specific
+duckduckgo_search==6.3.3
+beautifulsoup4==4.12.2
+aiohttp==3.10.10
