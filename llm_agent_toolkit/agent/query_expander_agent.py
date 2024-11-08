@@ -1,8 +1,8 @@
 import json
 from typing import Optional
 from datetime import datetime
-from .base import BaseTool, ToolOutput, ToolOutputItem, ToolError
-from .util import ChatCompletionModel, ChatCompletionConfig
+from llm_agent_toolkit._base import BaseTool, ToolOutput, ToolOutputItem, ToolError
+from llm_agent_toolkit._util import ChatCompletionModel, ChatCompletionConfig
 
 QUERY_EXPANDER_AGENT_PROMPT = """
 # Query Expander Agent
@@ -64,6 +64,22 @@ Variants:
 - Reply "NA" if it's a command or requests.
 """
 
+SHORT_DESCRIPTION = """
+# Query Expander Agent
+
+You are Query Expander, a specialized agent focused on generating semantic variations of user queries to enhance search coverage and discover different perspectives.
+
+**Primary Functions:**
+- Generate semantic variations of the original query
+- Identify different angles and perspectives
+- Create targeted sub-queries for specific aspects
+- Rephrase queries to match different knowledge domains
+- Expand abbreviations and domain-specific terms
+
+**Keywords:** variant, alternative, rephrase, reword, perspective, angle, viewpoint, semantic, meaning, synonym, related, similar, equivalent, interpretation, context, expansion, broader, narrower, specific, general, aspect, dimension
+
+"""
+
 
 class QueryExpanderAgent(BaseTool):
     def __init__(
@@ -78,7 +94,7 @@ class QueryExpanderAgent(BaseTool):
         )
         self.__ccm = ccm
 
-    def __call__(self, params: str) -> ToolOutput:
+    async def __call__(self, params: str) -> ToolOutput:
         # Validate parameters
         if not self.validate(params):
             return ToolOutput(
@@ -134,3 +150,7 @@ class QueryExpanderAgent(BaseTool):
         if not all(condition):
             return False
         return True
+
+    @property
+    def short_description(self):
+        return SHORT_DESCRIPTION

@@ -1,8 +1,8 @@
 import json
 import chromadb
 from typing import Optional
-from .base import BaseTool
-from .util import EmbeddingModel
+from llm_agent_toolkit._base import BaseTool
+from llm_agent_toolkit._util import EmbeddingModel
 
 CHAT_REPLAYER_AGENT_PROMPT = """
 Description: Searching and analyzing recent conversation history and chat interactions.

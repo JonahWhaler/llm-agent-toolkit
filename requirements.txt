@@ -8,3 +8,6 @@ chromadb==0.5.11
 duckduckgo_search==6.3.3
 beautifulsoup4==4.12.2
 aiohttp==3.10.10
+# Audio
+pydub==0.25.1
+ffmpeg-python==0.2.0

@@ -22,6 +22,17 @@ class ToolOutput:
     result: list[ToolOutputItem] | None = None
     error: ToolError | None = None
 
+    def __str__(self):
+        templated_output = f"Tool: {self.tool_name}\n"
+        if self.result is not None:
+            templated_output += "Results:\n"
+            for item in self.result:
+                templated_output += f"{item.value}\n"
+        if self.error is not None:
+            templated_output += f"Error: {self.error.type}: {self.error.message}\n"
+
+        return templated_output
+
 
 class BaseTool(ABC):
     def __init__(

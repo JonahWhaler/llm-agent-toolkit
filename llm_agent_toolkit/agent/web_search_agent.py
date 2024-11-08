@@ -5,7 +5,10 @@ from duckduckgo_search import DDGS
 from bs4 import BeautifulSoup
 from datetime import datetime
 from random import choice as random_choice
-from .base import BaseTool
+from llm_agent_toolkit._base import BaseTool, ToolOutput, ToolOutputItem, ToolError
+import logging
+
+logger = logging.getLogger(__name__)
 
 WEB_EXPLORER_AGENT_PROMPT = """
 Description: Execute web searches via DuckDuckGo, collect factual information from reliable online sources
@@ -28,8 +31,19 @@ Returns:
             ]
         }
 `next_func` (string): The name of the next function to call.
-
 Keywords: web, internet, online, search, Wikipedia, article, webpage, website, URL, DuckDuckGo, browser, HTTP, link, database, reference, citation, source, fact-check, current, updated, recent, global, worldwide, information
+
+Relevant Query Types:
+
+"What is the latest information about..."
+"Find articles about..."
+"Search for facts regarding..."
+"What does Wikipedia say about..."
+"Look up current details on..."
+"""
+
+SHORT_DESCRIPTION = """
+Description: Execute web searches via DuckDuckGo, collect factual information from reliable online sources
 
 Relevant Query Types:
 
@@ -64,40 +78,60 @@ class DuckDuckGoSearchAgent(BaseTool):
 
     def validate(self, params: str) -> bool:
         params = json.loads(params)
-        query = params.get("query", None)
+        p_query = params.get("query", None)
         top_n = params.get("top_n", 5)
-        if query is None:
+        if p_query is None:
             return False
-        query = query.strip()
-        conditions = [len(query) > 0, len(query) <=
+        p_query = p_query.strip()
+        conditions = [len(p_query) > 0, len(p_query) <=
                       200, top_n >= 1, top_n <= 10]
         if not all(conditions):
             return False
         return True
 
-    async def __call__(self, params: str) -> dict:
+    async def __call__(self, params: str) -> ToolOutput:
         # Validate parameters
         if not self.validate(params):
-            return {"error": "Invalid parameters for DuckDuckGoSearchAgent"}
+            return ToolOutput(
+                tool_name=self.name,
+                error=ToolError(
+                    type="validation_error",
+                    message="Invalid parameters for DuckDuckGoSearchAgent"
+                )
+            )
+        # print(f"Validated parameters for DuckDuckGoSearchAgent: {params}")
         # Load parameters
-        params = json.loads(params)
-        query = params.get("query", None)
-        top_n = params.get("top_n", 5)
-
+        j_params = json.loads(params)
+        p_query = j_params.get("query", None)
+        top_n = j_params.get("top_n", 5)
+        # print(f"Query: {p_query}, Top N: {top_n}")
         output = dict()
         top_search = []
         with DDGS() as ddgs:
-            for r in ddgs.text(keywords=query, region=self.__region, safesearch=self.__safesearch, max_results=top_n):
+            for r in ddgs.text(keywords=p_query, region=self.__region, safesearch=self.__safesearch, max_results=top_n):
                 top_search.append(r)
+        # logger.info(f"Gather top search!")
         async with aiohttp.ClientSession() as session:
             tasks = [self._fetch_data(session, r['href']) for r in top_search]
             search_results = await asyncio.gather(*tasks)
             for r, sr in zip(top_search, search_results):
-                r['html'] = sr
+                sr = sr.replace("\n\n", "\n")
+                sr = sr.replace("  ", " ")
+                sr = sr.replace("\\\\", "")
+                r['html'] = sr[:500]
+        # print(f"Gather contents!")
         web_search_result = "\n\n".join([json.dumps(r) for r in top_search])
         output["result"] = [
             ("web_search_result", web_search_result, datetime.now().isoformat(), True)]
-        return output
+        # print(f"Output: {output['result']}")
+        return ToolOutput(tool_name=self.name, result=[
+            ToolOutputItem(
+                identifier="web_search_result",
+                value=json.dumps(output),
+                timestamp=datetime.now().isoformat(),
+                is_answer=True
+            )
+        ])
 
     @property
     def headers(self) -> dict:
@@ -124,3 +158,7 @@ class DuckDuckGoSearchAgent(BaseTool):
                 return soup.find('body').text
         except Exception as _:
             return "Webpage not available, either due to an error or due to lack of access permissions to the site."
+
+    @property
+    def short_description(self):
+        return SHORT_DESCRIPTION

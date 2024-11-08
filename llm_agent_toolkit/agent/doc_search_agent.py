@@ -1,8 +1,8 @@
 import json
 import chromadb
 from typing import Optional
-from .base import BaseTool
-from .util import EmbeddingModel
+from llm_agent_toolkit._base import BaseTool
+from llm_agent_toolkit._util import EmbeddingModel
 
 FILE_EXPLORER_AGENT_PROMPT = """
 Description: Searching and analyzing content from the local vector database of documents and files.
