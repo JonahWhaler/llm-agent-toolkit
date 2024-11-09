@@ -6,10 +6,12 @@ from ._util import (
     AudioHelper
 )
 import core
+import tool
 
 __all__ = [
     "Core", "ChatCompletionConfig", "ImageGenerationConfig",
     "BaseTool", "ToolOutput", "ToolOutputItem", "ToolError",
     "OpenAIRole", "OpenAIMessage", "OpenAIFunction", "ContextMessage",
-    "AudioHelper", "core"
+    "AudioHelper", 
+    "core", "tool"
 ]
