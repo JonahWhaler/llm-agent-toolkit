@@ -8,8 +8,8 @@ from ._util import (
 import core
 
 __all__ = [
-    "core", "ChatCompletionConfig", "ImageGenerationConfig",
+    "Core", "ChatCompletionConfig", "ImageGenerationConfig",
     "BaseTool", "ToolOutput", "ToolOutputItem", "ToolError",
     "OpenAIRole", "OpenAIMessage", "OpenAIFunction", "ContextMessage",
-    "AudioHelper"
+    "AudioHelper", "core"
 ]
