@@ -8,6 +8,12 @@ import base64
 
 
 class I2T_OAI_Core(Core):
+    """
+    **Notes:**
+    - Supported image format: png, jpeg, gif, webp
+    """
+    SUPPORTED_IMAGE_FORMATS = ["png", "jpeg", "gif", "webp"]
+
     def __init__(
             self, system_prompt: str, model_name: str, config: ChatCompletionConfig = ChatCompletionConfig(),
             tools: list | None = None
@@ -77,11 +83,16 @@ class I2T_OAI_Core(Core):
             raise
 
     @staticmethod
-    def get_image_url(self, filepath: str):
+    def get_image_url(filepath: str):
+        ext = filepath.split(".")[-1].lower()
+        ext = "jpeg" if ext == "jpg" else ext
+        if ext not in I2T_OAI_Core.SUPPORTED_IMAGE_FORMATS:
+            raise Exception(f"Unsupported image type: {ext}")
+        prefix = "data:image/{};base64".format(ext)
         try:
             with open(filepath, "rb") as f:
                 encoded_image = base64.b64encode(f.read()).decode('utf-8')
-                return f"data:image/png;base64,{encoded_image}"
+                return f"{prefix},{encoded_image}"
         except Exception as e:
             print(f"get_image_url: {e}")
             raise
