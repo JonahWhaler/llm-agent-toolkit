@@ -49,3 +49,32 @@ class T2I_OAI_Core(Core):
         except Exception as e:
             print(f"run_async: {e}")
             raise
+
+    def run(
+            self,
+            query: str,
+            context: list[ContextMessage | dict] | None,
+            **kwargs
+    ) -> list[OpenAIMessage | dict]:
+        username: str = kwargs.get("user_name", "User")
+        params = self.config.__dict__()
+        params["model"] = self.model_name
+        params["user"] = username
+        params["prompt"] = query
+        output = []
+        try:
+            client = openai.OpenAI(api_key=os.environ["OPENAI_API_KEY"])
+            images_response = client.images.generate(**params)
+            for idx, image in enumerate(images_response.data):
+                img_model = image.model_dump()
+                img_b64 = img_model['b64_json']
+                img_decoding = base64.b64decode(img_b64)
+                export_path = f"./{username}_{idx}.png"
+                with open(export_path, "wb") as f:
+                    f.write(img_decoding)
+                output.append(OpenAIMessage(role=OpenAIRole.ASSISTANT, content=export_path))
+
+            return output
+        except Exception as e:
+            print(f"run_async: {e}")
+            raise

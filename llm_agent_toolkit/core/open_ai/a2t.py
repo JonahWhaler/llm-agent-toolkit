@@ -5,7 +5,7 @@ from llm_agent_toolkit._util import (
 import os
 import openai
 import io
-import ffmpeg
+import ffmpeg   # https://pypi.org/project/ffmpeg-python/
 import math
 
 
@@ -15,6 +15,7 @@ class A2T_OAI_Core(Core):
     - Only accept audio file in OGG format!!!
     - Large audio files will be split into multiple chunks, overlapping is not supported.
     """
+
     def __init__(
             self, system_prompt: str, model_name: str, config: ChatCompletionConfig = ChatCompletionConfig(),
             tools: list | None = None
@@ -39,7 +40,6 @@ class A2T_OAI_Core(Core):
         try:
             output = []
             for chunk_path in self.to_chunks(input_file=filepath, tmp_directory=tmp_directory):
-
                 with open(chunk_path, "rb") as f:
                     audio_data = f.read()
                     buffer = io.BytesIO(audio_data)
@@ -47,6 +47,41 @@ class A2T_OAI_Core(Core):
                     buffer.seek(0)
                 client = openai.AsyncOpenAI(api_key=os.environ["OPENAI_API_KEY"])
                 transcript = await client.audio.transcriptions.create(
+                    file=buffer, model=self.model_name, response_format='text',
+                    temperature=self.config.temperature, prompt=templated_prompt
+                )
+                output.append(
+                    OpenAIMessage(role=OpenAIRole.ASSISTANT, content=transcript)
+                )
+
+            return output
+        except Exception as e:
+            print(f"run_async: {e}")
+            raise
+
+    def run(
+            self,
+            query: str,
+            context: list[ContextMessage | dict] | None,
+            **kwargs
+    ) -> list[OpenAIMessage | dict]:
+        filepath: str | None = kwargs.get("filepath", None)
+        tmp_directory = kwargs.get("tmp_directory", "../")
+        if filepath is None or os.path.exists(filepath) is False:
+            raise Exception("File does not exist")
+        if os.path.exists(tmp_directory) is False:
+            raise Exception("Temporary directory does not exist")
+        templated_prompt = f"SYSTEM={self.system_prompt}\nQUERY={query}"
+        try:
+            output = []
+            for chunk_path in self.to_chunks(input_file=filepath, tmp_directory=tmp_directory):
+                with open(chunk_path, "rb") as f:
+                    audio_data = f.read()
+                    buffer = io.BytesIO(audio_data)
+                    buffer.name = filepath
+                    buffer.seek(0)
+                client = openai.OpenAI(api_key=os.environ["OPENAI_API_KEY"])
+                transcript = client.audio.transcriptions.create(
                     file=buffer, model=self.model_name, response_format='text',
                     temperature=self.config.temperature, prompt=templated_prompt
                 )

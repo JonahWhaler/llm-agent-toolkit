@@ -45,3 +45,12 @@ class Core(ABC):
             **kwargs
     ) -> list[OpenAIMessage | dict]:
         raise NotImplementedError
+
+    @abstractmethod
+    def run(
+            self,
+            query: str,
+            context: list[ContextMessage | dict] | None,
+            **kwargs
+    ) -> list[OpenAIMessage | dict]:
+        raise NotImplementedError
