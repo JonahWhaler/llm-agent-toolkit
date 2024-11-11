@@ -28,6 +28,10 @@ class I2T_OAI_Core(Core):
             context: list[ContextMessage | dict] | None,
             **kwargs
     ) -> list[OpenAIMessage | dict]:
+        filepath: str | None = kwargs.get("filepath", None)
+        if filepath is None:
+            raise ValueError("filepath is None")
+
         msgs = [{"role": OpenAIRole.SYSTEM.value, "content": self.system_prompt}]
         if context is not None:
             for ctx in context:
@@ -35,19 +39,18 @@ class I2T_OAI_Core(Core):
                     msgs.append(ctx.__dict__())
                 else:
                     msgs.append(ctx)
-        filepath = kwargs.get("filepath", None)
-        if filepath is not None:
-            img_url = self.get_image_url(filepath)
-            msgs.append(
-                {"role": OpenAIRole.USER.value, "content": [
-                    {
-                        "type": "image_url",
-                        "image_url": {
-                            "url": img_url
-                        }
+
+        img_url = self.get_image_url(filepath)
+        msgs.append(
+            {"role": OpenAIRole.USER.value, "content": [
+                {
+                    "type": "image_url",
+                    "image_url": {
+                        "url": img_url
                     }
-                ]}
-            )
+                }
+            ]}
+        )
         msgs.append({"role": OpenAIRole.USER.value, "content": query})
         try:
             client = openai.AsyncOpenAI(api_key=os.environ["OPENAI_API_KEY"])
