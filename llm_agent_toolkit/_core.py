@@ -1,8 +1,9 @@
 from abc import abstractmethod, ABC
-import openai
-import os
+
 from ._util import (
-    ChatCompletionConfig, ImageGenerationConfig, OpenAIMessage, OpenAIFunction,
+    ChatCompletionConfig,
+    ImageGenerationConfig,
+    OpenAIMessage,
     ContextMessage
 )
 
