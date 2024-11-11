@@ -1,3 +1,3 @@
-import open_ai
+from . import open_ai
 
 __all__ = ["open_ai"]

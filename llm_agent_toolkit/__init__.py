@@ -5,8 +5,7 @@ from ._util import (
     OpenAIRole, OpenAIMessage, OpenAIFunction, ContextMessage,
     AudioHelper
 )
-import core
-import tool
+from . import core, tool
 
 __all__ = [
     "Core", "ChatCompletionConfig", "ImageGenerationConfig",
