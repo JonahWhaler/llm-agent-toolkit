@@ -67,7 +67,7 @@ class I2T_OAI_Core(Core):
             for choice in choices:
                 oam = OpenAIMessage(
                     role=OpenAIRole(choice.message.role),
-                    content=choice.message.content,
+                    content=choice.message.content.strip(),
                 )
                 if choice.message.tool_calls:
                     oam.functions = []
@@ -130,7 +130,7 @@ class I2T_OAI_Core(Core):
             for choice in choices:
                 oam = OpenAIMessage(
                     role=OpenAIRole(choice.message.role),
-                    content=choice.message.content,
+                    content=choice.message.content.strip(),
                 )
                 if choice.message.tool_calls:
                     oam.functions = []

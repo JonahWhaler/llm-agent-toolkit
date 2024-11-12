@@ -51,7 +51,7 @@ class A2T_OAI_Core(Core):
                     temperature=self.config.temperature, prompt=templated_prompt
                 )
                 output.append(
-                    OpenAIMessage(role=OpenAIRole.ASSISTANT, content=transcript)
+                    OpenAIMessage(role=OpenAIRole.ASSISTANT, content=transcript.strip())
                 )
 
             return output
@@ -86,7 +86,7 @@ class A2T_OAI_Core(Core):
                     temperature=self.config.temperature, prompt=templated_prompt
                 )
                 output.append(
-                    OpenAIMessage(role=OpenAIRole.ASSISTANT, content=transcript)
+                    OpenAIMessage(role=OpenAIRole.ASSISTANT, content=transcript.strip())
                 )
 
             return output
