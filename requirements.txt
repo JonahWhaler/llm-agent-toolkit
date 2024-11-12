@@ -11,3 +11,6 @@ aiohttp==3.10.10
 # Audio
 pydub==0.25.1
 ffmpeg-python==0.2.0
+# PDF
+pdfplumber==0.11.4
+PyMuPDF==1.24.11
