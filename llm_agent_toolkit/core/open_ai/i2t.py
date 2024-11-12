@@ -1,4 +1,4 @@
-from llm_agent_toolkit._core import Core
+from llm_agent_toolkit._core import I2T_Core
 from llm_agent_toolkit._util import (
     OpenAIRole, OpenAIMessage, OpenAIFunction, ContextMessage, ChatCompletionConfig,
 )
@@ -7,12 +7,12 @@ import openai
 import base64
 
 
-class I2T_OAI_Core(Core):
+class I2T_OAI_Core(I2T_Core):
     """
     **Notes:**
     - Supported image format: png, jpeg, gif, webp
     """
-    SUPPORTED_IMAGE_FORMATS = ["png", "jpeg", "gif", "webp"]
+    SUPPORTED_IMAGE_FORMATS = ("png", "jpeg", "gif", "webp")
 
     def __init__(
             self, system_prompt: str, model_name: str, config: ChatCompletionConfig = ChatCompletionConfig(),

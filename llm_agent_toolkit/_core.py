@@ -55,3 +55,37 @@ class Core(ABC):
             **kwargs
     ) -> list[OpenAIMessage | dict]:
         raise NotImplementedError
+
+
+class I2T_Core(ABC, Core):
+
+    @staticmethod
+    @abstractmethod
+    def get_image_url(filepath: str) -> str:
+        raise NotImplementedError
+
+    @abstractmethod
+    async def run_async(
+            self,
+            query: str,
+            context: list[ContextMessage | dict] | None,
+            **kwargs
+    ) -> list[OpenAIMessage | dict]:
+        raise NotImplementedError
+
+    @abstractmethod
+    def run(
+            self,
+            query: str,
+            context: list[ContextMessage | dict] | None,
+            **kwargs
+    ) -> list[OpenAIMessage | dict]:
+        raise NotImplementedError
+
+
+class A2T_Core(ABC, Core):
+
+    @staticmethod
+    @abstractmethod
+    def to_chunks(input_path: str, tmp_directory: str, config: dict) -> str:
+        raise NotImplementedError
