@@ -4,18 +4,18 @@ from ._util import (
     ChatCompletionConfig,
     ImageGenerationConfig,
     OpenAIMessage,
-    ContextMessage
+    ContextMessage,
 )
 
 
 class Core(ABC):
     # TODO: Allow structured profile
     def __init__(
-            self,
-            system_prompt: str,
-            model_name: str,
-            config: ChatCompletionConfig | ImageGenerationConfig = ChatCompletionConfig(),
-            tools: list | None = None
+        self,
+        system_prompt: str,
+        model_name: str,
+        config: ChatCompletionConfig | ImageGenerationConfig = ChatCompletionConfig(),
+        tools: list | None = None,
     ):
         self.__system_prompt = system_prompt
         self.__model_name = model_name
@@ -40,24 +40,33 @@ class Core(ABC):
 
     @abstractmethod
     async def run_async(
-            self,
-            query: str,
-            context: list[ContextMessage | dict] | None,
-            **kwargs
+        self, query: str, context: list[ContextMessage | dict] | None, **kwargs
     ) -> list[OpenAIMessage | dict]:
         raise NotImplementedError
 
     @abstractmethod
     def run(
-            self,
-            query: str,
-            context: list[ContextMessage | dict] | None,
-            **kwargs
+        self, query: str, context: list[ContextMessage | dict] | None, **kwargs
     ) -> list[OpenAIMessage | dict]:
         raise NotImplementedError
 
 
-class I2T_Core(ABC, Core):
+class I2T_Core(Core, ABC):
+
+    def __init__(
+        self,
+        system_prompt: str,
+        model_name: str,
+        config: ChatCompletionConfig = ChatCompletionConfig(),
+        tools: list | None = None,
+    ):
+        Core.__init__(
+            self,
+            system_prompt=system_prompt,
+            model_name=model_name,
+            config=config,
+            tools=tools,
+        )
 
     @staticmethod
     @abstractmethod
@@ -66,26 +75,47 @@ class I2T_Core(ABC, Core):
 
     @abstractmethod
     async def run_async(
-            self,
-            query: str,
-            context: list[ContextMessage | dict] | None,
-            **kwargs
+        self, query: str, context: list[ContextMessage | dict] | None, **kwargs
     ) -> list[OpenAIMessage | dict]:
         raise NotImplementedError
 
     @abstractmethod
     def run(
-            self,
-            query: str,
-            context: list[ContextMessage | dict] | None,
-            **kwargs
+        self, query: str, context: list[ContextMessage | dict] | None, **kwargs
     ) -> list[OpenAIMessage | dict]:
         raise NotImplementedError
 
 
-class A2T_Core(ABC, Core):
+class A2T_Core(Core, ABC):
+
+    def __init__(
+        self,
+        system_prompt: str,
+        model_name: str,
+        config: ChatCompletionConfig = ChatCompletionConfig(),
+        tools: list | None = None,
+    ):
+        Core.__init__(
+            self,
+            system_prompt=system_prompt,
+            model_name=model_name,
+            config=config,
+            tools=tools,
+        )
 
     @staticmethod
     @abstractmethod
     def to_chunks(input_path: str, tmp_directory: str, config: dict) -> str:
+        raise NotImplementedError
+    
+    @abstractmethod
+    async def run_async(
+        self, query: str, context: list[ContextMessage | dict] | None, **kwargs
+    ) -> list[OpenAIMessage | dict]:
+        raise NotImplementedError
+
+    @abstractmethod
+    def run(
+        self, query: str, context: list[ContextMessage | dict] | None, **kwargs
+    ) -> list[OpenAIMessage | dict]:
         raise NotImplementedError
