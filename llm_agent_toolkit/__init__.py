@@ -5,12 +5,12 @@ from ._util import (
     OpenAIRole, OpenAIMessage, OpenAIFunction, ContextMessage,
     AudioHelper
 )
-from . import core, tool
+from . import core, tool, loader
 
 __all__ = [
     "Core", "ChatCompletionConfig", "ImageGenerationConfig",
     "BaseTool", "ToolOutput", "ToolOutputItem", "ToolError",
     "OpenAIRole", "OpenAIMessage", "OpenAIFunction", "ContextMessage",
     "AudioHelper", 
-    "core", "tool"
+    "core", "tool", "loader"
 ]
