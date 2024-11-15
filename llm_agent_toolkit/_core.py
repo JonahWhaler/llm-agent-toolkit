@@ -12,6 +12,7 @@ from ._util import (
     OpenAIMessage,
     ContextMessage,
 )
+from ._tool import Tool
 
 
 class Core(ABC):
@@ -33,7 +34,7 @@ class Core(ABC):
         system_prompt: str,
         model_name: str,
         config: ChatCompletionConfig | ImageGenerationConfig = ChatCompletionConfig(),
-        tools: list | None = None,
+        tools: list[Tool] | None = None,
     ):
         self.__system_prompt = system_prompt
         self.__model_name = model_name
@@ -41,18 +42,22 @@ class Core(ABC):
         self.__tools = tools
 
     @property
+    def system_prompt(self) -> str:
         """Return the system prompt for the LLM model."""
         return self.__system_prompt
 
     @property
+    def model_name(self) -> str:
         """Return the name of the LLM model."""
         return self.__model_name
 
     @property
+    def config(self) -> ChatCompletionConfig | ImageGenerationConfig:
         """Return the configuration for the LLM model."""
         return self.__config
 
     @property
+    def tools(self) -> list[Tool] | None:
         """Return the tools available for the LLM model."""
         return self.__tools
 
