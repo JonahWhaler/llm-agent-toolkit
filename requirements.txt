@@ -2,6 +2,8 @@ python-dotenv==0.21.0
 # AI
 openai==1.51.2
 tiktoken==0.8.0
+torch==2.5.1
+transformers==4.46.2
 # Vector DB
 chromadb==0.5.11
 # Agent-Specific
@@ -10,9 +12,14 @@ beautifulsoup4==4.12.2
 aiohttp==3.10.10
 # Audio
 pydub==0.25.1
+pydub-stubs==0.25.1.4
 ffmpeg-python==0.2.0
 # PDF
 pdfplumber==0.11.4
 PyMuPDF==1.24.11
 # Microsoft Word - Docx
 python-docx==1.1.2
+
+# chromadb failed to installed: https://stackoverflow.com/a/77578119/13928599
+# error: Microsoft Visual C++ 14.0 or greater is required. 
+# Get it with "Microsoft C++ Build Tools": https://visualstudio.microsoft.com/visual-cpp-build-tools/
