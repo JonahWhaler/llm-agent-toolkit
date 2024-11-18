@@ -222,9 +222,7 @@ class Tool(ABC):
             inconsistent_fields = set(mandatory_fields) - fields
             if len(inconsistent_fields) > 0:
                 raise ValueError(
-                    "Inconsistent mandatory fields: {}".format(
-                        ", ".join(inconsistent_fields)
-                    )
+                    f"Inconsistent mandatory fields: {', '.join(inconsistent_fields)}"
                 )
 
     def validate_mandatory_fields(self, user_fields: list[str]):
@@ -249,9 +247,7 @@ class Tool(ABC):
             for idx, cond in enumerate(tracker):
                 if not cond:
                     missing_fields.append(mandatory_fields[idx])
-            return False, "Missing mandatory fields: {}".format(
-                ", ".join(missing_fields)
-            )
+            return False, f"Missing mandatory fields: {', '.join(missing_fields)}"
 
         return True, None
 
@@ -288,7 +284,7 @@ class Tool(ABC):
         expected_fields = set(p.name for p in self.__func_info.input_schema.properties)
         unexpected_fields = set(user_fields) - expected_fields
         if len(unexpected_fields) > 0:
-            return False, "Unexpected fields: {}".format(", ".join(unexpected_fields))
+            return False, f"Unexpected fields: {', '.join(unexpected_fields)}"
 
         # Validate Values
         user_values = list(params.values())
@@ -300,100 +296,83 @@ class Tool(ABC):
             # Type Checking is essential to ensure the subsequent validation steps are conducted on the correct type
             if _property.type == FunctionPropertyType.STRING:
                 if isinstance(value, str) is False:
-                    return False, "Invalid type for {}, expected string, got {}".format(
-                        name, type(value)
+                    return (
+                        False,
+                        f"Invalid type for {name}, expected string, got {type(value)}",
                     )
                 if _property.constraint is not None:
                     if _property.constraint.minLength is not None:
                         if _property.constraint.minLength > len(value):
                             return (
                                 False,
-                                "Invalid length for {}, expected at least {}, got {}".format(
-                                    name, _property.constraint.minLength, len(value)
-                                ),
+                                f"Invalid length for {name}, expected at least {_property.constraint.minLength}, got {len(value)}",
                             )
                     if _property.constraint.maxLength is not None:
                         if _property.constraint.maxLength < len(value):
                             return (
                                 False,
-                                "Invalid length for {}, expected at most {}, got {}".format(
-                                    name, _property.constraint.maxLength, len(value)
-                                ),
+                                f"Invalid length for {name}, expected at most {_property.constraint.maxLength}, got {len(value)}",
                             )
                     if _property.constraint.enum is not None:
                         if value not in _property.constraint.enum:
                             return (
                                 False,
-                                "Invalid value for {}, expected one of {}, got {}".format(
-                                    name, _property.constraint.enum, value
-                                ),
+                                f"Invalid value for {name}, expected one of {_property.constraint.enum}, got {value}",
                             )
             elif _property.type == FunctionPropertyType.NUMBER:
                 if isinstance(value, (int, float)) is False:
-                    return False, "Invalid type for {}, expected number, got {}".format(
-                        name, type(value)
+                    return (
+                        False,
+                        f"Invalid type for {name}, expected number, got {type(value)}",
                     )
                 if _property.constraint is not None:
                     if _property.constraint.minimum is not None:
                         if _property.constraint.minimum > value:
                             return (
                                 False,
-                                "Invalid value for {}, expected at least {}, got {}".format(
-                                    name, _property.constraint.minimum, value
-                                ),
+                                f"Invalid value for {name}, expected at least {_property.constraint.minimum}, got {value}",
                             )
                     if _property.constraint.maximum is not None:
                         if _property.constraint.maximum < value:
                             return (
                                 False,
-                                "Invalid value for {}, expected at most {}, got {}".format(
-                                    name, _property.constraint.maximum, value
-                                ),
+                                f"Invalid value for {name}, expected at most {_property.constraint.maximum}, got {value}",
                             )
                     if _property.constraint.exclusiveMinimum is not None:
                         if _property.constraint.exclusiveMinimum >= value:
                             return (
                                 False,
-                                "Invalid value for {}, expected exclusive minimum {}, got {}".format(
-                                    name, _property.constraint.exclusiveMinimum, value
-                                ),
+                                f"Invalid value for {name}, expected exclusive minimum {_property.constraint.exclusiveMinimum}, got {value}",
                             )
                     if _property.constraint.exclusiveMaximum is not None:
                         if _property.constraint.exclusiveMaximum <= value:
                             return (
                                 False,
-                                "Invalid value for {}, expected exclusive maximum {}, got {}".format(
-                                    name, _property.constraint.exclusiveMaximum, value
-                                ),
+                                f"Invalid value for {name}, expected exclusive maximum {_property.constraint.exclusiveMaximum}, got {value}",
                             )
                     if _property.constraint.multipleOf is not None:
                         tmp = value % _property.constraint.multipleOf
                         if tmp != 0:
                             return (
                                 False,
-                                "Invalid value for {}, expected multiple of {}, got {}".format(
-                                    name, _property.constraint.multipleOf, value
-                                ),
+                                f"Invalid value for {name}, expected multiple of {_property.constraint.multipleOf}, got {value}",
                             )
             elif _property.type == FunctionPropertyType.BOOLEAN:
                 if isinstance(value, bool) is False:
                     return (
                         False,
-                        "Invalid type for {}, expected boolean, got {}".format(
-                            name, type(value)
-                        ),
+                        f"Invalid type for {name}, expected boolean, got {type(value)}",
                     )
             elif _property.type == FunctionPropertyType.OBJECT:
                 if isinstance(value, dict) is False:
-                    return False, "Invalid type for {}, expected object, got {}".format(
-                        name, type(value)
+                    return (
+                        False,
+                        f"Invalid type for {name}, expected object, got {type(value)}",
                     )
             else:
                 return (
                     False,
-                    "Invalid type for {}, expected one of [string, number, boolean, object], got {}".format(
-                        name, _property.type
-                    ),
+                    f"Invalid type for {name}, expected one of [string, number, boolean, object], got {_property.type}",
                 )
         return True, None
 
