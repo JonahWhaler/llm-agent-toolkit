@@ -10,6 +10,7 @@ class FunctionPropertyType(Enum):
     NUMBER = "number"
     BOOLEAN = "boolean"
     OBJECT = "object"
+    FUNCTION = "function"
 
 
 class FunctionPropertyDict(TypedDict, total=False):
@@ -47,7 +48,9 @@ class ToolMetadata(TypedDict):
 
 @dataclass
 class FunctionParameterConstraint:
-    """"""
+    """
+    List of constraints for a function parameter.
+    """
 
     maxLength: Optional[int] = None
     minLength: Optional[int] = None
@@ -91,43 +94,53 @@ class FunctionProperty:
     description: str
     constraint: FunctionParameterConstraint | None = None
 
-    def __dict__(self):
-        d = dict()
-        d["name"] = self.name
-        d["type"] = self.type.value
-        d["description"] = self.description
+    def to_dict(self) -> dict[str, Union[str, int, float, bool, list]]:
+        d: dict[str, Union[str, int, float, bool, list]] = {
+            # "name": self.name,
+            "type": self.type.value,
+            "description": self.description,
+        }
         if self.constraint is not None:
-            for k, v in self.constraint.__dict__().items():
-                d[k] = v
+            d = {**d, **self.constraint.to_dict()}
+
         return d
 
 
 @dataclass
-class FunctionSchema:
+class FunctionParameters:
     properties: list[FunctionProperty]
     type: str = "object"
     required: list[str] | None = None
 
-    def __dict__(self):
-        d = dict()
-        d["properties"] = [p.__dict__() for p in self.properties]
-        if self.type is not None:
-            d["type"] = self.type
+    def to_dict(self) -> dict:
+        properties = {}
+        for p in self.properties:
+            properties[p.name] = p.to_dict()
         if self.required is not None:
-            d["required"] = self.required
-        return d
+            return {
+                "type": "object",
+                "properties": properties,
+                "required": self.required,
+            }
+        return {
+            "type": "object",
+            "properties": properties,
+            "required": [],
+        }
 
 
 @dataclass
 class FunctionInfo:
     name: str
     description: str
-    input_schema: FunctionSchema
+    parameters: FunctionParameters
 
-    def __dict__(self) -> dict[str, Any]:
-        d = dict(name=self.name, description=self.description)
-        d["input_schema"] = self.input_schema.__dict__()
-        return d
+    def to_dict(self) -> FunctionInfoDict:
+        return {
+            "name": self.name,
+            "description": self.description,
+            "parameters": self.parameters.to_dict(),
+        }
 
 
 class Tool(ABC):
@@ -139,8 +152,7 @@ class Tool(ABC):
     provides mechanisms for input validation and execution.
 
     **Attributes:**
-    * info (dict): A dictionary containing metadata about the tool, including its
-                     name, description, and input schema.
+    * info (dict): A dictionary containing metadata about the tool, following the OpenAI format.
 
     * is_coroutine_function (bool): A flag indicating whether the tool is asynchronous or not.
 
@@ -185,21 +197,24 @@ class Tool(ABC):
     @abstractmethod
     def run(self, params: str) -> str:
         raise NotImplementedError
-    
+
     @abstractmethod
     async def run_async(self, params: str) -> str:
         raise NotImplementedError
 
     @property
-    def info(self) -> dict:
-        return self.__func_info.__dict__()
-    
+    def info(self) -> ToolMetadata:
+        return {
+            "type": "function",
+            "function": {**self.__func_info.to_dict()},
+        }
+
     @property
     def is_coroutine_function(self) -> bool:
         return self.__is_coroutine_function
 
     def show_info(self):
-        print(json.dumps(self.__func_info.__dict__(), indent=4))
+        print(json.dumps(self.info, indent=4))
 
     def __post_init(self):
         """
@@ -216,9 +231,9 @@ class Tool(ABC):
         Raises:
             ValueError: If mandatory fields are missing from the function properties.
         """
-        mandatory_fields = self.__func_info.input_schema.required
+        mandatory_fields = self.__func_info.parameters.required
         if mandatory_fields is not None:
-            fields = set(p.name for p in self.__func_info.input_schema.properties)
+            fields = set(p.name for p in self.__func_info.parameters.properties)
             inconsistent_fields = set(mandatory_fields) - fields
             if len(inconsistent_fields) > 0:
                 raise ValueError(
@@ -237,8 +252,11 @@ class Tool(ABC):
             * (bool): True if all mandatory fields are present, False otherwise.
             * (Optional[str]): Error message if validation fails, else None.
         """
-        mandatory_fields = self.__func_info.input_schema.required
-        tracker = list()
+        mandatory_fields = self.__func_info.parameters.required
+        if mandatory_fields is None:
+            return True, None
+
+        tracker = []
         for mandatory_field in mandatory_fields:
             tracker.append(mandatory_field in user_fields)
 
@@ -281,14 +299,14 @@ class Tool(ABC):
             return False, error_msg
 
         # Detect Unexpected fields
-        expected_fields = set(p.name for p in self.__func_info.input_schema.properties)
+        expected_fields = set(p.name for p in self.__func_info.parameters.properties)
         unexpected_fields = set(user_fields) - expected_fields
         if len(unexpected_fields) > 0:
             return False, f"Unexpected fields: {', '.join(unexpected_fields)}"
 
         # Validate Values
         user_values = list(params.values())
-        properties = self.__func_info.input_schema.properties
+        properties = self.__func_info.parameters.properties
         for name, value in zip(user_fields, user_values):
             p_index = [idx for idx, p in enumerate(properties) if p.name == name][0]
             _property = properties[p_index]
