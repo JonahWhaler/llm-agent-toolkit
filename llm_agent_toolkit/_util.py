@@ -79,6 +79,53 @@ class ImageGenerationConfig(ModelConfig):
         return values
 
 
+class TranscriptionConfig(ModelConfig):
+    temperature: float = 0.7
+    response_format: str = "text"
+    timestamp_granularities: list[str] = []
+
+    @field_validator("temperature")
+    def temperature_must_be_between_0_and_2(cls, v):  # pylint: disable=no-self-argument
+        if v < 0 or v > 2:
+            raise ValueError("temperature must be between 0 and 2")
+        return v
+
+    @field_validator("response_format")
+    def response_format_must_be_valid(cls, value):  # pylint: disable=no-self-argument
+        new_value = value.strip()
+        if not new_value:
+            raise ValidationError("Expect response_format to be a non-empty string")
+        if new_value not in ["text", "verbose_json"]:
+            raise ValueError("response_format must be one of text, verbose_json")
+        return new_value
+
+    @field_validator("model_name")
+    def model_name_must_be_valid(cls, value):  # pylint: disable=no-self-argument
+        new_value = value.strip()
+        if not new_value:
+            raise ValidationError("Expect model_name to be a non-empty string")
+        if new_value not in ["whisper-1"]:
+            raise ValueError("model_name must be one of whisper-1")
+        return new_value
+
+    @model_validator(mode="after")
+    def timestamp_granularities_must_be_valid(
+        cls, values
+    ):  # pylint: disable=no-self-argument
+        if values.response_format == "text":
+            return values
+        if len(values.timestamp_granularities) == 0:
+            raise ValueError(
+                "timestamp_granularities must be specified when response_format is verbose_json"
+            )
+        for granularity in values.timestamp_granularities:
+            if granularity not in ["segment", "word"]:
+                raise ValueError(
+                    "timestamp_granularities must be segment or word or both."
+                )
+        return values
+
+
 class CreatorRole(str, Enum):
     SYSTEM = "system"
     USER = "user"
