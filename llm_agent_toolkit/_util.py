@@ -1,129 +1,85 @@
-import os
-import openai
-from dataclasses import dataclass
 from enum import Enum
+from pydantic import BaseModel, field_validator, ValidationError, model_validator
 
 
-class EmbeddingModel:
-    def __init__(
-            self, embedding_model: str = "text-embedding-3-small",
-    ):
-        self.__embedding_model = embedding_model
+class ModelConfig(BaseModel):
+    model_name: str
+    return_n: int = 1
+    max_iteration: int = 10
 
-    def text_to_embedding(self, text: str):
-        try:
-            client = openai.OpenAI(api_key=os.environ["OPENAI_API_KEY"])
-            response = client.embeddings.create(
-                input=text, model=self.__embedding_model)
-            return response.data[0].embedding
-        except Exception as e:
-            print(f"text_to_embedding: {e}")
-            raise
+    @field_validator("model_name")
+    def model_name_must_be_valid(cls, value):  # pylint: disable=no-self-argument
+        new_value = value.strip()
+        if not new_value:
+            raise ValidationError("Expect model_name to be a non-empty string")
+        return new_value
+
+    @field_validator("return_n")
+    def return_n_must_be_positive(cls, v):  # pylint: disable=no-self-argument
+        if v <= 0:
+            raise ValueError("return_n must be positive")
+        return v
+
+    @field_validator("max_iteration")
+    def max_iteration_must_be_positive(cls, v):  # pylint: disable=no-self-argument
+        if v <= 0:
+            raise ValueError("max_iteration must be positive")
+        return v
 
 
-@dataclass
-class ChatCompletionConfig:
+class ChatCompletionConfig(ModelConfig):
     max_tokens: int = 4096
     temperature: float = 0.7
-    n: int = 1
+
+    @field_validator("max_tokens")
+    def max_tokens_must_be_positive(cls, v):  # pylint: disable=no-self-argument
+        if v <= 0:
+            raise ValueError("max_tokens must be positive")
+        return v
+
+    @field_validator("temperature")
+    def temperature_must_be_between_0_and_2(cls, v):  # pylint: disable=no-self-argument
+        if v < 0 or v > 2:
+            raise ValueError("temperature must be between 0 and 2")
+        return v
 
 
-@dataclass
-class ImageGenerationConfig:
+class ImageGenerationConfig(ModelConfig):
     size: str = "1024x1024"
-    n: int = 1
+    quality: str = "standard"
     response_format: str = "b64_json"
 
+    @field_validator("quality")
+    def quality_must_be_valid(cls, value):  # pylint: disable=no-self-argument
+        new_value = value.strip()
+        if not new_value:
+            raise ValidationError("Expect quality to be a non-empty string")
+        if new_value not in ["standard", "hd"]:
+            raise ValueError("quality must be one of standard, hd")
+        return new_value
 
-class OpenAIRole(Enum):
+    @field_validator("response_format")
+    def response_format_must_be_valid(cls, value):  # pylint: disable=no-self-argument
+        new_value = value.strip()
+        if not new_value:
+            raise ValidationError("Expect response_format to be a non-empty string")
+        if new_value not in ["url", "b64_json"]:
+            raise ValueError("response_format must be one of url, b64_json")
+        return new_value
+
+    @model_validator(mode="after")
+    def size_must_be_valid(cls, values):  # pylint: disable=no-self-argument
+        if values.model_name == "dall-e-2":
+            if values.size not in ["1024x1024", "512x512", "256x256"]:
+                raise ValueError("size must be one of 1024x1024, 512x512, 256x256")
+        if values.model_name == "dall-e-3":
+            if values.size not in ["1024x1024", "1792x1024", "1024x1792"]:
+                raise ValueError("size must be one of 1024x1024, 1792x1024, 1024x1792")
+        return values
+
+
+class CreatorRole(str, Enum):
     SYSTEM = "system"
     USER = "user"
     ASSISTANT = "assistant"
     FUNCTION = "function"
-
-
-@dataclass
-class OpenAIFunction:
-    call_id: str
-    function_name: str
-    args: str
-
-    def __dict__(self):
-        return {
-            "call_id": self.call_id,
-            "function_name": self.function_name,
-            "args": self.args
-        }
-
-
-@dataclass
-class OpenAIMessage:
-    role: OpenAIRole
-    content: str
-    functions: list[OpenAIFunction] | None = None
-
-    def __dict__(self):
-        if self.role == OpenAIRole.FUNCTION:
-            return {
-                "role": self.role.value,
-                "content": self.content,
-                "functions": [
-                    f.__dict__() for f in self.functions
-                ]
-            }
-        return {
-            "role": self.role.value,
-            "content": self.content
-        }
-
-
-@dataclass
-class ContextMessage:
-    role: OpenAIRole
-    content: str
-    name: str | None = None
-
-    def __dict__(self):
-        if self.role == OpenAIRole.FUNCTION:
-            return {
-                "role": self.role.value,
-                "content": self.content,
-                "name": self.name
-            }
-        return {
-            "role": self.role.value,
-            "content": self.content
-        }
-
-
-class AudioHelper:
-    import io
-
-    @classmethod
-    def convert_to_ogg_if_necessary(
-            cls, filepath: str, buffer_name: str, mimetype: str, output_path: str | None = None
-    ) -> io.BytesIO:
-        import io
-        from pydub import AudioSegment
-
-        ext = mimetype.split('/')[1]
-
-        with open(filepath, "rb") as reader:
-            audio_data = reader.read()
-            buffer = io.BytesIO(audio_data)
-            if ext not in ["ogg", "oga"]:
-                audio = AudioSegment.from_file(buffer)
-                ogg_stream = io.BytesIO()
-                audio.export(ogg_stream, format="ogg")
-
-                ogg_stream.seek(0)
-                buffer = ogg_stream.getvalue()
-                buffer = io.BytesIO(buffer)
-
-            buffer.name = f"{buffer_name}.ogg"
-            buffer.seek(0)
-
-            if output_path is not None:
-                with open(output_path, 'wb') as writer:
-                    writer.write(buffer.getvalue())
-            return buffer
