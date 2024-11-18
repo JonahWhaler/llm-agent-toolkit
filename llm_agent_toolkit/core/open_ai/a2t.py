@@ -1,15 +1,18 @@
-from llm_agent_toolkit._core import Core
-from llm_agent_toolkit._util import (
-    OpenAIRole, OpenAIMessage, ContextMessage, ChatCompletionConfig,
-)
 import os
-import openai
 import io
-import ffmpeg   # https://pypi.org/project/ffmpeg-python/
 import math
+import openai
+import ffmpeg  # https://pypi.org/project/ffmpeg-python/
+
+from ..._core import A2T_Core
+from ..._util import (
+    CreatorRole,
+    TranscriptionConfig,
+    MessageBlock,
+)
 
 
-class A2T_OAI_Core(Core):
+class A2T_OAI_Core(A2T_Core):
     """
     Notes:
     - Only accept audio file in OGG format!!!
@@ -17,95 +20,100 @@ class A2T_OAI_Core(Core):
     """
 
     def __init__(
-            self, system_prompt: str, model_name: str, config: ChatCompletionConfig = ChatCompletionConfig(),
-            tools: list | None = None
+        self,
+        system_prompt: str,
+        config: TranscriptionConfig,
+        tools: list | None = None,
     ):
-        super().__init__(
-            system_prompt, model_name, config, tools
-        )
+        super().__init__(system_prompt, config, None)
 
     async def run_async(
-            self,
-            query: str,
-            context: list[ContextMessage | dict] | None,
-            **kwargs
-    ) -> list[OpenAIMessage | dict]:
+        self, query: str, context: list[MessageBlock | dict] | None, **kwargs
+    ) -> list[MessageBlock | dict]:
         filepath: str | None = kwargs.get("filepath", None)
-        tmp_directory = kwargs.get("tmp_directory", "../")
-        if filepath is None or os.path.exists(filepath) is False:
-            raise Exception("File does not exist")
-        if os.path.exists(tmp_directory) is False:
-            raise Exception("Temporary directory does not exist")
-        templated_prompt = f"SYSTEM={self.system_prompt}\nQUERY={query}"
+        tmp_directory = kwargs.get("tmp_directory", None)
+        if filepath is None or tmp_directory is None:
+            raise ValueError("filepath and tmp_directory are required")
         try:
             output = []
-            for chunk_path in self.to_chunks(input_file=filepath, tmp_directory=tmp_directory):
+            chunks = self.to_chunks(input_path=filepath, tmp_directory=tmp_directory)
+            for idx, chunk_path in enumerate(chunks):
                 with open(chunk_path, "rb") as f:
                     audio_data = f.read()
                     buffer = io.BytesIO(audio_data)
                     buffer.name = filepath
                     buffer.seek(0)
                 client = openai.AsyncOpenAI(api_key=os.environ["OPENAI_API_KEY"])
-                transcript = await client.audio.transcriptions.create(
-                    file=buffer, model=self.model_name, response_format='text',
-                    temperature=self.config.temperature, prompt=templated_prompt
+                params = self.config.__dict__
+                params["file"] = buffer
+                params["prompt"] = (
+                    f"SYSTEM={self.system_prompt}\nQUERY={query}\nPage={idx+1}"
                 )
+                for kw in ["model_name", "return_n", "max_iteration"]:
+                    del params[kw]
+                transcript = await client.audio.transcriptions.create(**params)
                 output.append(
-                    OpenAIMessage(role=OpenAIRole.ASSISTANT, content=transcript.strip())
+                    {
+                        "role": CreatorRole.ASSISTANT.value,
+                        "content": f"Page={idx+1}\n{transcript.strip()}",
+                    }
                 )
-
-            return output
+            return [*output]
         except Exception as e:
             print(f"run_async: {e}")
             raise
 
     def run(
-            self,
-            query: str,
-            context: list[ContextMessage | dict] | None,
-            **kwargs
-    ) -> list[OpenAIMessage | dict]:
+        self, query: str, context: list[MessageBlock | dict] | None, **kwargs
+    ) -> list[MessageBlock | dict]:
         filepath: str | None = kwargs.get("filepath", None)
-        tmp_directory = kwargs.get("tmp_directory", "../")
-        if filepath is None or os.path.exists(filepath) is False:
-            raise Exception("File does not exist")
-        if os.path.exists(tmp_directory) is False:
-            raise Exception("Temporary directory does not exist")
-        templated_prompt = f"SYSTEM={self.system_prompt}\nQUERY={query}"
+        tmp_directory = kwargs.get("tmp_directory", None)
+        if filepath is None or tmp_directory is None:
+            raise ValueError("filepath and tmp_directory are required")
         try:
             output = []
-            for chunk_path in self.to_chunks(input_file=filepath, tmp_directory=tmp_directory):
+            chunks = self.to_chunks(input_path=filepath, tmp_directory=tmp_directory)
+            for idx, chunk_path in enumerate(chunks):
                 with open(chunk_path, "rb") as f:
                     audio_data = f.read()
                     buffer = io.BytesIO(audio_data)
                     buffer.name = filepath
                     buffer.seek(0)
                 client = openai.OpenAI(api_key=os.environ["OPENAI_API_KEY"])
-                transcript = client.audio.transcriptions.create(
-                    file=buffer, model=self.model_name, response_format='text',
-                    temperature=self.config.temperature, prompt=templated_prompt
+                params = self.config.__dict__
+                params["file"] = buffer
+                params["prompt"] = (
+                    f"SYSTEM={self.system_prompt}\nQUERY={query}\nPage={idx+1}"
                 )
+                for kw in ["model_name", "return_n", "max_iteration"]:
+                    del params[kw]
+                transcript = client.audio.transcriptions.create(**params)
                 output.append(
-                    OpenAIMessage(role=OpenAIRole.ASSISTANT, content=transcript.strip())
+                    {
+                        "role": CreatorRole.ASSISTANT.value,
+                        "content": f"Page={idx+1}\n{transcript.strip()}",
+                    }
                 )
-
-            return output
+            return [*output]
         except Exception as e:
             print(f"run_async: {e}")
             raise
 
-    @staticmethod
-    def to_chunks(
-            input_file: str, max_size_mb: int = 20,
-            audio_bitrate: str = '128k', tmp_directory: str = "./"):
-        slices = []
+    # @staticmethod
+    def to_chunks(self, input_path: str, tmp_directory: str, **kwargs) -> list[str]:
+        max_size_mb = kwargs.get("max_size_mb", 20)
+        audio_bitrate = kwargs.get("audio_bitrate", "128k")
+
+        slices: list[str] = []
         try:
             # Get input file information
-            probe = ffmpeg.probe(input_file)
-            duration = float(probe['format']['duration'])
+            probe = ffmpeg.probe(input_path)
+            duration = float(probe["format"]["duration"])
 
             # Convert audio_bitrate to bits per second
-            bitrate_bps = int(audio_bitrate[:-1]) * 1024  # Convert 'xxxk' to bits/second
+            bitrate_bps = (
+                int(audio_bitrate[:-1]) * 1024
+            )  # Convert 'xxxk' to bits/second
 
             # Calculate expected output size in bytes
             expected_size_bytes = (bitrate_bps * duration) / 8
@@ -119,16 +127,23 @@ class A2T_OAI_Core(Core):
             # Convert and slice the audio
             for i in range(num_slices):
                 start_time = i * slice_duration
-                output_file = os.path.join(tmp_directory, f'slice{i + 1}.ogg')
+                output_file = os.path.join(tmp_directory, f"slice{i + 1}.ogg")
                 try:
                     # Convert and slice
-                    stream = ffmpeg.input(input_file, ss=start_time, t=slice_duration)
-                    stream = ffmpeg.output(stream, output_file, acodec='libvorbis', audio_bitrate=audio_bitrate)
+                    stream = ffmpeg.input(input_path, ss=start_time, t=slice_duration)
+                    stream = ffmpeg.output(
+                        stream,
+                        output_file,
+                        acodec="libvorbis",
+                        audio_bitrate=audio_bitrate,
+                    )
                     ffmpeg.run(stream, overwrite_output=True)
 
                     # Print information about the exported file
                     output_probe = ffmpeg.probe(output_file)
-                    output_size = int(output_probe['format']['size']) / (1024 * 1024)  # Size in MB
+                    output_size = int(output_probe["format"]["size"]) / (
+                        1024 * 1024
+                    )  # Size in MB
                     print(f"Exported {output_file}")
                     print(f"Size: {output_size:.2f} MB")
 
@@ -150,3 +165,5 @@ class A2T_OAI_Core(Core):
                 print(e.stderr.decode())
             else:
                 print(str(e))
+
+        return slices

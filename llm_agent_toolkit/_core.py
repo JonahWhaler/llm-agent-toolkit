@@ -8,9 +8,10 @@ from abc import abstractmethod, ABC
 
 from ._util import (
     ChatCompletionConfig,
+    ModelConfig,
     ImageGenerationConfig,
-    OpenAIMessage,
-    ContextMessage,
+    MessageBlock,
+    TranscriptionConfig,
 )
 from ._tool import Tool
 
@@ -32,12 +33,10 @@ class Core(ABC):
     def __init__(
         self,
         system_prompt: str,
-        model_name: str,
-        config: ChatCompletionConfig | ImageGenerationConfig = ChatCompletionConfig(),
+        config: ChatCompletionConfig | ImageGenerationConfig | TranscriptionConfig,
         tools: list[Tool] | None = None,
     ):
         self.__system_prompt = system_prompt
-        self.__model_name = model_name
         self.__config = config
         self.__tools = tools
 
@@ -49,10 +48,14 @@ class Core(ABC):
     @property
     def model_name(self) -> str:
         """Return the name of the LLM model."""
-        return self.__model_name
+        return self.__config.model_name
 
     @property
-    def config(self) -> ChatCompletionConfig | ImageGenerationConfig:
+    def config(
+        self,
+    ) -> (
+        ModelConfig | ChatCompletionConfig | ImageGenerationConfig | TranscriptionConfig
+    ):
         """Return the configuration for the LLM model."""
         return self.__config
 
@@ -63,15 +66,15 @@ class Core(ABC):
 
     @abstractmethod
     async def run_async(
-        self, query: str, context: list[ContextMessage | dict] | None, **kwargs
-    ) -> list[OpenAIMessage | dict]:
+        self, query: str, context: list[MessageBlock | dict] | None, **kwargs
+    ) -> list[MessageBlock | dict]:
         """Asynchronously run the LLM model with the given query and context."""
         raise NotImplementedError
 
     @abstractmethod
     def run(
-        self, query: str, context: list[ContextMessage | dict] | None, **kwargs
-    ) -> list[OpenAIMessage | dict]:
+        self, query: str, context: list[MessageBlock | dict] | None, **kwargs
+    ) -> list[MessageBlock | dict]:
         """Synchronously run the LLM model with the given query and context."""
         raise NotImplementedError
 
@@ -92,14 +95,12 @@ class I2T_Core(Core, ABC):
     def __init__(
         self,
         system_prompt: str,
-        model_name: str,
-        config: ChatCompletionConfig = ChatCompletionConfig(),
+        config: ChatCompletionConfig,
         tools: list | None = None,
     ):
         Core.__init__(
             self,
             system_prompt=system_prompt,
-            model_name=model_name,
             config=config,
             tools=tools,
         )
@@ -112,15 +113,15 @@ class I2T_Core(Core, ABC):
 
     @abstractmethod
     async def run_async(
-        self, query: str, context: list[ContextMessage | dict] | None, **kwargs
-    ) -> list[OpenAIMessage | dict]:
+        self, query: str, context: list[MessageBlock | dict] | None, **kwargs
+    ) -> list[MessageBlock | dict]:
         """Asynchronously run the LLM model with the given query and context."""
         raise NotImplementedError
 
     @abstractmethod
     def run(
-        self, query: str, context: list[ContextMessage | dict] | None, **kwargs
-    ) -> list[OpenAIMessage | dict]:
+        self, query: str, context: list[MessageBlock | dict] | None, **kwargs
+    ) -> list[MessageBlock | dict]:
         """Synchronously run the LLM model with the given query and context."""
         raise NotImplementedError
 
@@ -141,34 +142,32 @@ class A2T_Core(Core, ABC):
     def __init__(
         self,
         system_prompt: str,
-        model_name: str,
-        config: ChatCompletionConfig = ChatCompletionConfig(),
+        config: TranscriptionConfig,
         tools: list | None = None,
     ):
         Core.__init__(
             self,
             system_prompt=system_prompt,
-            model_name=model_name,
             config=config,
             tools=tools,
         )
 
-    @staticmethod
+    # @staticmethod
     @abstractmethod
-    def to_chunks(input_path: str, tmp_directory: str, config: dict) -> str:
+    def to_chunks(self, input_path: str, tmp_directory: str, **kwargs) -> list[str]:
         """Split the audio file into multiple chunks."""
         raise NotImplementedError
 
     @abstractmethod
     async def run_async(
-        self, query: str, context: list[ContextMessage | dict] | None, **kwargs
-    ) -> list[OpenAIMessage | dict]:
+        self, query: str, context: list[MessageBlock | dict] | None, **kwargs
+    ) -> list[MessageBlock | dict]:
         """Asynchronously run the LLM model with the given query and context."""
         raise NotImplementedError
 
     @abstractmethod
     def run(
-        self, query: str, context: list[ContextMessage | dict] | None, **kwargs
-    ) -> list[OpenAIMessage | dict]:
+        self, query: str, context: list[MessageBlock | dict] | None, **kwargs
+    ) -> list[MessageBlock | dict]:
         """Synchronously run the LLM model with the given query and context."""
         raise NotImplementedError

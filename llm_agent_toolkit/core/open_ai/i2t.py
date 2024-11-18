@@ -1,10 +1,13 @@
-from llm_agent_toolkit._core import I2T_Core
-from llm_agent_toolkit._util import (
-    OpenAIRole, OpenAIMessage, OpenAIFunction, ContextMessage, ChatCompletionConfig,
-)
 import os
-import openai
+import warnings
 import base64
+import openai
+from ..._core import I2T_Core
+from ..._util import (
+    CreatorRole,
+    ChatCompletionConfig,
+    MessageBlock,
+)
 
 
 class I2T_OAI_Core(I2T_Core):
@@ -12,138 +15,182 @@ class I2T_OAI_Core(I2T_Core):
     **Notes:**
     - Supported image format: png, jpeg, gif, webp
     """
+
     SUPPORTED_IMAGE_FORMATS = ("png", "jpeg", "gif", "webp")
 
     def __init__(
-            self, system_prompt: str, model_name: str, config: ChatCompletionConfig = ChatCompletionConfig(),
-            tools: list | None = None
+        self,
+        system_prompt: str,
+        config: ChatCompletionConfig,
+        tools: list | None = None,
     ):
-        super().__init__(
-            system_prompt, model_name, config, tools
-        )
+        assert isinstance(config, ChatCompletionConfig)
+        super().__init__(system_prompt, config, tools)
 
     async def run_async(
-            self,
-            query: str,
-            context: list[ContextMessage | dict] | None,
-            **kwargs
-    ) -> list[OpenAIMessage | dict]:
-        filepath: str | None = kwargs.get("filepath", None)
-        if filepath is None:
-            raise ValueError("filepath is None")
+        self, query: str, context: list[MessageBlock | dict] | None, **kwargs
+    ) -> list[MessageBlock | dict]:
+        msgs: list[MessageBlock | dict] = [
+            MessageBlock(role=CreatorRole.SYSTEM.value, content=self.system_prompt)
+        ]
 
-        msgs = [{"role": OpenAIRole.SYSTEM.value, "content": self.system_prompt}]
         if context is not None:
             for ctx in context:
-                if isinstance(ctx, OpenAIMessage):
-                    msgs.append(ctx.__dict__())
-                else:
-                    msgs.append(ctx)
+                msgs.append(ctx)
 
-        img_url = self.get_image_url(filepath)
-        msgs.append(
-            {"role": OpenAIRole.USER.value, "content": [
+        filepath: str | None = kwargs.get("filepath", None)
+        if filepath is not None:
+            img_url = self.get_image_url(filepath)
+            msgs.append(
                 {
-                    "type": "image_url",
-                    "image_url": {
-                        "url": img_url
-                    }
+                    "role": CreatorRole.USER.value,
+                    "content": [{"type": "image_url", "image_url": {"url": img_url}}],  # type: ignore
                 }
-            ]}
-        )
-        msgs.append({"role": OpenAIRole.USER.value, "content": query})
+            )
+        msgs.append({"role": CreatorRole.USER.value, "content": query})
+        tools_metadata: list = []
+        if self.tools is not None:
+            for tool in self.tools:
+                tools_metadata.append(tool.info)
+
+        if isinstance(self.config, ChatCompletionConfig):
+            temperature = self.config.temperature
+            max_tokens = self.config.max_tokens
+        else:
+            temperature = 0.7
+            max_tokens = 4096
+        iteration = 0
+        token_count = 0
+        solved = False
+
         try:
             client = openai.AsyncOpenAI(api_key=os.environ["OPENAI_API_KEY"])
-            response = await client.chat.completions.create(
-                model=self.model_name,
-                messages=msgs,
-                max_tokens=self.config.max_tokens,
-                temperature=self.config.temperature,
-                n=self.config.n,
-                functions=self.tools
-            )
-            choices = response.choices
-            output = []
-            for choice in choices:
-                oam = OpenAIMessage(
-                    role=OpenAIRole(choice.message.role),
-                    content=choice.message.content.strip(),
+            while iteration < self.config.max_iteration and token_count < max_tokens:
+                print(f"\n\nIteration: {iteration}")
+                response = await client.chat.completions.create(
+                    model=self.model_name,
+                    messages=msgs,  # type: ignore
+                    max_tokens=max_tokens,
+                    temperature=temperature,
+                    n=self.config.return_n,
+                    functions=tools_metadata,  # type: ignore
                 )
-                if choice.message.tool_calls:
-                    oam.functions = []
-                    for tool_call in choice.message.tool_calls:
-                        oam.functions.append(
-                            OpenAIFunction(
-                                call_id=tool_call.id,
-                                function_name=tool_call.function.name,
-                                args=tool_call.function.arguments
-                            )
-                        )
-                output.append(oam)
-            return output
+                if response.usage:
+                    token_count += response.usage.total_tokens
+                choice = response.choices[0]
+                _content = getattr(choice.message, "content", "Not Available")
+                msgs.append(
+                    {
+                        "role": CreatorRole.ASSISTANT.value,
+                        "content": _content,
+                    }
+                )
+
+                tool_calls = choice.message.tool_calls
+
+                if tool_calls is None:
+                    solved = True
+                    break
+
+                output = await self.__call_tools_async(tool_calls)
+
+                msgs.extend(output)
+                iteration += 1
+
+            if not solved:
+                if iteration == self.config.max_iteration:
+                    warnings.warn(
+                        f"Maximum iteration reached. {iteration}/{self.config.max_iteration}"
+                    )
+                elif token_count >= max_tokens:
+                    warnings.warn(
+                        f"Maximum token count reached. {token_count}/{max_tokens}"
+                    )
+            return msgs
         except Exception as e:
             print(f"run: {e}")
             raise
 
     def run(
-            self,
-            query: str,
-            context: list[ContextMessage | dict] | None,
-            **kwargs
-    ) -> list[OpenAIMessage | dict]:
-        filepath: str | None = kwargs.get("filepath", None)
-        if filepath is None:
-            raise ValueError("filepath is None")
+        self, query: str, context: list[MessageBlock | dict] | None, **kwargs
+    ) -> list[MessageBlock | dict]:
+        msgs: list[MessageBlock | dict] = [
+            MessageBlock(role=CreatorRole.SYSTEM.value, content=self.system_prompt)
+        ]
 
-        msgs = [{"role": OpenAIRole.SYSTEM.value, "content": self.system_prompt}]
         if context is not None:
             for ctx in context:
-                if isinstance(ctx, OpenAIMessage):
-                    msgs.append(ctx.__dict__())
-                else:
-                    msgs.append(ctx)
+                msgs.append(ctx)
 
-        img_url = self.get_image_url(filepath)
-        msgs.append(
-            {"role": OpenAIRole.USER.value, "content": [
+        filepath: str | None = kwargs.get("filepath", None)
+        if filepath is not None:
+            img_url = self.get_image_url(filepath)
+            msgs.append(
                 {
-                    "type": "image_url",
-                    "image_url": {
-                        "url": img_url
-                    }
+                    "role": CreatorRole.USER.value,
+                    "content": [{"type": "image_url", "image_url": {"url": img_url}}],  # type: ignore
                 }
-            ]}
-        )
-        msgs.append({"role": OpenAIRole.USER.value, "content": query})
+            )
+        msgs.append({"role": CreatorRole.USER.value, "content": query})
+        tools_metadata: list = []
+        if self.tools is not None:
+            for tool in self.tools:
+                tools_metadata.append(tool.info)
+
+        if isinstance(self.config, ChatCompletionConfig):
+            temperature = self.config.temperature
+            max_tokens = self.config.max_tokens
+        else:
+            temperature = 0.7
+            max_tokens = 4096
+        iteration = 0
+        token_count = 0
+        solved = False
         try:
             client = openai.OpenAI(api_key=os.environ["OPENAI_API_KEY"])
-            response = client.chat.completions.create(
-                model=self.model_name,
-                messages=msgs,
-                max_tokens=self.config.max_tokens,
-                temperature=self.config.temperature,
-                n=self.config.n,
-                functions=self.tools
-            )
-            choices = response.choices
-            output = []
-            for choice in choices:
-                oam = OpenAIMessage(
-                    role=OpenAIRole(choice.message.role),
-                    content=choice.message.content.strip(),
+            while iteration < self.config.max_iteration and token_count < max_tokens:
+                print(f"\n\nIteration: {iteration}")
+                response = client.chat.completions.create(
+                    model=self.model_name,
+                    messages=msgs,  # type: ignore
+                    max_tokens=max_tokens,
+                    temperature=temperature,
+                    n=self.config.return_n,
+                    tools=tools_metadata,  # type: ignore
                 )
-                if choice.message.tool_calls:
-                    oam.functions = []
-                    for tool_call in choice.message.tool_calls:
-                        oam.functions.append(
-                            OpenAIFunction(
-                                call_id=tool_call.id,
-                                function_name=tool_call.function.name,
-                                args=tool_call.function.arguments
-                            )
-                        )
-                output.append(oam)
-            return output
+                if response.usage:
+                    token_count += response.usage.total_tokens
+                choice = response.choices[0]
+                _content = getattr(choice.message, "content", "Not Available")
+                if _content:
+                    msgs.append(
+                        {
+                            "role": CreatorRole.ASSISTANT.value,
+                            "content": _content,
+                        }
+                    )
+
+                tool_calls = choice.message.tool_calls
+
+                if tool_calls is None:
+                    solved = True
+                    break
+
+                output = self.__call_tools(tool_calls)
+
+                msgs.extend(output)
+                iteration += 1
+
+            if not solved:
+                if iteration == self.config.max_iteration:
+                    warnings.warn(
+                        f"Maximum iteration reached. {iteration}/{self.config.max_iteration}"
+                    )
+                elif token_count >= max_tokens:
+                    warnings.warn(
+                        f"Maximum token count reached. {token_count}/{max_tokens}"
+                    )
+            return msgs
         except Exception as e:
             print(f"run: {e}")
             raise
@@ -153,12 +200,70 @@ class I2T_OAI_Core(I2T_Core):
         ext = filepath.split(".")[-1].lower()
         ext = "jpeg" if ext == "jpg" else ext
         if ext not in I2T_OAI_Core.SUPPORTED_IMAGE_FORMATS:
-            raise Exception(f"Unsupported image type: {ext}")
-        prefix = "data:image/{};base64".format(ext)
+            raise ValueError(f"Unsupported image type: {ext}")
+        prefix = f"data:image/{ext};base64"
         try:
             with open(filepath, "rb") as f:
-                encoded_image = base64.b64encode(f.read()).decode('utf-8')
+                encoded_image = base64.b64encode(f.read()).decode("utf-8")
                 return f"{prefix},{encoded_image}"
         except Exception as e:
             print(f"get_image_url: {e}")
             raise
+
+    async def __call_tools_async(
+        self, selectd_tools: list
+    ) -> list[MessageBlock | dict]:
+        output: list[MessageBlock | dict] = []
+        for tool_call in selectd_tools:
+            for tool in self.tools:  # type: ignore
+                if tool.info["function"]["name"] != tool_call.function.name:
+                    continue
+                args = tool_call.function.arguments
+                try:
+                    result = await tool.run_async(args)
+                    output.append(
+                        {
+                            "role": CreatorRole.FUNCTION.value,
+                            "name": tool_call.function.name,
+                            "content": f"({args}) => {result}",
+                        }
+                    )
+                except Exception as e:
+                    output.append(
+                        {
+                            "role": CreatorRole.FUNCTION.value,
+                            "name": tool_call.function.name,
+                            "content": f"({args}) => {e}",
+                        }
+                    )
+                break
+
+        return output
+
+    def __call_tools(self, selectd_tools: list) -> list[MessageBlock | dict]:
+        output: list[MessageBlock | dict] = []
+        for tool_call in selectd_tools:
+            for tool in self.tools:  # type: ignore
+                if tool.info["function"]["name"] != tool_call.function.name:
+                    continue
+                args = tool_call.function.arguments
+                try:
+                    result = tool.run(args)
+                    output.append(
+                        {
+                            "role": CreatorRole.FUNCTION.value,
+                            "name": tool_call.function.name,
+                            "content": f"({args}) => {result}",
+                        }
+                    )
+                except Exception as e:
+                    output.append(
+                        {
+                            "role": CreatorRole.FUNCTION.value,
+                            "name": tool_call.function.name,
+                            "content": f"({args}) => {e}",
+                        }
+                    )
+                break
+
+        return output
