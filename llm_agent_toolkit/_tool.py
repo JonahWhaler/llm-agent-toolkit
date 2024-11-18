@@ -1,7 +1,7 @@
 from abc import abstractmethod, ABC
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Optional
+from typing import Any, Optional, TypedDict, Union
 import json
 
 
@@ -10,6 +10,39 @@ class FunctionPropertyType(Enum):
     NUMBER = "number"
     BOOLEAN = "boolean"
     OBJECT = "object"
+
+
+class FunctionPropertyDict(TypedDict, total=False):
+    name: str
+    type: str
+    description: str
+    constraint: dict[str, Union[int, float, str, bool, list]]
+
+
+class FunctionParametersDict(TypedDict):
+    type: str
+    properties: list[FunctionPropertyDict]
+    required: list[str]
+
+
+class FunctionInfoDict(TypedDict):
+    """
+    This is expected to aligned with OpenAI's `Function`
+
+    from openai.types.chat.completion_create_params import Function
+
+    Usage:
+        function = Function(**function_info)
+    """
+
+    name: str
+    description: str
+    parameters: dict[str, object]
+
+
+class ToolMetadata(TypedDict):
+    type: str
+    function: dict[str, object]
 
 
 @dataclass
