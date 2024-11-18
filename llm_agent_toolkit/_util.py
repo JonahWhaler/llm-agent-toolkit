@@ -1,4 +1,5 @@
 from enum import Enum
+from typing import TypedDict
 from pydantic import BaseModel, field_validator, ValidationError, model_validator
 
 
@@ -83,3 +84,9 @@ class CreatorRole(str, Enum):
     USER = "user"
     ASSISTANT = "assistant"
     FUNCTION = "function"
+
+
+class MessageBlock(TypedDict, total=False):
+    role: str
+    content: str
+    name: str  # function name when role is `function`
