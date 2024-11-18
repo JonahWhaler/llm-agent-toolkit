@@ -64,35 +64,24 @@ class FunctionParameterConstraint:
     # items: Optional[list[FunctionParameterConstraint]] = None
     enum: Optional[list[Any]] = None
 
-    def __dict__(self):
-        d = dict()
-        if self.minLength is not None:
-            d["minLength"] = self.minLength
-        if self.maxLength is not None:
-            d["maxLength"] = self.maxLength
-        if self.pattern is not None:
-            d["pattern"] = self.pattern
-        if self.format is not None:
-            d["format"] = self.format
-        if self.maximum is not None:
-            d["maximum"] = self.maximum
-        if self.minimum is not None:
-            d["minimum"] = self.minimum
-        if self.exclusiveMaximum is not None:
-            d["exclusiveMaximum"] = self.exclusiveMaximum
-        if self.exclusiveMinimum is not None:
-            d["exclusiveMinimum"] = self.exclusiveMinimum
-        if self.multipleOf is not None:
-            d["multipleOf"] = self.multipleOf
-        if self.minItems is not None:
-            d["minItems"] = self.minItems
-        if self.maxItems is not None:
-            d["maxItems"] = self.maxItems
-        if self.uniqueItems is not None:
-            d["uniqueItems"] = self.uniqueItems
-        if self.enum is not None:
-            d["enum"] = self.enum
-        return d
+    def to_dict(self) -> dict[str, Union[int, float, str, bool, list]]:
+        d = {
+            "minLength": self.minLength,
+            "maxLength": self.maxLength,
+            "pattern": self.pattern,
+            "format": self.format,
+            "maximum": self.maximum,
+            "minimum": self.minimum,
+            "exclusiveMaximum": self.exclusiveMaximum,
+            "exclusiveMinimum": self.exclusiveMinimum,
+            "multipleOf": self.multipleOf,
+            "minItems": self.minItems,
+            "maxItems": self.maxItems,
+            "uniqueItems": self.uniqueItems,
+            "enum": self.enum,
+        }
+        filtered_dict = {k: v for k, v in d.items() if v is not None}
+        return filtered_dict
 
 
 @dataclass
