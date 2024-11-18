@@ -1,13 +1,15 @@
+from typing import Any, Callable, Coroutine, Union
+import json
+import asyncio
+import inspect
+
 from .._tool import (
     FunctionInfo,
     FunctionProperty,
     FunctionPropertyType,
-    FunctionSchema,
+    FunctionParameters,
     Tool,
 )
-from typing import Any, Callable, Coroutine, Union
-import json
-import inspect
 
 
 class LazyTool(Tool):
@@ -33,7 +35,7 @@ class LazyTool(Tool):
         - Enhancing `LazyTool` to parse and utilize docstrings for more comprehensive metadata generation is planned for future work.
 
     **Attributes:**
-    * `__function` (Callable):
+    * `__function` (Callable | Coroutine):
         The Python function that this tool wraps and executes.
 
     * `info` (dict):
@@ -75,7 +77,11 @@ class LazyTool(Tool):
         or unsupported parameter types.
     """
 
-    def __init__(self, function: Union[Callable, Coroutine], is_coroutine_function: bool = False):
+    def __init__(
+        self,
+        function: Union[Callable[..., Any], Coroutine[Any, Any, str]],
+        is_coroutine_function: bool = False,
+    ):
         """
         Initialize the `LazyTool` with a given function.
 
@@ -96,12 +102,14 @@ class LazyTool(Tool):
                 If the function's signature contains inconsistencies or unsupported types.
 
         Notes:
-            This constructor checks if the provided function is a coroutine function as specified by the `is_coroutine_function` flag.
+            - This constructor checks if the provided function is a coroutine function as specified by the `is_coroutine_function` flag.
         """
         assert inspect.iscoroutinefunction(function) == is_coroutine_function
 
         func_info = LazyTool.get_func_info(function)
-        super().__init__(func_info=func_info, is_coroutine_function=is_coroutine_function)
+        super().__init__(
+            func_info=func_info, is_coroutine_function=is_coroutine_function
+        )
         self.__function = function
 
     @classmethod
@@ -145,7 +153,7 @@ class LazyTool(Tool):
             FunctionInfo:
                 An object containing the function's name, description, and input schema.
         """
-        signature = inspect.signature(function)
+        signature = inspect.signature(function)  # type: ignore
         parameters = signature.parameters
         ppt = []
         required = []
@@ -159,12 +167,14 @@ class LazyTool(Tool):
             if param.default == inspect.Parameter.empty:
                 required.append(name)
 
-        input_schema = FunctionSchema(type="object", required=required, properties=ppt)
+        input_schema = FunctionParameters(
+            type="object", required=required, properties=ppt
+        )
         doc = function.__doc__
         return FunctionInfo(
             name=function.__name__,
             description=function.__name__ if doc is None else doc.strip("\n "),
-            input_schema=input_schema,
+            parameters=input_schema,
         )
 
     def run(self, params: str) -> str:
@@ -184,13 +194,18 @@ class LazyTool(Tool):
         Returns:
             str:
                 The result of the function execution or an error message if validation fails.
+
+        Notes:
+            - Pass the wrapped function to `asyncrio.run` if the function is asynchronous.
         """
-        assert not self.is_coroutine_function
+        assert not inspect.iscoroutinefunction(self.__function)
         j_params = json.loads(params)
         valid_input, error_msg = self.validate(**j_params)
-        if not valid_input:
+        if not valid_input and error_msg:
             return error_msg
-        return self.__function(**j_params)
+        if self.is_coroutine_function:
+            return asyncio.run(self.__function(**j_params))  # type: ignore
+        return self.__function(**j_params)  # type: ignore
 
     async def run_async(self, params: str) -> str:
         """
@@ -209,43 +224,15 @@ class LazyTool(Tool):
         Returns:
             str:
                 The result of the function execution or an error message if validation fails.
+
+        Notes:
+            - Does not convert the wrapped function to `asynchronous` execution if the wrapped function is synchronous.
         """
-        assert self.is_coroutine_function
         j_params = json.loads(params)
         valid_input, error_msg = self.validate(**j_params)
-        if not valid_input:
+        if not valid_input and error_msg:
             return error_msg
-        return await self.__function(**j_params)
 
-
-if __name__ == "__main__":
-
-    def play(x: int, y: float = 0.1) -> float:
-        """
-        Multiple two numbers.
-
-        Args:
-            x (int): The first number.
-            y (float): The second number.
-
-        Returns:
-            (float): The product of x and y.
-        """
-        return x * y
-
-    def write(topic: str, config: dict) -> str:
-        return topic + " " + json.dumps(config)
-
-    class Stud:
-        def __init__(self, name, age):
-            self.name = name
-            self.age = age
-
-        def invoke(self, x: int, y: int) -> int:
-            """Multiple two numbers."""
-            print(self.name, self.age)
-            return x * y
-
-    stud = Stud("John", 20)
-    tool = LazyTool(stud.invoke)
-    tool.show_info()
+        if self.is_coroutine_function:
+            return await self.__function(**j_params)  # type: ignore
+        return self.__function(**j_params)  # type: ignore
