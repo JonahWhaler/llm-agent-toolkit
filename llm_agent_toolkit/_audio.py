@@ -1,7 +1,14 @@
 import io
 import os
 from pathlib import Path
+import math
+import subprocess
 from pydub import AudioSegment
+
+# Ignore Skipping analyzing "ffmpeg": module is installed, but missing library stubs or py.typed marker
+# https://pypi.org/project/ffmpeg-python/
+import ffmpeg  # type: ignore
+
 from pydantic import (
     BaseModel,
     FilePath,
@@ -27,6 +34,28 @@ class ConvertAudioInput(BaseModel):
 
 
 class AudioHelper:
+    """
+    A utility class for handling audio processing tasks, including format conversion,
+    validation, and audio chunking.
+
+    Methods:
+        convert_to_ogg_if_necessary(filepath: str, buffer_name: str, output_folder: str) -> str | None:
+            Converts the input audio file to OGG format if it is not already in OGG.
+            Saves the converted file to the specified output folder.
+
+        validate_input(file_path: str, buffer_name: str, output_folder: str) -> None:
+            Validates the provided input parameters to ensure that the file paths and buffer
+            names meet the requirements.
+
+        to_chunks(input_path: str, tmp_directory: str, **kwargs) -> list[str]:
+            Splits a given audio file into smaller chunks with optional overlap for smoother playback.
+            Supports OGG and MP3 output formats.
+
+        generate_chunks(input_path: str, tmp_directory: str, **kwargs):
+            A generator version of the to_chunks method that yields each chunk's path as it is created,
+            allowing more efficient processing for large files.
+
+    """
 
     @classmethod
     def convert_to_ogg_if_necessary(
@@ -88,3 +117,231 @@ class AudioHelper:
             buffer_name=buffer_name,
             output_folder=Path(output_folder),
         )
+
+    @classmethod
+    def to_chunks(cls, input_path: str, tmp_directory: str, **kwargs) -> list[str]:
+        max_size_mb = kwargs.get("max_size_mb", 20)
+        audio_bitrate = kwargs.get(
+            "audio_bitrate", "160k"
+        )  # Higher bitrate for better quality
+        sample_rate = kwargs.get("sample_rate", 48000)  # Maintain original sample rate
+        channels = kwargs.get("channels", 2)  # Stereo output
+        output_format = kwargs.get(
+            "output_format", "ogg"
+        )  # Default to ogg, but allow mp3 as well
+        overlap_duration = kwargs.get(
+            "overlap_duration", 5
+        )  # Overlap duration in seconds
+
+        slices: list[str] = []
+        try:
+            # Get input file information
+            probe = ffmpeg.probe(input_path)
+            duration = float(probe["format"]["duration"])
+
+            # Convert audio_bitrate to bits per second
+            bitrate_bps = (
+                int(audio_bitrate[:-1]) * 1024
+            )  # Convert 'xxxk' to bits/second
+
+            # Calculate expected output size in bytes
+            expected_size_bytes = (bitrate_bps * duration) / 8
+
+            # Calculate the number of slices based on expected output size
+            num_slices = math.ceil(expected_size_bytes / (max_size_mb * 1024 * 1024))
+
+            # Calculate the duration of each slice
+            slice_duration = duration / num_slices
+
+            # Convert and slice the audio
+            for i in range(num_slices):
+                start_time = max(
+                    0, i * slice_duration - (overlap_duration if i > 0 else 0)
+                )
+                actual_duration = slice_duration + (
+                    overlap_duration if i < num_slices - 1 else 0
+                )
+                output_file = os.path.join(
+                    tmp_directory, f"slice{i + 1}.{output_format}"
+                )
+                try:
+                    # Convert and slice
+                    stream = ffmpeg.input(input_path, ss=start_time, t=actual_duration)
+                    stream = ffmpeg.filter(stream, "loudnorm")  # Normalize loudness
+
+                    if output_format == "ogg":
+                        stream = ffmpeg.output(
+                            stream,
+                            output_file,
+                            acodec="libvorbis",  # OGG format using Vorbis codec
+                            audio_bitrate=audio_bitrate,
+                            ar=sample_rate,  # Preserve original sample rate (48000 Hz)
+                            ac=channels,  # Maintain stereo output
+                            compression_level=2,  # Lower compression for better quality
+                        )
+                    elif output_format == "mp3":
+                        stream = ffmpeg.output(
+                            stream,
+                            output_file,
+                            acodec="libmp3lame",  # MP3 format using LAME codec
+                            audio_bitrate=audio_bitrate,
+                            ar=sample_rate,  # Preserve original sample rate (48000 Hz)
+                            ac=channels,  # Maintain stereo output
+                        )
+                    else:
+                        raise ValueError(f"Unsupported output format: {output_format}")
+
+                    ffmpeg.run(stream, overwrite_output=True, quiet=True)
+
+                    # Print information about the exported file
+                    # output_probe = ffmpeg.probe(output_file)
+                    # output_size = int(output_probe["format"]["size"]) / (
+                    #     1024 * 1024
+                    # )  # Size in MB
+                    # print(f"Exported {output_file}")
+                    # print(f"Size: {output_size:.2f} MB")
+
+                    # Print progress
+                    # progress = (i + 1) / num_slices * 100
+                    # print(f"Progress: {progress:.2f}%")
+
+                    slices.append(output_file)
+                except ffmpeg.Error as e:
+                    print(f"Error processing slice {i + 1}:")
+                    if e.stderr is not None:
+                        print(e.stderr.decode())
+                    else:
+                        print(str(e))
+                    raise
+
+            return slices
+        except ffmpeg.Error as e:
+            print("Error during file processing:")
+            if e.stderr is not None:
+                print(e.stderr.decode())
+            else:
+                print(str(e))
+            raise
+
+        return slices
+
+    @classmethod
+    def generate_chunks(cls, input_path: str, tmp_directory: str, **kwargs):
+        """
+        Generator version of the to_chunks method that yields audio chunks one at a time.
+
+        Args:
+            input_path (str): Path to the input audio file.
+            tmp_directory (str): Directory to store the temporary chunks.
+            **kwargs: Additional optional parameters for customization:
+                - max_size_mb (int): Maximum size of each chunk in megabytes.
+                - audio_bitrate (str): Bitrate for the output audio.
+                - sample_rate (int): Sample rate for the output audio.
+                - channels (int): Number of audio channels.
+                - output_format (str): Format for output files ('ogg' or 'mp3').
+                - overlap_duration (int): Duration of overlap between chunks in seconds.
+
+        Yields:
+            str: Path to each generated audio chunk.
+        """
+        max_size_mb = kwargs.get("max_size_mb", 20)
+        audio_bitrate = kwargs.get(
+            "audio_bitrate", "160k"
+        )  # Higher bitrate for better quality
+        sample_rate = kwargs.get("sample_rate", 48000)  # Maintain original sample rate
+        channels = kwargs.get("channels", 2)  # Stereo output
+        output_format = kwargs.get(
+            "output_format", "ogg"
+        )  # Default to ogg, but allow mp3 as well
+        overlap_duration = kwargs.get(
+            "overlap_duration", 5
+        )  # Overlap duration in seconds
+
+        try:
+            # Get input file information
+            probe = ffmpeg.probe(input_path)
+            duration = float(probe["format"]["duration"])
+
+            # Convert audio_bitrate to bits per second
+            bitrate_bps = (
+                int(audio_bitrate[:-1]) * 1024
+            )  # Convert 'xxxk' to bits/second
+
+            # Calculate expected output size in bytes
+            expected_size_bytes = (bitrate_bps * duration) / 8
+
+            # Calculate the number of slices based on expected output size
+            num_slices = math.ceil(expected_size_bytes / (max_size_mb * 1024 * 1024))
+
+            # Calculate the duration of each slice
+            slice_duration = duration / num_slices
+
+            # Convert and slice the audio
+            for i in range(num_slices):
+                start_time = max(
+                    0, i * slice_duration - (overlap_duration if i > 0 else 0)
+                )
+                actual_duration = slice_duration + (
+                    overlap_duration if i < num_slices - 1 else 0
+                )
+                output_file = os.path.join(
+                    tmp_directory, f"slice{i + 1}.{output_format}"
+                )
+                try:
+                    # Convert and slice
+                    stream = ffmpeg.input(input_path, ss=start_time, t=actual_duration)
+                    stream = ffmpeg.filter(stream, "loudnorm")  # Normalize loudness
+
+                    if output_format == "ogg":
+                        stream = ffmpeg.output(
+                            stream,
+                            output_file,
+                            acodec="libvorbis",  # OGG format using Vorbis codec
+                            audio_bitrate=audio_bitrate,
+                            ar=sample_rate,  # Preserve original sample rate (48000 Hz)
+                            ac=channels,  # Maintain stereo output
+                            compression_level=2,  # Lower compression for better quality
+                        )
+                    elif output_format == "mp3":
+                        stream = ffmpeg.output(
+                            stream,
+                            output_file,
+                            acodec="libmp3lame",  # MP3 format using LAME codec
+                            audio_bitrate=audio_bitrate,
+                            ar=sample_rate,  # Preserve original sample rate (48000 Hz)
+                            ac=channels,  # Maintain stereo output
+                        )
+                    else:
+                        raise ValueError(f"Unsupported output format: {output_format}")
+
+                    ffmpeg.run(stream, overwrite_output=True, quiet=True)
+
+                    # Print information about the exported file
+                    # output_probe = ffmpeg.probe(output_file)
+                    # output_size = int(output_probe["format"]["size"]) / (
+                    #     1024 * 1024
+                    # )  # Size in MB
+                    # print(f"Exported {output_file}")
+                    # print(f"Size: {output_size:.2f} MB")
+
+                    # # Print progress
+                    # progress = (i + 1) / num_slices * 100
+                    # print(f"Progress: {progress:.2f}%")
+
+                    # Yield the output file path
+                    yield output_file
+                except ffmpeg.Error as e:
+                    print(f"Error processing slice {i + 1}:")
+                    if e.stderr is not None:
+                        print(e.stderr.decode())
+                    else:
+                        print(str(e))
+                    raise
+
+        except ffmpeg.Error as e:
+            print("Error during file processing:")
+            if e.stderr is not None:
+                print(e.stderr.decode())
+            else:
+                print(str(e))
+            raise

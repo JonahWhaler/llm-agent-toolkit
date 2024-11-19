@@ -152,12 +152,6 @@ class A2T_Core(Core, ABC):
             tools=tools,
         )
 
-    # @staticmethod
-    @abstractmethod
-    def to_chunks(self, input_path: str, tmp_directory: str, **kwargs) -> list[str]:
-        """Split the audio file into multiple chunks."""
-        raise NotImplementedError
-
     @abstractmethod
     async def run_async(
         self, query: str, context: list[MessageBlock | dict] | None, **kwargs
