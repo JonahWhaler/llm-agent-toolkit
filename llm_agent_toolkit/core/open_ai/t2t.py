@@ -55,11 +55,13 @@ class T2T_OAI_Core(Core):
             for ctx in context:
                 msgs.append(ctx)
         msgs.append({"role": CreatorRole.USER.value, "content": query})
-        tools_metadata: list = []
+
         if self.tools is not None:
+            tools_metadata = []
             for tool in self.tools:
                 tools_metadata.append(tool.info)
-
+        else:
+            tools_metadata = None
         if isinstance(self.config, ChatCompletionConfig):
             temperature = self.config.temperature
             max_tokens = self.config.max_tokens
@@ -76,6 +78,7 @@ class T2T_OAI_Core(Core):
                 response = await client.chat.completions.create(
                     model=self.model_name,
                     messages=msgs,  # type: ignore
+                    frequency_penalty=0.5,
                     max_tokens=max_tokens,
                     temperature=temperature,
                     n=self.config.return_n,
@@ -138,10 +141,12 @@ class T2T_OAI_Core(Core):
             for ctx in context:
                 msgs.append(ctx)
         msgs.append({"role": CreatorRole.USER.value, "content": query})
-        tools_metadata: list = []
         if self.tools is not None:
+            tools_metadata = []
             for tool in self.tools:
                 tools_metadata.append(tool.info)
+        else:
+            tools_metadata = None
 
         if isinstance(self.config, ChatCompletionConfig):
             temperature = self.config.temperature
@@ -159,10 +164,11 @@ class T2T_OAI_Core(Core):
                 response = client.chat.completions.create(
                     model=self.model_name,
                     messages=msgs,  # type: ignore
+                    frequency_penalty=0.5,
                     max_tokens=max_tokens,
                     temperature=temperature,
                     n=self.config.return_n,
-                    tools=tools_metadata,  # type: ignore
+                    tools=tools_metadata,  # type: ignore,
                 )
                 if response.usage:
                     token_count += response.usage.total_tokens
