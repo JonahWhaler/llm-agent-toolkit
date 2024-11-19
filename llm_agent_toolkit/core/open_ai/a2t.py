@@ -38,7 +38,7 @@ class A2T_OAI_Core(A2T_Core):
         try:
             output = []
             chunks = AudioHelper.generate_chunks(
-                input_path=filepath, tmp_directory=tmp_directory, output_format=ext
+                input_path=filepath, tmp_directory=tmp_directory, output_format=ext[1:]
             )
             for idx, chunk_path in enumerate(chunks):
                 with open(chunk_path, "rb") as f:
@@ -84,7 +84,7 @@ class A2T_OAI_Core(A2T_Core):
             output = []
             client = openai.OpenAI(api_key=os.environ["OPENAI_API_KEY"])
             chunks = AudioHelper.generate_chunks(
-                input_path=filepath, tmp_directory=tmp_directory, output_format=ext
+                input_path=filepath, tmp_directory=tmp_directory, output_format=ext[1:]
             )
             for idx, chunk_path in enumerate(chunks):
                 with open(chunk_path, "rb") as f:
