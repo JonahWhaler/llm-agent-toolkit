@@ -130,7 +130,7 @@ class AudioHelper:
             "output_format", "ogg"
         )  # Default to ogg, but allow mp3 as well
         overlap_duration = kwargs.get(
-            "overlap_duration", 5
+            "overlap_duration", 0
         )  # Overlap duration in seconds
 
         slices: list[str] = []
@@ -254,7 +254,7 @@ class AudioHelper:
             "output_format", "ogg"
         )  # Default to ogg, but allow mp3 as well
         overlap_duration = kwargs.get(
-            "overlap_duration", 5
+            "overlap_duration", 0
         )  # Overlap duration in seconds
 
         try:
