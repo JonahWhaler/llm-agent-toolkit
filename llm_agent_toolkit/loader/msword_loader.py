@@ -1,13 +1,18 @@
-from llm_agent_toolkit._loader import BaseLoader
-from llm_agent_toolkit._core import Core, I2T_Core
-from llm_agent_toolkit._util import OpenAIMessage
 import os
 import warnings
-from contextlib import contextmanager
-from docx import Document
 import zipfile
 from io import StringIO, BytesIO
 import re
+from contextlib import contextmanager
+
+from docx import Document
+from docx.document import Document as _Document
+from docx.table import _Cell, Table
+
+from .._loader import BaseLoader
+from .._core import Core, I2T_Core
+from .._util import MessageBlock
+
 
 """
 Dependencies:
@@ -23,15 +28,25 @@ class MsWordLoader(BaseLoader):
         tmp_directory: str | None = None,
         core: Core | None = None,
     ):
+        self.__text_only = text_only
         self.__core = core
         self.__tmp_directory = tmp_directory
         if not text_only:
             assert isinstance(core, I2T_Core)
-            if core.config.n != 1:
+
+            if core.config.return_n != 1:
                 warnings.warn(
                     "Configured to return {} responses from `core`. "
-                    "Only first response will be used.".format(core.config.n)
+                    "Only first response will be used.".format(core.config.return_n)
                 )
+
+            assert isinstance(tmp_directory, str)
+            tmp_directory = tmp_directory.strip()
+            if not tmp_directory:
+                raise ValueError(
+                    "Invalid temporary directory: Must be a non-empty string."
+                )
+
             if not os.path.exists(tmp_directory):
                 warnings.warn(
                     "Temporary directory not exists. "
@@ -61,7 +76,7 @@ class MsWordLoader(BaseLoader):
         markdown_content.extend(self.extract_text_content(doc))
 
         # Handle tables
-        markdown_content.extend(self.extract_table_contet(doc))
+        markdown_content.extend(self.extract_tables_content(doc))
 
         # Handle images
         markdown_content.extend(self.extract_image_content(input_path))
@@ -79,7 +94,7 @@ class MsWordLoader(BaseLoader):
         markdown_content.extend(self.extract_text_content(doc))
 
         # Handle tables
-        markdown_content.extend(self.extract_table_contet(doc))
+        markdown_content.extend(self.extract_tables_content(doc))
 
         # Handle images
         markdown_content.extend(await self.extract_image_content_async(input_path))
@@ -87,41 +102,53 @@ class MsWordLoader(BaseLoader):
         return "\n".join(markdown_content)
 
     @staticmethod
-    def extract_text_content(doc: Document) -> list[str]:
+    def extract_text_content(doc: _Document) -> list[str]:
         markdown_content = []
 
         # Iterate through all elements in the document
         for para in doc.paragraphs:
+            p = para._element
+            pstyle_match = re.search(r'<w:pStyle w:val="([^"]+)"/>', p.xml)
+            style_name = pstyle_match.group(1) if pstyle_match else "Normal"
+            text = para.text.strip()
+            if style_name == "Title":
+                content = f"\n# {text}"
+            elif style_name.startswith("Heading"):
+                level = min(int(style_name[len("Heading") :]) + 1, 6)
+                content = f"\n{'#' * level} {text}"
+            elif style_name == "ListParagraph":
+                content = f"* {text}"
+            else:
+                content = f"{text}"
 
-            if para.style.name.startswith("Heading"):
-                # Handle Headings
-                level = int(re.search(r"\d+", para.style.name).group(0))
-                markdown_content.append(f"{'#' * level} {para.text}")
-            elif para.text.strip():
-                # Handle regular paragraphs and text
-                markdown_content.append(para.text)
+            markdown_content.append(content)
 
         return markdown_content
 
     @staticmethod
-    def extract_table_contet(doc: Document) -> list[str]:
+    def extract_tables_content(doc: _Document) -> list[str]:
+        """
+        Iteratively extract tables from the document.
+
+        Args:
+            doc (_Document): The document to extract tables from.
+
+        Returns:
+            list[str]: A list of Markdown-formatted table content.
+
+        Notes:
+            - Ignore content formatting/styles.
+            - Markdown syntax is used for the main table, nested tables are presented in HTML.
+            - Exact location of the tables in the document is not guaranteed.
+        """
+
         markdown_content = []
 
         # Extract tables
-        for table in doc.tables:
-            markdown_content.append("\n")
-            for row_index, row in enumerate(table.rows):
-                row_data = [
-                    f"| {MsWordLoader.get_cell_content_with_formatting(cell)} "
-                    for cell in row.cells
-                ]
-                markdown_content.append("".join(row_data) + "|")
-                # Create a separator for header row (assuming first row is header)
-                if row_index == 0:
-                    header_separator = "".join(["| --- " for _ in row.cells])
-                    markdown_content.append(header_separator + "|")
-            # Add a newline after the table
-            markdown_content.append("\n")
+        for table_index, table in enumerate(doc.tables, start=1):
+            markdown_content.append(f"## Table {table_index}\n")
+            markdown_content.append(MsWordLoader.extract_table_content(table))
+            # markdown_content.append("\n")
 
         if len(markdown_content) > 0:
             markdown_content.insert(0, f"\n# Tables\n")
@@ -129,18 +156,100 @@ class MsWordLoader(BaseLoader):
         return markdown_content
 
     @staticmethod
-    def get_cell_content_with_formatting(cell):
-        content = StringIO()
-        for para in cell.paragraphs:
-            for run in para.runs:
-                if run.bold:
-                    content.write(f"**{run.text}**")
-                elif run.italic:
-                    content.write(f"*{run.text}*")
+    def extract_table_content(table: Table):
+        """
+        Extract table content, support nested table.
+
+        Args:
+            table (Table): The table to extract content from.
+
+        Returns:
+            str: The extracted table content in Markdown format.
+
+        Notes:
+            - Ignore content formatting/styles.
+            - Markdown syntax is used for the main table, nested tables are presented in HTML.
+        """
+        markdown_content = []
+
+        header_row = table.rows[0]
+        headers = [f"| {cell.text.strip()} " for cell in header_row.cells]
+        markdown_content.append("".join(headers) + "|")
+        markdown_content.append(
+            f"|{'---|' * len(headers)}"
+        )  # Markdown header separator
+
+        for row in table.rows[1:]:
+            row_content = []
+            for cell in row.cells:
+                if cell.tables:  # Check if the cell contains a nested table
+                    nested_table_md = []
+                    for nested_table in cell.tables:
+                        nested_table_md.append(
+                            MsWordLoader.extract_subtable_content(nested_table)
+                        )
+                    row_content.append(
+                        f"{cell.text.strip()} {''.join(nested_table_md)}"
+                    )
                 else:
-                    content.write(run.text)
-            content.write("\n")
-        return content.getvalue().strip()
+                    row_content.append(f"{cell.text.strip()}")
+            row_string = f"| {' | '.join(row_content)} |"
+            markdown_content.append(row_string)
+
+        return "\n".join(markdown_content)
+
+    @staticmethod
+    def extract_subtable_content(table: Table) -> str:
+        """
+        Recursively extract table content.
+
+        Args:
+            table (Table): The table to extract content from.
+
+        Returns:
+            str: The extracted content.
+
+        Notes:
+            - This function is used to extract content from nested tables.
+            - It is called recursively for each nested table.
+            - Ignore content formatting/styles.
+            - HTML table structure is used to represent the extracted content.
+        """
+        content = StringIO()
+        content.write("<table>")
+        for row in table.rows:
+            content.write("<tr>")
+            for cell in row.cells:
+                content.write(f"<td>{cell.text.strip()}")
+                if cell.tables:
+                    for nested_table in cell.tables:
+                        content.write(
+                            MsWordLoader.extract_subtable_content(nested_table)
+                        )
+                content.write("</td>")
+            content.write("</tr>")
+        content.write("</table>")
+        return content.getvalue()
+
+    # @staticmethod
+    # def get_cell_content_with_formatting(cell: _Cell):
+    #     """
+    #     Extracts the content of a cell with formatting.
+
+    #     Notes:
+    #     * Tables in
+    #     """
+    #     content = StringIO()
+    #     for para in cell.paragraphs:
+    #         for run in para.runs:
+    #             if run.bold:
+    #                 content.write(f"**{run.text}**")
+    #             elif run.italic:
+    #                 content.write(f"*{run.text}*")
+    #             else:
+    #                 content.write(run.text)
+    #         content.write("\n")
+    #     return content.getvalue().strip()
 
     @staticmethod
     def extract_alt_text_dict(docx: zipfile.ZipFile) -> dict[str, str]:
@@ -208,15 +317,12 @@ class MsWordLoader(BaseLoader):
                     image_data = docx.read(file)
                     image_name = os.path.basename(file)  # image{index}.png
                     with self.temporary_file(image_data, image_name) as image_path:
-                        responses: list[OpenAIMessage | dict] = self.__core.run(
+                        responses: list[MessageBlock | dict] = self.__core.run(
                             query="Describe this image",
                             context=None,
                             filepath=image_path,
                         )
-                        if isinstance(responses[0], OpenAIMessage):
-                            image_description = responses[0].content
-                        elif isinstance(responses[0], dict):
-                            image_description = responses[0]["content"]
+                        image_description = responses[0]["content"]
                 markdown_content.append(
                     f"## {os.path.basename(file)}\nDescription: {image_description}\n\nAlt Text: {alt_text}\n"
                 )
@@ -248,15 +354,14 @@ class MsWordLoader(BaseLoader):
                     image_data = docx.read(file)
                     image_name = os.path.basename(file)  # image{index}.png
                     with self.temporary_file(image_data, image_name) as image_path:
-                        responses: list[OpenAIMessage | dict] = await self.__core.run_async(
-                            query="Describe this image",
-                            context=None,
-                            filepath=image_path,
+                        responses: list[MessageBlock | dict] = (
+                            await self.__core.run_async(
+                                query="Describe this image",
+                                context=None,
+                                filepath=image_path,
+                            )
                         )
-                        if isinstance(responses[0], OpenAIMessage):
-                            image_description = responses[0].content
-                        elif isinstance(responses[0], dict):
-                            image_description = responses[0]["content"]
+                        image_description = responses[0]["content"]
                 markdown_content.append(
                     f"## {os.path.basename(file)}\nDescription: {image_description}\n\nAlt Text: {alt_text}\n"
                 )
