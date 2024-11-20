@@ -1,12 +1,17 @@
-from llm_agent_toolkit._loader import BaseLoader
-from llm_agent_toolkit._core import Core, I2T_Core
-from llm_agent_toolkit._util import OpenAIMessage
 import os
+import io
 import warnings
 from contextlib import contextmanager
-import fitz  # PyMuPDF
+
+# PyMuPDF
+import fitz  # type: ignore
+from fitz import Page, Document
 import pdfplumber
-import io
+
+from .._loader import BaseLoader
+from .._core import Core, I2T_Core
+from .._util import MessageBlock
+
 
 """
 Dependencies:
@@ -51,23 +56,31 @@ class PDFLoader(BaseLoader):
     - Ensure that the `I2T_Core` core is properly configured and initialized before using this loader.
     """
 
-    SUPPORTED_EXTENSIONS = ('.pdf', )
+    SUPPORTED_EXTENSIONS = (".pdf",)
 
     def __init__(
-            self,
-            text_only: bool = True,
-            tmp_directory: str | None = None,
-            core: Core | None = None,
+        self,
+        text_only: bool = True,
+        tmp_directory: str | None = None,
+        core: Core | None = None,
     ):
         self.__core = core
         self.__tmp_directory = tmp_directory
         if not text_only:
             assert isinstance(core, I2T_Core)
-            if core.config.n != 1:
+            if core.config.return_n != 1:
                 warnings.warn(
                     "Configured to return {} responses from `core`. "
-                    "Only first response will be used.".format(core.config.n)
+                    "Only first response will be used.".format(core.config.return_n)
                 )
+
+            assert isinstance(tmp_directory, str)
+            tmp_directory = tmp_directory.strip()
+            if not tmp_directory:
+                raise ValueError(
+                    "Invalid temporary directory: Must be a non-empty string."
+                )
+
             if not os.path.exists(tmp_directory):
                 warnings.warn(
                     "Temporary directory not exists. "
@@ -105,12 +118,14 @@ class PDFLoader(BaseLoader):
                     markdown_content.extend(links_content)
 
                     # Extract images and their alt text if available
-                    images_content = self.handle_images(doc, page, page.get_images(), page_number)
+                    images_content = self.handle_images(
+                        doc, page, page.get_images(), page_number
+                    )
                     markdown_content.extend(images_content)
 
             tables_content = self.handle_tables(input_path)
             markdown_content.extend(tables_content)
-            return '\n'.join(markdown_content)
+            return "\n".join(markdown_content)
         except Exception as e:
             raise e
 
@@ -131,64 +146,44 @@ class PDFLoader(BaseLoader):
                     markdown_content.extend(links_content)
 
                     # Extract images and their alt text if available
-                    images_content = await self.handle_images_async(doc, page, page.get_images(), page_number)
+                    images_content = await self.handle_images_async(
+                        doc, page, page.get_images(), page_number
+                    )
                     markdown_content.extend(images_content)
 
             tables_content = self.handle_tables(input_path)
             markdown_content.extend(tables_content)
-            return '\n'.join(markdown_content)
+            return "\n".join(markdown_content)
         except Exception as e:
             raise e
 
-    @staticmethod
-    def extract_alt_text(page, img) -> str:
-        """Attempt to extract alt text for an image."""
-        alt_text = img.get('alt', None)
-
-        # If not found, try to get it from the page's /MC (marked content) entries
-        if alt_text is None:
-            for xref in page.get_contents():
-                stream = page.parent.xref_stream(xref)
-                if stream:
-                    # Simplified check for alt text in marked content
-                    if b'/Alt' in stream:
-                        alt_parts = stream.split(b'/Alt')
-                        if len(alt_parts) > 1:
-                            alt_text = alt_parts[1].split(b')')[0].decode(
-                                'utf-8', errors='ignore').strip()
-                            break
-
-        return alt_text if alt_text else "No alt text found"
-
-    def extract_img_description(self, image_bytes: bytes, image_name: str, alt_text: str) -> str:
+    def extract_img_description(self, image_bytes: bytes, image_name: str) -> str:
         if self.__core is None:
             return "Image description not available"
 
-        image_caption = f"alt_text={alt_text},filename={image_name}. This is an attachment found in a pdf file."
+        image_caption = (
+            f"filename={image_name}. This is an attachment found in a pdf file."
+        )
         with self.temporary_file(image_bytes, image_name) as tmp_path:
-            responses: list[OpenAIMessage | dict] = self.__core.run(
+            responses: list[MessageBlock | dict] = self.__core.run(
                 query=image_caption, context=None, filepath=tmp_path
             )
-            if isinstance(responses[0], OpenAIMessage):
-                return responses[0].content
-            elif isinstance(responses[0], dict):
-                return responses[0]["content"]
+            return responses[0]["content"]
 
     async def extract_img_description_async(
-            self, image_bytes: bytes, image_name: str, alt_text: str
+        self, image_bytes: bytes, image_name: str
     ) -> str:
         if self.__core is None:
             return "Image description not available"
 
-        image_caption = f"alt_text={alt_text},filename={image_name}. This is an attachment found in a pdf file."
+        image_caption = (
+            f"filename={image_name}. This is an attachment found in a pdf file."
+        )
         with self.temporary_file(image_bytes, image_name) as tmp_path:
-            responses: list[OpenAIMessage | dict] = await self.__core.run_async(
+            responses: list[MessageBlock | dict] = await self.__core.run_async(
                 query=image_caption, context=None, filepath=tmp_path
             )
-            if isinstance(responses[0], OpenAIMessage):
-                return responses[0].content
-            elif isinstance(responses[0], dict):
-                return responses[0]["content"]
+            return responses[0]["content"]
 
     @contextmanager
     def temporary_file(self, image_bytes: bytes, filename: str):
@@ -211,8 +206,10 @@ class PDFLoader(BaseLoader):
         markdown_content = ["\n## Links\n"]
 
         for link in links:
-            if 'uri' in link:
-                markdown_content.append(f"- [Link on Page {page_number}]({link['uri']})\n")
+            if "uri" in link:
+                markdown_content.append(
+                    f"- [Link on Page {page_number}]({link['uri']})\n"
+                )
 
         return markdown_content
 
@@ -222,18 +219,25 @@ class PDFLoader(BaseLoader):
 
         markdown_content = ["\n## Images\n"]
         for img_index, img in enumerate(images, start=1):
+            print(f"${img_index}: {img}")
             xref = img[0]
             base_image = doc.extract_image(xref)
             if base_image:
-                alt_text = self.extract_alt_text(page, img)
                 image_name = f"image_{page_number}_{img_index}.{base_image['ext']}"
                 markdown_content.extend(
-                    self.handle_image(base_image['image'], image_name, img_index, alt_text, page_number)
+                    self.handle_image(
+                        base_image["image"],
+                        image_name,
+                        img_index,
+                        page_number,
+                    )
                 )
 
         return markdown_content
 
-    async def handle_images_async(self, doc, page, images: list, page_number: int) -> list[str]:
+    async def handle_images_async(
+        self, doc, page, images: list, page_number: int
+    ) -> list[str]:
         if images is None:
             return []
 
@@ -242,37 +246,49 @@ class PDFLoader(BaseLoader):
             xref = img[0]
             base_image = doc.extract_image(xref)
             if base_image:
-                alt_text = self.extract_alt_text(page, img)
                 image_name = f"image_{page_number}_{img_index}.{base_image['ext']}"
                 markdown_content.extend(
-                    await self.handle_image_async(base_image['image'], image_name, img_index, alt_text, page_number)
+                    await self.handle_image_async(
+                        base_image["image"],
+                        image_name,
+                        img_index,
+                        page_number,
+                    )
                 )
 
         return markdown_content
 
-    def handle_image(self, image_bytes, image_name, img_index, alt_text, page_number) -> list[str]:
+    def handle_image(
+        self, image_bytes, image_name, img_index, page_number
+    ) -> list[str]:
         markdown_content = []
 
         if self.__core:
-            image_description = self.extract_img_description(image_bytes, image_name, alt_text)
+            image_description = self.extract_img_description(image_bytes, image_name)
         else:
             image_description = "Image description not available"
-        markdown_content.append(f"- Image {img_index} on Page {page_number}: {image_name}\n")
-        markdown_content.append(f"  Alt Text: {alt_text}\n")
+        markdown_content.append(
+            f"- Image {img_index} on Page {page_number}: {image_name}\n"
+        )
         markdown_content.append(f"  Description: \n{image_description}\n")
         markdown_content.append(f"  [IMAGE ATTACHED: {image_name}]\n")
 
         return markdown_content
 
-    async def handle_image_async(self, image_bytes, image_name, img_index, alt_text, page_number) -> list[str]:
+    async def handle_image_async(
+        self, image_bytes, image_name, img_index, page_number
+    ) -> list[str]:
         markdown_content = []
 
         if self.__core:
-            image_description = await self.extract_img_description_async(image_bytes, image_name, alt_text)
+            image_description = await self.extract_img_description_async(
+                image_bytes, image_name
+            )
         else:
             image_description = "Image description not available"
-        markdown_content.append(f"- Image {img_index} on Page {page_number}: {image_name}\n")
-        markdown_content.append(f"  Alt Text: {alt_text}\n")
+        markdown_content.append(
+            f"- Image {img_index} on Page {page_number}: {image_name}\n"
+        )
         markdown_content.append(f"  Description: \n{image_description}\n")
         markdown_content.append(f"  [IMAGE ATTACHED: {image_name}]\n")
 
@@ -289,10 +305,12 @@ class PDFLoader(BaseLoader):
                 for table_index, table in enumerate(tables, start=1):
                     if table:
                         markdown_content.append(
-                            f"\n## Table {table_index} on Page {page_number}\n")
+                            f"\n## Table {table_index} on Page {page_number}\n"
+                        )
                         for row in table[:]:
                             markdown_content.append(
-                                "| " + " | ".join(str(cell) for cell in row) + " |")
+                                "| " + " | ".join(str(cell) for cell in row) + " |"
+                            )
                         markdown_content.append("\n")
 
         return markdown_content
