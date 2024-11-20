@@ -1,6 +1,6 @@
-from llm_agent_toolkit._loader import BaseLoader
 import os
 import asyncio
+from .._loader import BaseLoader
 
 
 class TextLoader(BaseLoader):
@@ -56,7 +56,16 @@ class TextLoader(BaseLoader):
       files. Consider using dedicated CSV parsing libraries for better performance and functionality.
     """
 
-    SUPPORTED_EXTENSIONS = ('.txt', '.md', '.py', '.html', '.css', '.js', '.json', '.csv')
+    SUPPORTED_EXTENSIONS = (
+        ".txt",
+        ".md",
+        ".py",
+        ".html",
+        ".css",
+        ".js",
+        ".json",
+        ".csv",
+    )
 
     def __init__(self, encoding: str = "utf-8"):
         """
@@ -88,13 +97,21 @@ class TextLoader(BaseLoader):
         - ValueError: If the input path is not a non-empty string or if the file format is unsupported.
         - FileNotFoundError: If the specified file does not exist.
         """
-        if not all([input_path is not None, isinstance(input_path, str), input_path.strip() != ""]):
+        if not all(
+            [
+                input_path is not None,
+                isinstance(input_path, str),
+                input_path.strip() != "",
+            ]
+        ):
             raise ValueError("Invalid input path: Path must be a non-empty string.")
 
         _, ext = os.path.splitext(input_path)
         if ext.lower() not in TextLoader.SUPPORTED_EXTENSIONS:
-            supported = ', '.join(TextLoader.SUPPORTED_EXTENSIONS)
-            raise ValueError(f"Unsupported file format: '{ext}'. Supported formats are: {supported}.")
+            supported = ", ".join(TextLoader.SUPPORTED_EXTENSIONS)
+            raise ValueError(
+                f"Unsupported file format: '{ext}'. Supported formats are: {supported}."
+            )
 
         if not os.path.exists(input_path):
             raise FileNotFoundError(f"File not found: '{input_path}'.")
