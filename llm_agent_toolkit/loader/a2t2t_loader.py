@@ -10,6 +10,9 @@ from .._util import (
 
 
 class A2T2TLoader(BaseLoader):
+
+    SUPPORTED_EXTENSIONS = (".mp3", ".ogg", ".oga")
+
     def __init__(
         self,
         transcript_polisher: Core,
@@ -23,6 +26,8 @@ class A2T2TLoader(BaseLoader):
         self.__tmp_directory = tmp_directory
 
     def load(self, filepath: str) -> str:
+        A2T2TLoader.raise_if_invalid(filepath)
+
         # Transform audio to text
         print("Step 1: Transform audio to text")
         markdown_content = []
@@ -71,6 +76,8 @@ class A2T2TLoader(BaseLoader):
         return result.get("content", "Not Available")
 
     async def load_async(self, filepath: str) -> str:
+        A2T2TLoader.raise_if_invalid(filepath)
+
         # Transform audio to text
         print("Step 1: Transform audio to text")
         markdown_content = []
@@ -122,3 +129,24 @@ class A2T2TLoader(BaseLoader):
             chunk = text[start:end]
             chunks.append(chunk)
         return chunks
+
+    @staticmethod
+    def raise_if_invalid(input_path: str):
+        if not all(
+            [
+                input_path is not None,
+                isinstance(input_path, str),
+                input_path.strip() != "",
+            ]
+        ):
+            raise ValueError("Invalid input path: Path must be a non-empty string.")
+
+        _, ext = os.path.splitext(input_path)
+        if ext.lower() not in A2T2TLoader.SUPPORTED_EXTENSIONS:
+            supported = ", ".join(A2T2TLoader.SUPPORTED_EXTENSIONS)
+            raise ValueError(
+                f"Unsupported file format: '{ext}'. Supported formats are: {supported}."
+            )
+
+        if not os.path.exists(input_path):
+            raise FileNotFoundError(f"File not found: '{input_path}'.")
