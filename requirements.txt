@@ -9,7 +9,7 @@ chromadb==0.5.11
 # Agent-Specific
 duckduckgo_search==6.3.3
 beautifulsoup4==4.12.2
-aiohttp==3.10.10
+aiohttp==3.10.11
 # Audio
 pydub==0.25.1
 pydub-stubs==0.25.1.4
