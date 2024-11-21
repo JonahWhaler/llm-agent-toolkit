@@ -1,8 +1,9 @@
-from llm_agent_toolkit._loader import BaseLoader
-from llm_agent_toolkit._core import Core, I2T_Core
-from llm_agent_toolkit._util import OpenAIMessage
 import os
 import warnings
+
+from .._loader import BaseLoader
+from .._core import Core, I2T_Core
+from .._util import MessageBlock
 
 
 class ImageToTextLoader(BaseLoader):
@@ -52,9 +53,9 @@ class ImageToTextLoader(BaseLoader):
 
     """
 
-    SUPPORTED_EXTENSIONS = ('.png', '.jpg', '.jpeg', '.gif', '.webp')
+    SUPPORTED_EXTENSIONS = (".png", ".jpg", ".jpeg", ".gif", ".webp")
 
-    def __init__(self, core: Core, prompt: str | None = "What's in the image?"):
+    def __init__(self, core: Core, prompt: str = "What's in the image?"):
         """
         Initializes a new instance of `ImageToTextLoader` with the specified core processing unit.
 
@@ -72,12 +73,16 @@ class ImageToTextLoader(BaseLoader):
         - If the core's configuration `n` is not 1.
         """
         if not isinstance(core, I2T_Core):
-            raise TypeError("Expect `core` to be an instance of `I2T_Core`, got: {}".format(type(core)))
+            raise TypeError(
+                "Expect `core` to be an instance of `I2T_Core`, got: {}".format(
+                    type(core)
+                )
+            )
 
-        if core.config.n != 1:
+        if core.config.return_n != 1:
             warnings.warn(
                 "Configured to return {} responses from `core`. "
-                "Only first response will be used.".format(core.config.n)
+                "Only first response will be used.".format(core.config.return_n)
             )
 
         self.__prompt = prompt
@@ -101,13 +106,21 @@ class ImageToTextLoader(BaseLoader):
         - ValueError: If the input path is not a non-empty string or if the file format is unsupported.
         - FileNotFoundError: If the specified file does not exist.
         """
-        if not all([input_path is not None, isinstance(input_path, str), input_path.strip() != ""]):
+        if not all(
+            [
+                input_path is not None,
+                isinstance(input_path, str),
+                input_path.strip() != "",
+            ]
+        ):
             raise ValueError("Invalid input path: Path must be a non-empty string.")
 
         _, ext = os.path.splitext(input_path)
         if ext.lower() not in ImageToTextLoader.SUPPORTED_EXTENSIONS:
-            supported = ', '.join(ImageToTextLoader.SUPPORTED_EXTENSIONS)
-            raise ValueError(f"Unsupported file format: '{ext}'. Supported formats are: {supported}.")
+            supported = ", ".join(ImageToTextLoader.SUPPORTED_EXTENSIONS)
+            raise ValueError(
+                f"Unsupported file format: '{ext}'. Supported formats are: {supported}."
+            )
 
         if not os.path.exists(input_path):
             raise FileNotFoundError(f"File not found: '{input_path}'.")
@@ -133,13 +146,10 @@ class ImageToTextLoader(BaseLoader):
         ImageToTextLoader.raise_if_invalid(input_path)
 
         try:
-            responses: list[OpenAIMessage | dict] = self.__core.run(
+            responses: list[MessageBlock | dict] = self.__core.run(
                 query=self.__prompt, context=None, filepath=input_path
             )
-            if isinstance(responses[0], OpenAIMessage):
-                return responses[0].content
-            elif isinstance(responses[0], dict):
-                return responses[0]["content"]
+            return responses[-1]["content"]
         except Exception as e:
             raise e
 
@@ -164,12 +174,9 @@ class ImageToTextLoader(BaseLoader):
         ImageToTextLoader.raise_if_invalid(input_path)
 
         try:
-            responses: list[OpenAIMessage | dict] = await self.__core.run_async(
+            responses: list[MessageBlock | dict] = await self.__core.run_async(
                 query=self.__prompt, context=None, filepath=input_path
             )
-            if isinstance(responses[0], OpenAIMessage):
-                return responses[0].content
-            elif isinstance(responses[0], dict):
-                return responses[0]["content"]
+            return responses[-1]["content"]
         except Exception as e:
             raise e
