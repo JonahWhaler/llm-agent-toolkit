@@ -29,9 +29,9 @@ class TransformerEncoder(Encoder):
             name="sentence-transformers/roberta-base-nli-stsb-mean-tokens",
             dimension=768,
         ),
-        EncoderProfile(
-            name="sentence-transformers/distilroberta-base-paraphrase-v1", dimension=768
-        ),
+        # EncoderProfile(
+        #     name="sentence-transformers/distilroberta-base-paraphrase-v1", dimension=768
+        # ),
     )
 
     def __init__(self, model_name: str):
