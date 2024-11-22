@@ -6,6 +6,7 @@ torch==2.5.1
 transformers==4.46.2
 # Vector DB
 chromadb==0.5.11
+faiss-cpu==1.9.0.post1
 # Agent-Specific
 duckduckgo_search==6.3.3
 beautifulsoup4==4.12.2
