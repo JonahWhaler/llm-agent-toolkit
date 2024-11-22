@@ -15,8 +15,8 @@ from ..._util import (
 class A2T_OAI_Core(A2T_Core):
     """
     Notes:
-    - Only accept audio file in OGG format!!!
-    - Large audio files will be split into multiple chunks, overlapping is not supported.
+    - Only accept audio file in OGG and MP3 format!!!
+    - Large audio files will be split into multiple chunks, overlapping is supported.
     """
 
     def __init__(
