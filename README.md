@@ -1,5 +1,18 @@
-# llm-agent-toolkit
-This project defines essential interfaces for fundamental components needed in LLM-based applications. It prioritizes simplicity and modularity by proposing minimal wrappers designed to work across common tools, discouraging direct access to underlying technologies. Specific implementations and examples will be documented separately in a Cookbook (planned).
+# LLM Agent Toolkit: Modular Components for AI WOrkflows
+LLM Agent Toolkit provides minimal, modular interfaces for core components in LLM-based applications. Simplify workflows with stateless interaction, embedding encoders, memory management, tool integration, and data loaders, designed for compatibility and scalability. It prioritizes simplicity and modularity by proposing minimal wrappers designed to work across common tools, discouraging direct access to underlying technologies. Specific implementations and examples will be documented separately in a Cookbook (planned).
+
+## Table of Contents
+- [LLM Agent Toolkit: Modular Components for AI WOrkflows](#llm-agent-toolkit-modular-components-for-ai-workflows)
+  - [Table of Contents](#table-of-contents)
+- [Fundamental Components](#fundamental-components)
+  - [Core:](#core)
+  - [Encoder:](#encoder)
+  - [Memory:](#memory)
+  - [Tool:](#tool)
+  - [Loader:](#loader)
+- [Planned Feature](#planned-feature)
+- [License](#license)
+
 
 # Fundamental Components
 ## Core: 
@@ -50,3 +63,10 @@ Responsible for converting raw data into text.
 
 **Features**:
 * Covering limited type of documents, images, and audio files.
+
+# Planned Feature
+- A Cookbook with detailed implementation examples.
+- Release to PyPI.
+
+# License
+This project is licensed under the GNU General Public License v3.0 License. See the [LICENSE](LICENSE) file for details.
