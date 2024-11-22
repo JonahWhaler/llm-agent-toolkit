@@ -349,11 +349,9 @@ class FaissHNSWDB:
         self,
         namespace: str,
         dimension: int,
-        is_persist: bool,
         db_folder: str | None,
         load_strategy: LoadStrategy = LoadStrategy.LAZY,
     ):
-        self.__is_persist = is_persist
         self.__db_path = db_folder
         self.__dimension = dimension
         self.__namespace = namespace
@@ -370,7 +368,7 @@ class FaissHNSWDB:
             index = faiss.read_index(f"{self.__db_path}/{namespace}.index")
         else:
             logger.info("Creating...")
-            index = faiss.IndexHNSW(self.__dimension, FaissHNSWDB.M)
+            index = faiss.IndexHNSWFlat(self.__dimension, FaissHNSWDB.M)
             index.hnsw.efConstruction = FaissHNSWDB.EF_CONSTRUCTION
             index.hnsw.efSearch = FaissHNSWDB.EF_SEARCH
             faiss.write_index(index, f"{self.__db_path}/{namespace}.index")
@@ -614,7 +612,7 @@ class FaissHNSWDB:
             db_path=tmp_sqlite_path, table_name=self.__namespace, overwrite=True
         )
         # Build a tmp faiss index
-        tmp_index = faiss.IndexHNSW(self.__dimension, FaissHNSWDB.M)
+        tmp_index = faiss.IndexHNSWFlat(self.__dimension, FaissHNSWDB.M)
         tmp_index.hnsw.efConstruction = FaissHNSWDB.EF_CONSTRUCTION
         tmp_index.hnsw.efSearch = FaissHNSWDB.EF_SEARCH
         counter = 0  # Start from 0
