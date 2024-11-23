@@ -10,6 +10,24 @@ from ..._util import (
 
 
 class T2I_OAI_Core(Core):
+    """
+    `T2I_OAI_Core` is a concrete implementation of the `Core` abstract class.
+    It facilitates synchronous and asynchronous communication with OpenAI's API to generate images with the given query.
+
+    Methods:
+    - run(query: str, context: list[MessageBlock | dict] | None, **kwargs) -> list[MessageBlock | dict]:
+        Synchronously generate images based on the given query.
+        `Context` is not supported.
+    - run_async(query: str, context: list[MessageBlock | dict] | None, **kwargs) -> list[MessageBlock | dict]:
+        Asynchronously generate images based on the given query.
+        `Context` is not supported.
+
+    Notes:
+    - Supported image format: png, jpeg, gif, webp
+    - Tools are not supported in current version.
+    - Context is not supported in current version.
+    """
+
     def __init__(
         self,
         system_prompt: str,
@@ -24,7 +42,6 @@ class T2I_OAI_Core(Core):
     ) -> list[MessageBlock | dict]:
         """
         Asynchronously generate images based on the given query.
-        `Context` is not supported.
 
         Args:
             query (str): The query to generate images for.
@@ -33,6 +50,11 @@ class T2I_OAI_Core(Core):
 
         Returns:
             list: A list of generated images (filepath).
+
+        Notes:
+        - `Context` is not supported
+        - Generated images are saved in the specified temporary directory
+        - The file name is in the `{username}_{index}.png` format.
         """
         username: str = kwargs.get("user_name", "User")
         tmp_directory: str = kwargs.get("tmp_directory", "./")
@@ -40,10 +62,10 @@ class T2I_OAI_Core(Core):
         params["model"] = self.model_name
         params["user"] = username
         params["prompt"] = query
-        for kw in ["model_name", "return_n", "max_iteration"]:
+        for kw in ["name", "return_n", "max_iteration"]:
             del params[kw]
 
-        output: list[dict] = []
+        output: list[MessageBlock] = []
         try:
             client = openai.AsyncOpenAI(api_key=os.environ["OPENAI_API_KEY"])
             images_response = await client.images.generate(**params)
@@ -54,11 +76,9 @@ class T2I_OAI_Core(Core):
                 export_path = f"{tmp_directory}/{username}_{idx}.png"
                 with open(export_path, "wb") as f:
                     f.write(img_decoding)
+
                 output.append(
-                    {
-                        "role": CreatorRole.ASSISTANT.value,
-                        "content": export_path,
-                    }
+                    MessageBlock(role=CreatorRole.ASSISTANT.value, content=export_path)
                 )
 
             return [*output]
@@ -71,7 +91,6 @@ class T2I_OAI_Core(Core):
     ) -> list[MessageBlock | dict]:
         """
         Synchronously generate images based on the given query.
-        `Context` is not supported.
 
         Args:
             query (str): The query to generate images for.
@@ -80,6 +99,11 @@ class T2I_OAI_Core(Core):
 
         Returns:
             list: A list of generated images (filepath).
+
+        Notes:
+        - `Context` is not supported
+        - Generated images are saved in the specified temporary directory
+        - The file name is in the `{username}_{index}.png` format.
         """
         username: str = kwargs.get("user_name", "User")
         tmp_directory: str = kwargs.get("tmp_directory", "./")
@@ -87,10 +111,10 @@ class T2I_OAI_Core(Core):
         params["model"] = self.model_name
         params["user"] = username
         params["prompt"] = query
-        for kw in ["model_name", "return_n", "max_iteration"]:
+        for kw in ["name", "return_n", "max_iteration"]:
             del params[kw]
 
-        output = []
+        output: list[MessageBlock] = []
         try:
             client = openai.OpenAI(api_key=os.environ["OPENAI_API_KEY"])
             images_response = client.images.generate(**params)
@@ -102,10 +126,7 @@ class T2I_OAI_Core(Core):
                 with open(export_path, "wb") as f:
                     f.write(img_decoding)
                 output.append(
-                    {
-                        "role": CreatorRole.ASSISTANT.value,
-                        "content": export_path,
-                    }
+                    MessageBlock(role=CreatorRole.ASSISTANT.value, content=export_path)
                 )
 
             return [*output]
