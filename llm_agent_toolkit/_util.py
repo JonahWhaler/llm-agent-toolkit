@@ -4,12 +4,12 @@ from pydantic import BaseModel, field_validator, ValidationError, model_validato
 
 
 class ModelConfig(BaseModel):
-    model_name: str
+    name: str
     return_n: int = 1
     max_iteration: int = 10
 
-    @field_validator("model_name")
-    def model_name_must_be_valid(cls, value):  # pylint: disable=no-self-argument
+    @field_validator("name")
+    def name_must_be_valid(cls, value):  # pylint: disable=no-self-argument
         new_value = value.strip()
         if not new_value:
             raise ValidationError("Expect model_name to be a non-empty string")
@@ -99,8 +99,8 @@ class TranscriptionConfig(ModelConfig):
             raise ValueError("response_format must be one of text, verbose_json")
         return new_value
 
-    @field_validator("model_name")
-    def model_name_must_be_valid(cls, value):  # pylint: disable=no-self-argument
+    @field_validator("name")
+    def name_must_be_valid(cls, value):  # pylint: disable=no-self-argument
         new_value = value.strip()
         if not new_value:
             raise ValidationError("Expect model_name to be a non-empty string")

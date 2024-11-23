@@ -48,7 +48,7 @@ class Core(ABC):
     @property
     def model_name(self) -> str:
         """Return the name of the LLM model."""
-        return self.__config.model_name
+        return self.__config.name
 
     @property
     def config(
