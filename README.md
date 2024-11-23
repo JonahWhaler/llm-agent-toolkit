@@ -4,6 +4,7 @@ LLM Agent Toolkit provides minimal, modular interfaces for core components in LL
 ## Table of Contents
 - [LLM Agent Toolkit: Modular Components for AI WOrkflows](#llm-agent-toolkit-modular-components-for-ai-workflows)
   - [Table of Contents](#table-of-contents)
+- [Installation](#installation)
 - [Fundamental Components](#fundamental-components)
   - [Core:](#core)
   - [Encoder:](#encoder)
@@ -13,7 +14,11 @@ LLM Agent Toolkit provides minimal, modular interfaces for core components in LL
 - [Planned Feature](#planned-feature)
 - [License](#license)
 
-
+# Installation
+  `
+  pip install llm-agent-toolkit
+  `
+  
 # Fundamental Components
 ## Core: 
 
