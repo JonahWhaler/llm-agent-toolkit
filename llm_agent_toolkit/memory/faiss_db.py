@@ -1,9 +1,10 @@
 import os
 import uuid
-import sqlite3
 from copy import deepcopy
 import logging
 from enum import Enum
+from abc import ABC, abstractmethod
+
 import faiss  # type: ignore
 import numpy as np
 
@@ -19,7 +20,37 @@ class LoadStrategy(Enum):
     EAGER: str = "Eager"
 
 
-class FaissIFL2DB:
+class FaissDB(ABC):
+    @abstractmethod
+    def add(
+        self,
+        documents: list[str],
+        metadatas: list[dict],
+        ids: list[str],
+        embeddings: list[list[float]],
+    ) -> None:
+        raise NotImplementedError
+
+    @abstractmethod
+    def query(
+        self,
+        query_embedding,
+        n_results: int = 5,
+        where: dict | None = None,
+        include: list[str] | None = None,
+    ) -> list[dict]:
+        raise NotImplementedError
+
+    @abstractmethod
+    def remove(self, ids: list[str], **kwargs) -> list[str]:
+        raise NotImplementedError
+
+    @abstractmethod
+    def reconstruct(self, encoder: Encoder) -> None:
+        raise NotImplementedError
+
+
+class FaissIFL2DB(FaissDB):
     """
     Attributes:
     - db_path: str: The path to the sqlite database.
@@ -145,7 +176,8 @@ class FaissIFL2DB:
                     },
                 )
                 # Add to Faiss
-                index.add(np.reshape(np.array(e), (-1, self.__dimension)))
+                np_embedding = np.expand_dims(np.array(e, dtype=np.float32), axis=0)
+                index.add(np_embedding)
                 inserted = True
                 track.append(counter)
             except AssertionError as a_e:
@@ -213,8 +245,8 @@ class FaissIFL2DB:
             raise
 
         try:
-            np_query_embedding = np.array(query_embedding)
-            np_query_embedding = np.reshape(np_query_embedding, (-1, self.__dimension))
+            np_query_embedding = np.array(query_embedding, dtype=np.float32)
+            np_query_embedding = np.expand_dims(np_query_embedding, axis=0)
             assert np_query_embedding.shape == (1, self.__dimension)
             distances, indices = index.search(np_query_embedding, k=n_results)
             distances = distances[0]
@@ -223,10 +255,10 @@ class FaissIFL2DB:
             output = []
             for index, distance in zip(indices, distances):
                 value_dict = sqlite.get(key=str(index))
-                assert value_dict is not None, f"Inconsistency Detected"
+                assert value_dict is not None, "Inconsistency Detected"
                 # Skip the deleted
                 if "is_deleted" in value_dict:
-                    if value_dict["is_deleted"] == True:
+                    if value_dict["is_deleted"] is True:
                         continue
                 _output_object = {
                     "id": value_dict["id"],
@@ -305,14 +337,15 @@ class FaissIFL2DB:
         for key in sqlite.keys():
             value_dict = sqlite.get(key=key)
             # Skip the deleted
-            if "is_deleted" in value_dict and value_dict["is_deleted"] == True:
+            if "is_deleted" in value_dict and value_dict["is_deleted"] is True:
                 continue
             # Add to tmp db
             tmp_db.set(key=str(counter), value=value_dict)
             # Add to tmp index
             _embedding = np.array(encoder.encode(value_dict["document"]))
-            _embedding = np.reshape(_embedding, (-1, self.__dimension))
-            tmp_index.add(_embedding)
+            _embedding = np.expand_dims(_embedding, axis=0)
+            # pylint: disable = no-value-for-parameter
+            tmp_index.add(_embedding.astype(np.float32))
             counter += 1
         os.replace(tmp_sqlite_path, self.db_path)
         if self.load_strategy == LoadStrategy.EAGER:
@@ -323,7 +356,7 @@ class FaissIFL2DB:
         faiss.write_index(tmp_index, self.index_path)
 
 
-class FaissHNSWDB:
+class FaissHNSWDB(FaissDB):
     """
     Attributes:
     - db_path: str: The path to the sqlite database.
@@ -458,7 +491,7 @@ class FaissHNSWDB:
                     },
                 )
                 # Add to Faiss
-                index.add(np.reshape(np.array(e), (-1, self.__dimension)))
+                index.add(np.expand_dims(np.array(e, dtype=np.float32), axis=0))
                 inserted = True
                 track.append(counter)
             except AssertionError as a_e:
@@ -526,8 +559,9 @@ class FaissHNSWDB:
             raise
 
         try:
-            np_query_embedding = np.array(query_embedding)
-            np_query_embedding = np.reshape(np_query_embedding, (-1, self.__dimension))
+            np_query_embedding = np.expand_dims(
+                np.array(query_embedding, dtype=np.float32), axis=0
+            )
             assert np_query_embedding.shape == (1, self.__dimension)
             distances, indices = index.search(np_query_embedding, k=n_results)
             distances = distances[0]
@@ -536,10 +570,10 @@ class FaissHNSWDB:
             output = []
             for index, distance in zip(indices, distances):
                 value_dict = sqlite.get(key=str(index))
-                assert value_dict is not None, f"Inconsistency Detected"
+                assert value_dict is not None, "Inconsistency Detected"
                 # Skip the deleted
                 if "is_deleted" in value_dict:
-                    if value_dict["is_deleted"] == True:
+                    if value_dict["is_deleted"] is True:
                         continue
                 _output_object = {
                     "id": value_dict["id"],
@@ -620,14 +654,17 @@ class FaissHNSWDB:
         for key in sqlite.keys():
             value_dict = sqlite.get(key=key)
             # Skip the deleted
-            if "is_deleted" in value_dict and value_dict["is_deleted"] == True:
+            if "is_deleted" in value_dict and value_dict["is_deleted"] is True:
                 continue
             # Add to tmp db
             tmp_db.set(key=str(counter), value=value_dict)
             # Add to tmp index
-            _embedding = np.array(encoder.encode(value_dict["document"]))
-            _embedding = np.reshape(_embedding, (-1, self.__dimension))
-            tmp_index.add(_embedding)
+            _embedding = np.array(
+                encoder.encode(value_dict["document"]), dtype=np.float32
+            )
+            _embedding = np.expand_dims(_embedding, axis=0)
+            # pylint: disable = no-value-for-parameter
+            tmp_index.add(_embedding.astype(np.float32))
             counter += 1
         os.replace(tmp_sqlite_path, self.db_path)
         if self.load_strategy == LoadStrategy.EAGER:
@@ -636,3 +673,41 @@ class FaissHNSWDB:
             )
             self.__index = tmp_index
         faiss.write_index(tmp_index, self.index_path)
+
+
+class FaissMemory(VectorMemory):
+    def __init__(
+        self,
+        vdb: FaissDB,
+        encoder: Encoder,
+        split_text_config: SplitTextConfig,
+        **kwargs,
+    ):
+        super().__init__(vdb, encoder, split_text_config, **kwargs)
+
+    def add(self, document_string: str, **kwargs):
+        identifier = kwargs.get("identifier", str(uuid.uuid4()))
+        metadata = kwargs.get("metadata", None)
+        document_chunks = self.split_text(document_string)
+
+        if metadata is not None:
+            metas = []
+            ids = []
+            for i in range(len(document_chunks)):
+                meta = deepcopy(metadata)
+                meta["page"] = i
+                meta["parent"] = identifier
+                metas.append(meta)
+                ids.append(f"{identifier}-{i}")
+            self.vdb.add(
+                documents=document_chunks,
+                metadatas=metas,
+                ids=ids,
+                embeddings=self.encoder.encode(document_chunks),
+            )
+        else:
+            self.vdb.add(
+                documents=document_chunks,
+                ids=[f"{identifier}-{i}" for i in range(len(document_chunks))],
+                embeddings=self.encoder.encode(document_chunks),
+            )
