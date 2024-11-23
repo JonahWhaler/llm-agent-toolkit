@@ -1,0 +1,11 @@
+exclude .gitignore
+exclude *.log
+exclude *.env
+
+prune venv
+prune .mypy_cache
+prune dev
+prune snippet
+prune tests
+prune build
+prune dist
