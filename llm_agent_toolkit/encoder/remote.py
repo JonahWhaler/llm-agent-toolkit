@@ -21,7 +21,7 @@ class OpenAIEncoder(Encoder):
             if model_name == profile["name"] and dimension == profile["dimension"]:
                 break
         else:
-            raise ValueError(f"Either model name or dimension are not supported.")
+            raise ValueError("Either model name or dimension are not supported.")
 
     def encode(self, text: str) -> list[float]:
         try:
