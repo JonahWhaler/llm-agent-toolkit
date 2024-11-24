@@ -70,10 +70,10 @@ class ImageGenerationConfig(ModelConfig):
 
     @model_validator(mode="after")
     def size_must_be_valid(cls, values):  # pylint: disable=no-self-argument
-        if values.model_name == "dall-e-2":
+        if values.name == "dall-e-2":
             if values.size not in ["1024x1024", "512x512", "256x256"]:
                 raise ValueError("size must be one of 1024x1024, 512x512, 256x256")
-        if values.model_name == "dall-e-3":
+        if values.name == "dall-e-3":
             if values.size not in ["1024x1024", "1792x1024", "1024x1792"]:
                 raise ValueError("size must be one of 1024x1024, 1792x1024, 1024x1792")
         return values
