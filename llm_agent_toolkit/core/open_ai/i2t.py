@@ -9,6 +9,12 @@ from ..._util import (
     MessageBlock,
 )
 
+TOOL_PROMPT = """
+Utilize tools to solve the problems. 
+Results from tools will be kept in the context. 
+Calling the tools repeatedly is highly discouraged.
+"""
+
 
 class I2T_OAI_Core(I2T_Core):
     """
@@ -79,6 +85,9 @@ class I2T_OAI_Core(I2T_Core):
             tools_metadata = []
             for tool in self.tools:
                 tools_metadata.append(tool.info)
+            msgs.append(
+                MessageBlock(role=CreatorRole.SYSTEM.value, content=TOOL_PROMPT)
+            )
         else:
             tools_metadata = None
 
@@ -174,6 +183,9 @@ class I2T_OAI_Core(I2T_Core):
             tools_metadata = []
             for tool in self.tools:
                 tools_metadata.append(tool.info)
+            msgs.append(
+                MessageBlock(role=CreatorRole.SYSTEM.value, content=TOOL_PROMPT)
+            )
         else:
             tools_metadata = None
 

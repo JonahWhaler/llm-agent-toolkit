@@ -1,6 +1,6 @@
-from mailbox import Message
 import os
 import warnings
+import logging
 import openai
 from ..._core import Core
 from ..._util import (
@@ -9,6 +9,16 @@ from ..._util import (
     MessageBlock,
 )
 from ..._tool import Tool
+
+
+logger = logging.getLogger(__name__)
+
+
+TOOL_PROMPT = """
+Utilize tools to solve the problems. 
+Results from tools will be kept in the context. 
+Calling the tools repeatedly is highly discouraged.
+"""
 
 
 class T2T_OAI_Core(Core):
@@ -60,6 +70,9 @@ class T2T_OAI_Core(Core):
             tools_metadata = []
             for tool in self.tools:
                 tools_metadata.append(tool.info)
+            msgs.append(
+                MessageBlock(role=CreatorRole.SYSTEM.value, content=TOOL_PROMPT)
+            )
         else:
             tools_metadata = None
         if isinstance(self.config, ChatCompletionConfig):
@@ -140,6 +153,9 @@ class T2T_OAI_Core(Core):
             tools_metadata = []
             for tool in self.tools:
                 tools_metadata.append(tool.info)
+            msgs.append(
+                MessageBlock(role=CreatorRole.SYSTEM.value, content=TOOL_PROMPT)
+            )
         else:
             tools_metadata = None
 
