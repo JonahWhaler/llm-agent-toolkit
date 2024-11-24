@@ -198,7 +198,6 @@ class LazyTool(Tool):
         Notes:
             - Pass the wrapped function to `asyncrio.run` if the function is asynchronous.
         """
-        assert not inspect.iscoroutinefunction(self.__function)
         j_params = json.loads(params)
         valid_input, error_msg = self.validate(**j_params)
         if not valid_input and error_msg:
