@@ -252,8 +252,62 @@ def create_custom_tool_example_1():
     A, B = 1, 2
     result = custom_tool.run(params=json.dumps({"a": A, "b": B}))
 
-    logger.info("\n%s", json.dumps(result, indent=4))
+    logger.info("\n%d + %d = %s", A, B, json.dumps(result, indent=4))
     logger.info("END create_custom_tool_example_1")
+
+
+async def create_custom_tool_example_2():
+    import json
+
+    class CustomTool(Tool):
+        def __init__(
+            self, func_info: FunctionInfo, is_coroutine_function: bool = False
+        ):
+            super().__init__(
+                func_info=func_info, is_coroutine_function=is_coroutine_function
+            )
+
+        def run(self, params: str) -> str:
+            j_params = json.loads(params)
+            c = int(j_params["a"]) + int(j_params["b"])
+            return str(c)
+
+        async def run_async(self, params: str) -> str:
+            j_params = json.loads(params)
+            await asyncio.sleep(1)
+            c = int(j_params["a"]) + int(j_params["b"])
+            return str(c)
+
+    fi = FunctionInfo(
+        name="Two Number Sum",
+        description="Returns the sum of two numbers",
+        parameters=FunctionParameters(
+            required=["a", "b"],
+            type="object",
+            properties=[
+                FunctionProperty(
+                    name="a",
+                    type=FunctionPropertyType.NUMBER,
+                    description="The first number",
+                ),
+                FunctionProperty(
+                    name="b",
+                    type=FunctionPropertyType.NUMBER,
+                    description="The second number",
+                ),
+            ],
+        ),
+    )
+
+    custom_tool = CustomTool(func_info=fi, is_coroutine_function=True)
+
+    logger.info("\n%s", json.dumps(custom_tool.info, indent=4))
+
+    A, B = 1, 2
+    result = await custom_tool.run_async(params=json.dumps({"a": A, "b": B}))
+
+    logger.info("\n%d + %d = %s", A, B, json.dumps(result, indent=4))
+    logger.info("END create_custom_tool_example_2")
 
 
 if __name__ == "__main__":
@@ -270,4 +324,5 @@ if __name__ == "__main__":
 
     logger.info("BEGIN CustomTool Example")
     create_custom_tool_example_1()
+    asyncio.run(create_custom_tool_example_2())
     logger.info("END CustomTool Example")
