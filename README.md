@@ -1,6 +1,8 @@
 # LLM Agent Toolkit: Modular Components for AI WOrkflows
 LLM Agent Toolkit provides minimal, modular interfaces for core components in LLM-based applications. Simplify workflows with stateless interaction, embedding encoders, memory management, tool integration, and data loaders, designed for compatibility and scalability. It prioritizes simplicity and modularity by proposing minimal wrappers designed to work across common tools, discouraging direct access to underlying technologies. Specific implementations and examples will be documented separately in a Cookbook (planned).
 
+![PyPI Downloads](https://static.pepy.tech/badge/llm-agent-toolkit)
+
 ## Table of Contents
 - [LLM Agent Toolkit: Modular Components for AI WOrkflows](#llm-agent-toolkit-modular-components-for-ai-workflows)
   - [Table of Contents](#table-of-contents)
