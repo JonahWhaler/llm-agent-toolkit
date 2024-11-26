@@ -1,3 +1,3 @@
-from . import open_ai
+from . import open_ai, local
 
-__all__ = ["open_ai"]
+__all__ = ["open_ai", "local"]

@@ -131,6 +131,7 @@ class CreatorRole(str, Enum):
     USER = "user"
     ASSISTANT = "assistant"
     FUNCTION = "function"
+    TOOL = "tool"
 
 
 class MessageBlock(TypedDict, total=False):
