@@ -80,7 +80,6 @@ class I2T_OAI_Core(I2T_Core):
                 }
             )
         msgs.append(MessageBlock(role=CreatorRole.USER.value, content=query))
-        number_of_primers = len(msgs)
         if self.tools is not None:
             tools_metadata = []
             for tool in self.tools:
@@ -91,6 +90,7 @@ class I2T_OAI_Core(I2T_Core):
         else:
             tools_metadata = None
 
+        number_of_primers = len(msgs)
         if isinstance(self.config, ChatCompletionConfig):
             temperature = self.config.temperature
             max_tokens = self.config.max_tokens
@@ -178,7 +178,6 @@ class I2T_OAI_Core(I2T_Core):
                 }
             )
         msgs.append(MessageBlock(role=CreatorRole.USER.value, content=query))
-        number_of_primers = len(msgs)
         if self.tools is not None:
             tools_metadata = []
             for tool in self.tools:
@@ -188,7 +187,7 @@ class I2T_OAI_Core(I2T_Core):
             )
         else:
             tools_metadata = None
-
+        number_of_primers = len(msgs)
         if isinstance(self.config, ChatCompletionConfig):
             temperature = self.config.temperature
             max_tokens = self.config.max_tokens
