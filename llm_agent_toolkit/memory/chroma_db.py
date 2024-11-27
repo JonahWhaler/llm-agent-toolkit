@@ -23,13 +23,20 @@ class ChromaMemory(VectorMemory):
         super().__init__(vdb, encoder, split_text_config, **kwargs)
         self.__namespace = kwargs.get("namespace", "default")
         overwrite: bool = kwargs.get("overwrite", False)
-        if self.vdb.get_collection(name=self.__namespace) and overwrite == True:
-            self.vdb.delete_collection(name=self.__namespace)
-            self.vdb.create_collection(
-                name=self.__namespace, metadata={"hnsw:space": "cosine"}
-            )
+        if overwrite:
+            try:
+                self.vdb.delete_collection(name=self.__namespace)
+                # delete_collection raises InvalidCollectionException
+                # if attempt to delete non-exists collection
+            except (chromadb.errors.InvalidCollectionException, ValueError):
+                pass  # self.__namespace is not found in the vector database
+            finally:
+                self.vdb.create_collection(
+                    name=self.__namespace, metadata={"hnsw:space": "cosine"}
+                )
         else:
-            self.vdb.create_collection(
+            # Create collection if not already present
+            self.vdb.get_or_create_collection(
                 name=self.__namespace, metadata={"hnsw:space": "cosine"}
             )
 
