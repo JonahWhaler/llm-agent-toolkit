@@ -79,7 +79,7 @@ class AudioHelper:
         AudioHelper.validate_input(filepath, buffer_name, output_folder)
 
         ext = os.path.splitext(filepath)[-1]
-        if ext in ["ogg", "oga"]:
+        if ext in [".ogg", ".oga"]:
             return None
 
         with open(filepath, "rb") as reader:

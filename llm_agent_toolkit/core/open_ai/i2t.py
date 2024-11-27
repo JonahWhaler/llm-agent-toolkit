@@ -34,11 +34,11 @@ class I2T_OAI_Core(I2T_Core):
         Synchronously call tools.
 
     **Notes:**
-    - Supported image format: png, jpeg, gif, webp
+    - Supported image format: .png, .jpeg, .gif, .webp
     - Tools are supported.
     """
 
-    SUPPORTED_IMAGE_FORMATS = ("png", "jpeg", "gif", "webp")
+    SUPPORTED_IMAGE_FORMATS = (".png", ".jpeg", ".gif", ".webp")
 
     def __init__(
         self,
