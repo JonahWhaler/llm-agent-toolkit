@@ -1,7 +1,9 @@
+from tarfile import SUPPORTED_TYPES
 from typing import TypedDict
 
 import torch
 from transformers import AutoTokenizer, AutoModel, logging  # type: ignore
+import ollama
 
 from .._encoder import Encoder, EncoderProfile
 
@@ -70,3 +72,34 @@ class TransformerEncoder(Encoder):
             return (
                 embeddings[0].cpu().numpy()
             )  # Return as a NumPy array for easy handling
+
+
+class OllamaEncoder(Encoder):
+    SUPPORTED_MODELS = (
+        EncoderProfile(name="bge-m3", dimension=1024),
+        EncoderProfile(name="mxbai-embed-large", dimension=1024),
+        EncoderProfile(name="snowflake-arctic-embed", dimension=1024),
+    )
+
+    def __init__(self, connection_string: str, model_name: str):
+        self.__connection_string = connection_string
+        self.__model_name = model_name
+        self.__dimension = 1024
+
+    @property
+    def dimension(self) -> int:
+        return self.__dimension
+
+    @property
+    def CONN_STRING(self) -> str:
+        return self.__connection_string
+
+    def encode(self, text: str) -> list[float]:
+        try:
+            client = ollama.Client(host=self.CONN_STRING)
+            response = client.embeddings(model=self.__model_name, prompt=text)  # type: ignore
+            embedding = response.get("embedding")
+            return [float(x) for x in embedding]
+        except Exception as e:
+            print(str(e))
+            raise
