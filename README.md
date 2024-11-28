@@ -1,11 +1,17 @@
 # LLM Agent Toolkit: Modular Components for AI WOrkflows
 LLM Agent Toolkit provides minimal, modular interfaces for core components in LLM-based applications. Simplify workflows with stateless interaction, embedding encoders, memory management, tool integration, and data loaders, designed for compatibility and scalability. It prioritizes simplicity and modularity by proposing minimal wrappers designed to work across common tools, discouraging direct access to underlying technologies. Specific implementations and examples will be documented separately in a Cookbook (planned).
 
-![PyPI Downloads](https://static.pepy.tech/badge/llm-agent-toolkit)
+PyPI: ![PyPI Downloads](https://static.pepy.tech/badge/llm-agent-toolkit)
 
-## Table of Contents
+## Attention!!!
+Using this toolkit simplifies integration by providing unified and modular interfaces across platforms. Many configurations are intentionally kept at their default settings to prioritize ease of use. However, most of these components are extensible through abstract classes, allowing developers to define their own desired configurations for greater flexibility. While this approach enhances consistency and reduces complexity, advanced customization may require extending the provided abstractions. 
+
+For developers requiring full-range customization or access to the latest features, it is recommended to consider using native libraries like `ollama` and `openai` directly.
+
+# Table of Contents
 - [LLM Agent Toolkit: Modular Components for AI WOrkflows](#llm-agent-toolkit-modular-components-for-ai-workflows)
-  - [Table of Contents](#table-of-contents)
+  - [Attention!!!](#attention)
+- [Table of Contents](#table-of-contents)
 - [Installation](#installation)
 - [Fundamental Components](#fundamental-components)
   - [Core:](#core)
@@ -20,7 +26,7 @@ LLM Agent Toolkit provides minimal, modular interfaces for core components in LL
   `
   pip install llm-agent-toolkit
   `
-  
+
 # Fundamental Components
 ## Core: 
 
@@ -32,6 +38,7 @@ A stateless interface to interact with the LLM.
 * Supports multiple input-output modalities (e.g., Text-to-Text, Text-to-Image).
 * Enables iterative executions for multi-step workflows.
 * Facilitates tool invocation as part of the workflow.
+* Support models from OpenAI and Ollama
 
 ## Encoder:
 A standardized wrapper for embedding models.
@@ -41,6 +48,7 @@ A standardized wrapper for embedding models.
 **Features**:
 * Abstracts away model-specific details (e.g., dimensionality, framework differences).
 * Allows flexible integration with downstream components like Memory or retrieval mechanisms.
+* Support OpenAI, Ollama and Transformers
 
 ## Memory: 
 Offers essential context retention capabilities.
@@ -53,6 +61,7 @@ Offers essential context retention capabilities.
 2. *Vector Memory*:
     * Combines embedding and storage for retrieval-augmented workflows.
     * Includes optional metadata management for filtering results.
+    * Support Faiss and Chroma
 
 ## Tool:
 A unified interface for augmenting the LLM's functionality.
@@ -73,7 +82,6 @@ Responsible for converting raw data into text.
 
 # Planned Feature
 - A Cookbook with detailed implementation examples.
-- Release to PyPI.
 
 # License
 This project is licensed under the GNU General Public License v3.0 License. See the [LICENSE](LICENSE) file for details.
