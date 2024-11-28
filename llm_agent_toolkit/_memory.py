@@ -16,6 +16,8 @@ class ShortTermMemory:
 
     def last_n(self, n: int = 10) -> list[MessageBlock | dict]:
         q_len = len(self.__dq)
+        if n >= q_len:
+            return self.to_list()
         return list(islice(self.__dq, q_len - n, q_len))
 
     def to_list(self) -> list[MessageBlock | dict]:
