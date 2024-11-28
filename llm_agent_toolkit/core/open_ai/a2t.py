@@ -97,7 +97,7 @@ class A2T_OAI_Core(A2T_Core):
                 )
             return [*output]
         except Exception as e:
-            print(f"run_async: {e}")
+            # print(f"run_async: {e}")
             raise
 
     def run(
@@ -161,5 +161,5 @@ class A2T_OAI_Core(A2T_Core):
                 )
             return [*output]
         except Exception as e:
-            print(f"run_async: {e}")
+            # print(f"run_async: {e}")
             raise

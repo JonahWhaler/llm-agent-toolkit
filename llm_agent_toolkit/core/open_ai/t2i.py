@@ -83,7 +83,7 @@ class T2I_OAI_Core(Core):
 
             return [*output]
         except Exception as e:
-            print(f"run_async: {e}")
+            # print(f"run_async: {e}")
             raise
 
     def run(
@@ -131,5 +131,5 @@ class T2I_OAI_Core(Core):
 
             return [*output]
         except Exception as e:
-            print(f"run_async: {e}")
+            # print(f"run_async: {e}")
             raise

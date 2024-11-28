@@ -98,7 +98,7 @@ class T2T_OLM_Core(Core):
         try:
             client = ollama.Client(host=self.CONN_STRING)
             while iteration < self.config.max_iteration and token_count < max_tokens:
-                print(f"\n\nIteration: {iteration}")
+                # print(f"\n\nIteration: {iteration}")
                 response = client.chat(
                     model=self.model_name,
                     messages=msgs,
@@ -182,7 +182,7 @@ class T2T_OLM_Core(Core):
         try:
             client = ollama.AsyncClient(host=self.CONN_STRING)
             while iteration < self.config.max_iteration and token_count < max_tokens:
-                print(f"\n\nIteration: {iteration}")
+                # print(f"\n\nIteration: {iteration}")
                 response = await client.chat(
                     model=self.model_name,
                     messages=msgs,

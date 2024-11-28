@@ -87,7 +87,7 @@ class T2T_OAI_Core(Core):
         try:
             client = openai.AsyncOpenAI(api_key=os.environ["OPENAI_API_KEY"])
             while iteration < self.config.max_iteration and token_count < max_tokens:
-                print(f"\n\nIteration: {iteration}")
+                # print(f"\n\nIteration: {iteration}")
                 response = await client.chat.completions.create(
                     model=self.model_name,
                     messages=msgs,  # type: ignore
@@ -125,7 +125,7 @@ class T2T_OAI_Core(Core):
                     )
             return msgs[number_of_primers:]  # Return only the generated messages
         except Exception as e:
-            print(f"run_async: {e}")
+            # print(f"run_async: {e}")
             raise
 
     def run(
@@ -170,7 +170,7 @@ class T2T_OAI_Core(Core):
         try:
             client = openai.OpenAI(api_key=os.environ["OPENAI_API_KEY"])
             while iteration < self.config.max_iteration and token_count < max_tokens:
-                print(f"\n\nIteration: {iteration}")
+                # print(f"\n\nIteration: {iteration}")
                 response = client.chat.completions.create(
                     model=self.model_name,
                     messages=msgs,  # type: ignore
@@ -211,7 +211,7 @@ class T2T_OAI_Core(Core):
                     )
             return msgs[number_of_primers:]  # Return only the generated messages
         except Exception as e:
-            print(f"run: {e}")
+            # print(f"run: {e}")
             raise
 
     async def __call_tools_async(

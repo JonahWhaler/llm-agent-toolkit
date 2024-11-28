@@ -118,7 +118,7 @@ class I2T_OLM_Core(I2T_Core):
         try:
             client = ollama.Client(host=self.CONN_STRING)
             while iteration < self.config.max_iteration and token_count < max_tokens:
-                print(f"\n\nIteration: {iteration}")
+                # print(f"\n\nIteration: {iteration}")
                 response = client.chat(
                     model=self.model_name,
                     messages=msgs,
@@ -157,7 +157,7 @@ class I2T_OLM_Core(I2T_Core):
                     )
             return msgs[number_of_primers:]  # Return only the generated messages
         except Exception as e:
-            print(f"run: {e}")
+            # print(f"run: {e}")
             raise
 
     async def run_async(
@@ -213,7 +213,7 @@ class I2T_OLM_Core(I2T_Core):
         try:
             client = ollama.AsyncClient(host=self.CONN_STRING)
             while iteration < self.config.max_iteration and token_count < max_tokens:
-                print(f"\n\nIteration: {iteration}")
+                # print(f"\n\nIteration: {iteration}")
                 response = await client.chat(
                     model=self.model_name,
                     messages=msgs,
@@ -251,7 +251,7 @@ class I2T_OLM_Core(I2T_Core):
                     )
             return msgs[number_of_primers:]  # Return only the generated messages
         except Exception as e:
-            print(f"run: {e}")
+            # print(f"run: {e}")
             raise
 
     async def __call_tools_async(

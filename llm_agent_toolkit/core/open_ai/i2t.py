@@ -104,7 +104,7 @@ class I2T_OAI_Core(I2T_Core):
         try:
             client = openai.AsyncOpenAI(api_key=os.environ["OPENAI_API_KEY"])
             while iteration < self.config.max_iteration and token_count < max_tokens:
-                print(f"\n\nIteration: {iteration}")
+                # print(f"\n\nIteration: {iteration}")
                 response = await client.chat.completions.create(
                     model=self.model_name,
                     messages=msgs,  # type: ignore
@@ -144,7 +144,7 @@ class I2T_OAI_Core(I2T_Core):
                     )
             return msgs[number_of_primers:]  # Return only the generated messages
         except Exception as e:
-            print(f"run: {e}")
+            # print(f"run: {e}")
             raise
 
     def run(
@@ -200,7 +200,7 @@ class I2T_OAI_Core(I2T_Core):
         try:
             client = openai.OpenAI(api_key=os.environ["OPENAI_API_KEY"])
             while iteration < self.config.max_iteration and token_count < max_tokens:
-                print(f"\n\nIteration: {iteration}")
+                # print(f"\n\nIteration: {iteration}")
                 response = client.chat.completions.create(
                     model=self.model_name,
                     messages=msgs,  # type: ignore
@@ -241,7 +241,7 @@ class I2T_OAI_Core(I2T_Core):
                     )
             return msgs[number_of_primers:]  # Return only the generated messages
         except Exception as e:
-            print(f"run: {e}")
+            # print(f"run: {e}")
             raise
 
     @staticmethod
@@ -256,7 +256,7 @@ class I2T_OAI_Core(I2T_Core):
                 encoded_image = base64.b64encode(f.read()).decode("utf-8")
                 return f"{prefix},{encoded_image}"
         except Exception as e:
-            print(f"get_image_url: {e}")
+            # print(f"get_image_url: {e}")
             raise
 
     async def __call_tools_async(
