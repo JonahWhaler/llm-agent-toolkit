@@ -138,14 +138,17 @@ class SemanticChunker(Chunker):
         similarity = dot_product / (norm1 * norm2) if norm1 != 0 and norm2 != 0 else 0
         return similarity
 
-    def group_coherance(self, group_embeddings: list[list[float]]) -> float:
-        if len(group_embeddings) <= 1:
-            return 0  # Undefined
+    def group_coherance(
+        self, embeddings: list[list[float]], start: int, end: int
+    ) -> float:
+        if end - start <= 1:
+            return 0
+
         pairwise_similarities = []
-        for vi in range(len(group_embeddings)):
-            va = group_embeddings[vi]
-            for vj in range(vi + 1, len(group_embeddings)):
-                vb = group_embeddings[vj]
+        for vi in range(start, end):
+            va = embeddings[vi]
+            for vj in range(vi + 1, end):
+                vb = embeddings[vj]
                 key = (vi, vj)
                 if key not in self.similarity_cache:
                     self.similarity_cache[key] = self.cosine_similarity(va, vb)
@@ -172,8 +175,7 @@ class SemanticChunker(Chunker):
             scores = []
             offset = 0
             for g in grouping:
-                embedding_chunk = embeddings[offset : offset + g]
-                coherence_score = self.group_coherance(embedding_chunk)
+                coherence_score = self.group_coherance(embeddings, offset, offset + g)
                 scores.append(coherence_score)
                 offset += g
             avg_score = sum(scores) / len(scores)
