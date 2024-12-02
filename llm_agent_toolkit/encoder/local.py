@@ -76,11 +76,10 @@ class TransformerEncoder(Encoder):
         Warnings:
         - If the selected model has not been tested in this project.
         """
-        self.__model_name = model_name
         for profile in TransformerEncoder.SUPPORTED_MODELS:
             if model_name == profile["name"]:
-                self.__dimension = profile["dimension"]
-                self.__ctx_length = profile["ctx_length"]
+                dimension = profile["dimension"]
+                ctx_length = profile["ctx_length"]
                 break
         else:
             logger.warning(
@@ -88,21 +87,10 @@ class TransformerEncoder(Encoder):
             )
             if not isinstance(dimension, int):
                 raise TypeError("Invalid argument. Expect dimension to be type int.")
-            self.__dimension = dimension
 
             if not isinstance(ctx_length, int):
                 raise TypeError("Invalid argument. Expect ctx_length to be type int.")
-            self.__ctx_length = ctx_length
-
-    @property
-    def dimension(self) -> int:
-        """Output dimension of the generated embedding."""
-        return self.__dimension
-
-    @property
-    def ctx_length(self) -> int:
-        """Number of word/token the embedding model can handle."""
-        return self.__ctx_length
+        super().__init__(model_name, dimension, ctx_length)
 
     def encode(self, text: str) -> list[float]:
         """Transform string to embedding."""
@@ -174,11 +162,10 @@ class OllamaEncoder(Encoder):
         - If the selected model has not been tested in this project.
         """
         self.__connection_string = connection_string
-        self.__model_name = model_name
         for profile in OllamaEncoder.SUPPORTED_MODELS:
             if profile["name"] == model_name:
-                self.__ctx_length = profile["ctx_length"]
-                self.__dimension = profile["dimension"]
+                ctx_length = profile["ctx_length"]
+                dimension = profile["dimension"]
                 break
         else:
             logger.warning(
@@ -186,21 +173,10 @@ class OllamaEncoder(Encoder):
             )
             if not isinstance(dimension, int):
                 raise TypeError("Invalid argument. Expect dimension to be type int.")
-            self.__dimension = dimension
 
             if not isinstance(ctx_length, int):
                 raise TypeError("Invalid argument. Expect ctx_length to be type int.")
-            self.__ctx_length = ctx_length
-
-    @property
-    def dimension(self) -> int:
-        """Output dimension of the generated embedding."""
-        return self.__dimension
-
-    @property
-    def ctx_length(self) -> int:
-        """Number of word/token the embedding model can handle."""
-        return self.__ctx_length
+        super().__init__(model_name, dimension, ctx_length)
 
     @property
     def CONN_STRING(self) -> str:
