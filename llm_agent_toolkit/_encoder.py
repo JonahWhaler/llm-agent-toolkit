@@ -16,3 +16,4 @@ class Encoder(ABC):
 class EncoderProfile(TypedDict):
     name: str
     dimension: int
+    ctx_length: int
