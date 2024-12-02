@@ -132,16 +132,11 @@ class SemanticChunker(Chunker):
         self.similarity_cache: dict = {}  # Cache for cosine similarity
 
     def cosine_similarity(self, vec1: list[float], vec2: list[float]) -> float:
-        key = (tuple(vec1), tuple(vec2))
-        if key not in self.similarity_cache:
-            dot_product = sum(a * b for a, b in zip(vec1, vec2))
-            norm1 = sum(a * a for a in vec1) ** 0.5
-            norm2 = sum(b * b for b in vec2) ** 0.5
-            similarity = (
-                dot_product / (norm1 * norm2) if norm1 != 0 and norm2 != 0 else 0
-            )
-            self.similarity_cache[key] = similarity
-        return self.similarity_cache[key]
+        dot_product = sum(a * b for a, b in zip(vec1, vec2))
+        norm1 = sum(a * a for a in vec1) ** 0.5
+        norm2 = sum(b * b for b in vec2) ** 0.5
+        similarity = dot_product / (norm1 * norm2) if norm1 != 0 and norm2 != 0 else 0
+        return similarity
 
     def group_coherance(self, group_embeddings: list[list[float]]) -> float:
         if len(group_embeddings) <= 1:
@@ -151,7 +146,11 @@ class SemanticChunker(Chunker):
             va = group_embeddings[vi]
             for vj in range(vi + 1, len(group_embeddings)):
                 vb = group_embeddings[vj]
-                pairwise_similarities.append(self.cosine_similarity(va, vb))
+                key = (vi, vj)
+                if key not in self.similarity_cache:
+                    self.similarity_cache[key] = self.cosine_similarity(va, vb)
+                similarity = self.similarity_cache[key]
+                pairwise_similarities.append(similarity)
         return (
             sum(pairwise_similarities) / len(pairwise_similarities)
             if pairwise_similarities
@@ -163,7 +162,7 @@ class SemanticChunker(Chunker):
         lines = re.split(r"(?<=[.?!])\s+", long_text.strip())
         embeddings = [self.encoder.encode(line) for line in lines]
         full_len = len(lines)
-        grouping = self.random_groups(full_len, k)
+        grouping = self.init(full_len, k)  # Initialize a random arrangement
         best_group = grouping
         max_iteration = 100
         iteration = 0
@@ -195,7 +194,7 @@ class SemanticChunker(Chunker):
         return doc_list
 
     @staticmethod
-    def random_groups(total_capacity: int, k: int) -> list[int]:
+    def init(total_capacity: int, k: int) -> list[int]:
         remainer = total_capacity
         # Random Exploration, encourage even distribution
         # Does not support overlapping
