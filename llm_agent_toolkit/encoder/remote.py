@@ -25,15 +25,28 @@ class OpenAIEncoder(Encoder):
             raise ValueError("Either model name or dimension are not supported.")
         super().__init__(model_name, dimension, ctx_length)
 
-    def encode(self, text: str) -> list[float]:
+    def encode(self, text: str, **kwargs) -> list[float]:
         try:
             client = openai.OpenAI(api_key=os.environ["OPENAI_API_KEY"])
             response = client.embeddings.create(
-                model=self.__model_name,
-                dimensions=self.__dimension,
+                model=self.model_name,
+                dimensions=self.dimension,
                 input=text,
             )
             return response.data[0].embedding
         except Exception as e:
-            logger.error(msg=f"{self.__model_name}.encode failed. Error: {str(e)}")
+            logger.error(msg=f"{self.model_name}.encode failed. Error: {str(e)}")
+            raise
+
+    def encode_v2(self, text: str, **kwargs) -> tuple[list[float], int]:
+        try:
+            client = openai.OpenAI(api_key=os.environ["OPENAI_API_KEY"])
+            response = client.embeddings.create(
+                model=self.model_name,
+                dimensions=self.dimension,
+                input=text,
+            )
+            return (response.data[0].embedding, response.usage.total_tokens)
+        except Exception as e:
+            logger.error(msg=f"{self.model_name}.encode failed. Error: {str(e)}")
             raise

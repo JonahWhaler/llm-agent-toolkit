@@ -24,7 +24,35 @@ class Encoder(ABC):
         return self.__ctx_length
 
     @abstractmethod
-    def encode(self, text: str) -> list[float]:
+    def encode(self, text: str, **kwargs) -> list[float]:
+        """Transform string to embedding.
+
+        Args:
+            text (str): Content to be embedded.
+            kwargs (dict): Optional additional arguments to customize encoding.
+                            This is intended for use by subclasses to extend or modify
+                            the behavior of the `encode` method, such as configuring
+                            tokenization, truncation, padding, or any model-specific parameters.
+
+        Returns:
+            list[float]: Embedding
+        """
+        raise NotImplementedError
+
+    @abstractmethod
+    def encode_v2(self, text: str, **kwargs) -> tuple[list[float], int]:
+        """Transform string to embedding.
+
+        Args:
+            text(str): Content to be embedded.
+            kwargs (dict): Optional additional arguments to customize encoding.
+                            This is intended for use by subclasses to extend or modify
+                            the behavior of the `encode_v2` method, such as configuring
+                            tokenization, truncation, padding, or any model-specific parameters.
+
+        Returns:
+            tuple: Embedding, Token Count
+        """
         raise NotImplementedError
 
 

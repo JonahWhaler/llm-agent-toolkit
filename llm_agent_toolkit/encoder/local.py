@@ -92,28 +92,72 @@ class TransformerEncoder(Encoder):
                 raise TypeError("Invalid argument. Expect ctx_length to be type int.")
         super().__init__(model_name, dimension, ctx_length)
 
-    def encode(self, text: str) -> list[float]:
-        """Transform string to embedding."""
+    def encode(self, text: str, **kwargs) -> list[float]:
+        """Transform string to embedding.
+
+        Args:
+            text (str): Content to be embedded.
+            kwargs (dict): Ignored
+
+        Returns:
+            list[float]: Embedding
+
+        Notes:
+        * truncate=True
+        * padding=False
+        * add_special_tokens=True
+        """
         try:
             tokenizer = AutoTokenizer.from_pretrained(self.__model_name, use_fast=True)
-            model = AutoModel.from_pretrained(self.__model_name)
-            return self.__to_embedding(model, tokenizer, text)
+            tokens = tokenizer(
+                text,
+                return_tensors="pt",
+                truncation=True,
+                padding=False,
+                add_special_tokens=True,
+            )
+            model = AutoModel.from_pretrained(self.model_name)
+            return self.__to_embedding(model, tokens)
         except Exception as e:
-            logger.error(msg=f"{self.__model_name}.encode failed. Error: {str(e)}")
+            logger.error(msg=f"{self.model_name}.encode failed. Error: {str(e)}")
+            raise
+
+    def encode_v2(self, text: str, **kwargs) -> tuple[list[float], int]:
+        """Transform string to embedding.
+
+        Args:
+            text (str): Content to be embedded.
+            kwargs (dict): Ignored.
+
+        Returns:
+            tuple: Embedding, Token Count
+
+        Notes:
+        * truncate=True
+        * padding=False
+        * add_special_tokens=True
+        """
+        try:
+            tokenizer = AutoTokenizer.from_pretrained(self.__model_name, use_fast=True)
+            tokens = tokenizer(
+                text,
+                return_tensors="pt",
+                truncation=True,
+                padding=False,
+                add_special_tokens=True,
+            )
+            token_count = len(tokens["input_ids"][0])
+            model = AutoModel.from_pretrained(self.model_name)
+            return self.__to_embedding(model, tokens), token_count
+        except Exception as e:
+            logger.error(msg=f"{self.model_name}.encode failed. Error: {str(e)}")
             raise
 
     @staticmethod
-    def __to_embedding(model, tokenizer, text):
-        """Transform string to embedding (detailed steps)."""
-        inputs = tokenizer(
-            text,
-            return_tensors="pt",
-            truncation=True,
-            padding=True,
-            add_special_tokens=True,
-        )
+    def __to_embedding(model, tokens):
+        """Transform tokens to embedding (detailed steps)."""
         with torch.no_grad():
-            outputs = model(**inputs)
+            outputs = model(**tokens)
             embeddings = outputs.last_hidden_state[:, 0, :]  # CLS token embedding
             return (
                 embeddings[0].cpu().numpy()
@@ -129,10 +173,10 @@ class OllamaEncoder(Encoder):
     # List of models this project had tested.
     SUPPORTED_MODELS = (
         EncoderProfile(
-            name="bge-m3", dimension=1024, ctx_length=8192
+            name="bge-m3:latest", dimension=1024, ctx_length=8192
         ),  # ollama pull bge-m3
         EncoderProfile(
-            name="mxbai-embed-large", dimension=1024, ctx_length=512
+            name="mxbai-embed-large:latest", dimension=1024, ctx_length=512
         ),  # ollama pull mxbai-embed-large
         EncoderProfile(
             name="snowflake-arctic-embed", dimension=1024, ctx_length=512
@@ -183,13 +227,48 @@ class OllamaEncoder(Encoder):
         """IP and PORT needed to access Ollama's API"""
         return self.__connection_string
 
-    def encode(self, text: str) -> list[float]:
-        """Transform string to embedding."""
+    def encode(self, text: str, **kwargs) -> list[float]:
+        """Transform string to embedding.
+
+        Args:
+            text (str): Content to be embedded.
+            kwargs (dict): Ignored
+
+        Returns:
+            list[float]: Embedding
+
+        Notes:
+        * truncate=True
+        """
         try:
             client = ollama.Client(host=self.CONN_STRING)
-            response = client.embeddings(model=self.__model_name, prompt=text)  # type: ignore
-            embedding = response.get("embedding")
-            return [float(x) for x in embedding]
+            response = client.embed(model=self.__model_name, input=text, truncate=True)
+            response_body = response.model_dump()
+            embeddings = [float(x) for x in response_body["embeddings"]]
+            return embeddings
+        except Exception as e:
+            logger.error(msg=f"{self.__model_name}.encode failed. Error: {str(e)}")
+            raise
+
+    def encode_v2(self, text: str, **kwargs) -> tuple[list[float], int]:
+        """Transform string to embedding.
+
+        Args:
+            text (str): Content to be embedded.
+            kwargs (dict): Ignored.
+
+        Returns:
+            tuple: Embedding, Token Count
+
+        Notes:
+        * truncate=True
+        """
+        try:
+            client = ollama.Client(host=self.CONN_STRING)
+            response = client.embed(model=self.__model_name, input=text, truncate=True)
+            response_body = response.model_dump()
+            embeddings = [float(x) for x in response_body["embeddings"]]
+            return embeddings, response_body["prompt_eval_count"]
         except Exception as e:
             logger.error(msg=f"{self.__model_name}.encode failed. Error: {str(e)}")
             raise
