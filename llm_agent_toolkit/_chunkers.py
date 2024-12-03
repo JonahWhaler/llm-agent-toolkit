@@ -182,3 +182,88 @@ class FixedGroupChunker(Chunker):
             g_string = self.reconstruct_chunk(chunk)
             output_list.append(g_string)
         return output_list
+
+
+class OptimizeStrategy(ABC):
+    @abstractmethod
+    def optimize(self, input_list: list[tuple[int, int]]) -> list[tuple[int, int]]:
+        raise NotImplementedError
+
+
+class SimulatedAnnealingStrategy(OptimizeStrategy):
+    def __init__(
+        self,
+        update_rate: float,
+        initial_temp: float,
+        cooling_rate: float,
+        constraints: dict,
+    ):
+        self.__update_rate = update_rate  # [0, 1]
+        self.__temperature = initial_temp  # [0, 1]
+        self.__cooling_rate = cooling_rate  # [0, 1]
+        self.__constraints = constraints
+
+    @property
+    def update_rate(self) -> float:
+        return self.__update_rate
+
+    @property
+    def temperature(self) -> float:
+        return self.__temperature
+
+    @property
+    def cooling_rate(self) -> float:
+        return self.__cooling_rate
+
+    def cooldown(self) -> None:
+        # Need a more robust way to cool it down
+        self.__temperature -= self.__cooling_rate
+        self.__temperature = max(0, self.__temperature)
+
+    @staticmethod
+    def drop_duplicates(grouping: list[tuple[int, int]]) -> list[tuple[int, int]]:
+        unique_set = set()
+        for group in grouping:
+            if group not in unique_set:
+                unique_set.add(group)
+        return [*unique_set]
+
+    def optimize(
+        self,
+        input_list: list[tuple[int, int]],
+    ) -> list[tuple[int, int]]:
+        RIGHT_BOUND = self.__constraints.get(
+            "RIGHT_BOUND", max([t[1] for t in input_list])
+        )
+        output_list: list[tuple[int, int]] = input_list[:]
+        k = len(input_list)
+        factor = int(k * self.update_rate)
+        for _ in range(factor):
+            point = random.randint(0, k - 1)
+            increment = random.randint(0, 1) == 0
+            reference_tuple = output_list[point]
+
+            if increment:
+                left = reference_tuple[0]
+                right = min(RIGHT_BOUND, reference_tuple[1] + 1)
+            else:
+                left = max(0, reference_tuple[0] - 1)
+                right = reference_tuple[1]
+            new_tuple = (left, right)
+            assert new_tuple[1] - new_tuple[0] >= 1
+            output_list[point] = new_tuple
+        # Handle duplicated combination
+        # Harder to have duplication with high capacity and low K
+        unique_list = self.drop_duplicates(output_list)
+        diff = k - len(unique_list)
+        if diff > 0:
+            for _ in range(diff):
+                while True:
+                    # This might end up in a very large chunk!
+                    start = random.randint(RIGHT_BOUND // 4, RIGHT_BOUND // 2)
+                    end = random.randint(start, RIGHT_BOUND // 4 * 3)
+                    new_tuple = (start, end)  # Find a random chunk within the 25 - 75 %
+                    if new_tuple not in unique_list:
+                        break
+                unique_list.append(new_tuple)
+        return unique_list
