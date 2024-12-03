@@ -122,3 +122,30 @@ class ChunkerInitializer:
 
         assert ChunkerMetrics.calculate_coverage(total_capacity, output_list) == 1.0
         return output_list
+
+
+class Chunker(ABC):
+    def __init__(self, config: dict):
+        self.__config = config
+
+    @property
+    def config(self) -> dict:
+        return self.__config
+
+    @abstractmethod
+    def split(self, long_text: str) -> list[str]:
+        raise NotImplementedError
+
+    @staticmethod
+    def reconstruct_chunk(partial_chunk: list[str]) -> str:
+        reconstructed = ""
+
+        for chunk in partial_chunk:
+            if reconstructed and chunk not in {".", "?", "!"}:
+                reconstructed += " "
+            reconstructed += chunk
+        return reconstructed
+
+    @staticmethod
+    def _split(long_text: str, pattern: str = r"([.?!])\s*") -> list[str]:
+        return re.split(pattern, long_text.strip())
