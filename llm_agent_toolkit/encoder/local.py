@@ -108,7 +108,7 @@ class TransformerEncoder(Encoder):
         * add_special_tokens=True
         """
         try:
-            tokenizer = AutoTokenizer.from_pretrained(self.__model_name, use_fast=True)
+            tokenizer = AutoTokenizer.from_pretrained(self.model_name, use_fast=True)
             tokens = tokenizer(
                 text,
                 return_tensors="pt",
@@ -138,7 +138,7 @@ class TransformerEncoder(Encoder):
         * add_special_tokens=True
         """
         try:
-            tokenizer = AutoTokenizer.from_pretrained(self.__model_name, use_fast=True)
+            tokenizer = AutoTokenizer.from_pretrained(self.model_name, use_fast=True)
             tokens = tokenizer(
                 text,
                 return_tensors="pt",
@@ -242,12 +242,12 @@ class OllamaEncoder(Encoder):
         """
         try:
             client = ollama.Client(host=self.CONN_STRING)
-            response = client.embed(model=self.__model_name, input=text, truncate=True)
+            response = client.embed(model=self.model_name, input=text, truncate=True)
             response_body = response.model_dump()
-            embeddings = [float(x) for x in response_body["embeddings"]]
+            embeddings = [float(x) for x in response_body["embeddings"][0]]
             return embeddings
         except Exception as e:
-            logger.error(msg=f"{self.__model_name}.encode failed. Error: {str(e)}")
+            logger.error(msg=f"{self.model_name}.encode failed. Error: {str(e)}")
             raise
 
     def encode_v2(self, text: str, **kwargs) -> tuple[list[float], int]:
@@ -265,10 +265,10 @@ class OllamaEncoder(Encoder):
         """
         try:
             client = ollama.Client(host=self.CONN_STRING)
-            response = client.embed(model=self.__model_name, input=text, truncate=True)
+            response = client.embed(model=self.model_name, input=text, truncate=True)
             response_body = response.model_dump()
-            embeddings = [float(x) for x in response_body["embeddings"]]
+            embeddings = [float(x) for x in response_body["embeddings"][0]]
             return embeddings, response_body["prompt_eval_count"]
         except Exception as e:
-            logger.error(msg=f"{self.__model_name}.encode failed. Error: {str(e)}")
+            logger.error(msg=f"{self.model_name}.encode failed. Error: {str(e)}")
             raise
