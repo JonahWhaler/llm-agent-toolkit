@@ -105,6 +105,9 @@ class RandomInitializer:
     Attributes:
         - total_capacity (int): The total size of be divided into chunks.
         - k (int): The number of chunks to create.
+
+    Notes:
+    * Guarantee coverage of 1.0
     """
 
     def __init__(self, total_capacity: int, k: int):
@@ -165,6 +168,7 @@ class Chunker(ABC):
             Reconstructs a single text string from a list of partial chunks.
             Ensures proper spacing and punctuation between chunks.
     """
+
     def __init__(self, config: dict):
         self.__config = config
 
