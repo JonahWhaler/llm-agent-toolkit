@@ -191,7 +191,7 @@ class SemanticChunker(Chunker):
             token_counts.append(tc)
         # Separators are not included, therefore, this is only a close estimation.
         total_tokens = sum(token_counts)
-        ideal_k = total_tokens // self.__encoder.ctx_length
+        ideal_k = total_tokens // self.encoder.ctx_length
         K: int = self.config.get("K", ideal_k)
         if K < ideal_k:
             logger.warning(
@@ -406,10 +406,10 @@ class SimulatedAnnealingSemanticChunker(SemanticChunker):
         lines, tokens, embeddings, grouping, RIGHT_BOUND, *_ = args
         coverage = ChunkerMetrics.calculate_coverage(RIGHT_BOUND, grouping)
         utilization = ChunkerMetrics.calculate_utilization_rate(
-            self.__encoder.ctx_length, tokens, grouping
+            self.encoder.ctx_length, tokens, grouping
         )
         wastage = ChunkerMetrics.calculate_wastage_rate(
-            self.__encoder.ctx_length, tokens, grouping
+            self.encoder.ctx_length, tokens, grouping
         )
         cohesion: float = 0
         for g_start, g_end in grouping:
@@ -448,7 +448,7 @@ class SimulatedAnnealingSemanticChunker(SemanticChunker):
             token_counts.append(tc)
         # Separators are not included, therefore, this is only a close estimation.
         total_tokens = sum(token_counts)
-        ideal_k = total_tokens // self.__encoder.ctx_length
+        ideal_k = total_tokens // self.encoder.ctx_length
         K: int = self.config.get("K", ideal_k)
         if K < ideal_k:
             logger.warning(
