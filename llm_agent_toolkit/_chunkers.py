@@ -197,8 +197,13 @@ class Chunker(ABC):
         previous_chunk = ""
 
         for chunk in partial_chunk:
-            if previous_chunk and chunk not in {".", "?", "!"}:
-                reconstructed.append(" ")
+            if previous_chunk:
+                if "#" in chunk or "`" in chunk:
+                    reconstructed.append("\n")
+                elif (
+                    chunk not in {".", "?", "!", "\n", "\t"} and previous_chunk != "\n"
+                ):
+                    reconstructed.append(" ")
             reconstructed.append(chunk)
             previous_chunk = chunk
 
