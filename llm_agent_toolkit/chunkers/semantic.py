@@ -172,8 +172,9 @@ class SemanticChunker(Chunker):
                 f"Expected 'long_text' to be str, got {type(long_text).__name__}."
             )
         # Sanitize argument `long_text`
-        text = long_text.replace("\n\n", "\n").strip("\n ")  # Remove excessive newlines
-        text = text.replace("\n", "\n")  # Convert viewable newline to readable newline
+        text = long_text.strip()
+        # text = long_text.replace("\n\n", "\n").strip("\n ")  # Remove excessive newlines
+        # text = text.replace("\n", "\n")  # Convert viewable newline to readable newline
         if len(text) == 0:
             raise ValueError("Expect long_text to be non-empty string.")
         # Split long text into multiple parts. ("Hello! How are you?") => ["Hello", "!", "How are you", "?"]
@@ -431,8 +432,9 @@ class SimulatedAnnealingSemanticChunker(SemanticChunker):
                 f"Expected 'long_text' to be str, got {type(long_text).__name__}."
             )
         # Sanitize argument `long_text`
-        text = long_text.replace("\n\n", "\n").strip("\n ")  # Remove excessive newlines
-        text = text.replace("\n", "\n")  # Convert viewable newline to readable newline
+        text = long_text.strip()
+        # text = long_text.replace("\n\n", "\n").strip("\n ")  # Remove excessive newlines
+        # text = text.replace("\n", "\n")  # Convert viewable newline to readable newline
         if len(text) == 0:
             raise ValueError("Expect long_text to be non-empty string.")
         # Split long text into multiple parts. ("Hello! How are you?") => ["Hello", "!", "How are you", "?"]
