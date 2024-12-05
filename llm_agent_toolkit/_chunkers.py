@@ -1,4 +1,3 @@
-import re
 import random
 import logging
 from abc import abstractmethod, ABC
@@ -166,7 +165,3 @@ class Chunker(ABC):
                 reconstructed += " "
             reconstructed += chunk
         return reconstructed
-
-    @staticmethod
-    def _split(long_text: str, pattern: str = r"([.?!])\s*") -> list[str]:
-        return re.split(pattern, long_text.strip())
