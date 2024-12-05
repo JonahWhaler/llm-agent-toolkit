@@ -68,6 +68,11 @@ class FixedCharacterChunker(Chunker):
 
         chunk_size: int = self.config.get("chunk_size", 512)
         if chunk_size > len(text):
+            logger.warning(
+                "chunk_size (%d) is greater than > len(text) (%d), therefore, only 1 chunk is return.",
+                chunk_size,
+                len(text),
+            )
             return [text]
 
         stride_rate: float = self.config.get("stride_rate", 1.0)
