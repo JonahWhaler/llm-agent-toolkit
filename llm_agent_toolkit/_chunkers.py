@@ -72,6 +72,9 @@ class UniformInitializer:
         - total_capacity (int): The total size of be divided into chunks.
         - k (int): The number of chunks to create.
         - resolution (str): Default = "skip", options = ["front", "back", "skip"]
+
+    Notes:
+    * coverage may not equal to 1.0 when resolution is "skip"
     """
 
     def __init__(self, total_capacity: int, k: int, resolution: str = "skip"):
@@ -92,9 +95,7 @@ class UniformInitializer:
                 right = self.total_capacity
             output_list.append((offset, min(right, self.total_capacity)))
             offset = right
-        assert (
-            ChunkerMetrics.calculate_coverage(self.total_capacity, output_list) == 1.0
-        )
+
         return output_list
 
 
