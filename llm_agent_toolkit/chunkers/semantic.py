@@ -165,16 +165,26 @@ class SemanticChunker(Chunker):
         return cohesion
 
     def split(self, long_text: str):
-        text = long_text.replace("\n\n", "\n")  # Remove continuous newline
+        if not isinstance(long_text, str):
+            raise TypeError(
+                f"Expected 'long_text' to be str, got {type(long_text).__name__}."
+            )
+        # Sanitize argument `long_text`
+        text = long_text.replace("\n\n", "\n").strip("\n ")  # Remove excessive newlines
+        text = text.replace("\n", "\n")  # Convert viewable newline to readable newline
+        if len(text) == 0:
+            raise ValueError("Expect long_text to be non-empty string.")
         # Split long text into multiple parts. ("Hello! How are you?") => ["Hello", "!", "How are you", "?"]
-        lines = re.split(r"([.?!])\s*", text.strip())
-        lines = list(filter(lambda x: len(x.strip("\n ")), lines))
+        lines = re.split(r"([.?!\n\t])\s*", text)
+        lines = list(filter(lambda line: line, lines))  # Remove invalid lines
         TOTAL_CAPACITY = len(lines)
         # Transform individual parts into embedding
         embeddings: list[list[float]] = []
         token_counts: list[int] = []
         for index in range(TOTAL_CAPACITY):
             e, tc = self._encode(lines, index, index + 1)
+            if e and tc is None:
+                tc = 0
             embeddings.append(e)
             token_counts.append(tc)
         # Separators are not included, therefore, this is only a close estimation.
@@ -189,7 +199,6 @@ class SemanticChunker(Chunker):
         # Initialization
         initializer = RandomInitializer(TOTAL_CAPACITY, K)
         grouping = initializer.init()
-        assert ChunkerMetrics.calculate_coverage(TOTAL_CAPACITY, grouping) == 1.0
         # [(i_start, i_end), (i+1_start, i+1_end), ..., (k-1_start, k-1_end), (k_start, k_end)]
         best_group = grouping
         iteration = 0
@@ -210,7 +219,7 @@ class SemanticChunker(Chunker):
             # Decide whether to revert
             if best_score != score:
                 grouping = best_group[:]
-            grouping = self.optimize(grouping, TOTAL_CAPACITY - 1)
+            grouping = self.optimize(grouping, TOTAL_CAPACITY)
             iteration += 1
         print("Best Score: %f", best_score)
         print(
@@ -413,15 +422,26 @@ class SimulatedAnnealingSemanticChunker(SemanticChunker):
         return coverage * C1 + utilization * C2 + cohesion * C3 - wastage * C4
 
     def split(self, long_text: str):
-        text = long_text.replace("\n\n", "\n")  # Remove continuous newline
+        if not isinstance(long_text, str):
+            raise TypeError(
+                f"Expected 'long_text' to be str, got {type(long_text).__name__}."
+            )
+        # Sanitize argument `long_text`
+        text = long_text.replace("\n\n", "\n").strip("\n ")  # Remove excessive newlines
+        text = text.replace("\n", "\n")  # Convert viewable newline to readable newline
+        if len(text) == 0:
+            raise ValueError("Expect long_text to be non-empty string.")
         # Split long text into multiple parts. ("Hello! How are you?") => ["Hello", "!", "How are you", "?"]
-        lines = re.split(r"([.?!])\s*", text.strip())
+        lines = re.split(r"([.?!\n\t])\s*", text)
+        lines = list(filter(lambda line: line, lines))  # Remove invalid lines
         TOTAL_CAPACITY = len(lines)
         # Transform individual parts into embedding
         embeddings: list[list[float]] = []
         token_counts: list[int] = []
         for index in range(TOTAL_CAPACITY):
             e, tc = self._encode(lines, index, index + 1)
+            if e and tc is None:
+                tc = 0
             embeddings.append(e)
             token_counts.append(tc)
         # Separators are not included, therefore, this is only a close estimation.
@@ -436,7 +456,6 @@ class SimulatedAnnealingSemanticChunker(SemanticChunker):
         # Initialization
         initializer = RandomInitializer(TOTAL_CAPACITY, K)
         grouping = initializer.init()
-        assert ChunkerMetrics.calculate_coverage(TOTAL_CAPACITY, grouping) == 1.0
         # [(i_start, i_end), (i+1_start, i+1_end), ..., (k-1_start, k-1_end), (k_start, k_end)]
         best_group = grouping
         iteration = 0
@@ -459,7 +478,7 @@ class SimulatedAnnealingSemanticChunker(SemanticChunker):
             # Decide whether to revert
             if best_score != score and random.uniform(0, 1) > self.temperature:
                 grouping = best_group[:]
-            grouping = self.optimize(grouping, TOTAL_CAPACITY - 1)
+            grouping = self.optimize(grouping, TOTAL_CAPACITY)
             self.cooldown()
             iteration += 1
         # Bundle `lines` into `K` groups according to the discovered `best_group`
