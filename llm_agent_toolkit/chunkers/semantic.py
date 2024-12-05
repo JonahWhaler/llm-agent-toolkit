@@ -293,7 +293,9 @@ class SimulatedAnnealingSemanticChunker(SemanticChunker):
             raise ValueError(
                 f"Expect cooling_rate within the range of [0, 1.0], got '{cooling_rate}'."
             )
-        constants: tuple[float, float, float, float] = parameters.get("constants", None)
+        constants: tuple[float, float, float, float] = parameters.get(
+            "constants", (1.0, 1.0, 1.0, 1.0)
+        )
         if constants is not None and not isinstance(constants, tuple):
             raise TypeError(
                 f"Expect constants to be type 'tuple', got '{type(constants).__name__}'."
