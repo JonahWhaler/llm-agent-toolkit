@@ -152,6 +152,8 @@ class SemanticChunker(Chunker):
         if key not in self.__e_cache:
             self.__e_cache[key] = self.__encoder.encode_v2(
                 self.reconstruct_chunk(lines[start:end])
+                if end - start > 1
+                else lines[start]
             )
         return self.__e_cache[key]
 
