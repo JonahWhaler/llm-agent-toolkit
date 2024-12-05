@@ -157,10 +157,15 @@ class FixedGroupChunker(Chunker):
         # Invalid resolution will be caught at __init__
         resolution: str = self.config.get("resolution", "back")
         # BEGIN
-        text = long_text.replace("\n\n", "\n").strip("\n ")
+        # Sanitize argument `long_text`
+        text = long_text.replace("\n\n", "\n").strip("\n ")  # Remove excessive newlines
+        text = text.replace("\n", "\n")  # Convert viewable newline to readable newline
         if len(text) == 0:
             raise ValueError("Expect long_text to be non-empty string.")
-        lines = list(text) if level == "character" else re.split(r"([.?!])\s*", text)
+        lines = (
+            list(text) if level == "character" else re.split(r"([.?!\n\t])\s*", text)
+        )
+        lines = list(filter(lambda line: line, lines))  # Remove invalid lines
         if K > len(lines):
             logger.warning(
                 "K (%d) is greater than > len(lines) (%d), therefore, only %d chunks are return.",
