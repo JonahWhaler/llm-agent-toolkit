@@ -1,4 +1,6 @@
 import logging
+import re
+
 from .._chunkers import Chunker, UniformInitializer
 
 logger = logging.getLogger(name=__name__)
@@ -85,19 +87,105 @@ class FixedCharacterChunker(Chunker):
 
 
 class FixedGroupChunker(Chunker):
+    """FixedGroupChunker splits text into K chunks.
+
+    Configuration:
+    - K (int): [1,]. Required field.
+    - resolution (str): ["front", "back", "skip"], default = "back"
+    - level (str): ["word", "character"], default = "character"
+
+    Notes:
+    - Does not guarantee token counts of each chunk.
+    - Does nto guarantee the return list to have K chunks.
+    """
+
     def __init__(self, config: dict):
+        self.raise_if_invalid(config)
         super().__init__(config)
 
+    @staticmethod
+    def raise_if_invalid(parameters: dict) -> None:
+        K: int = parameters.get("K", None)
+        if K is not None and not isinstance(K, int):
+            raise TypeError(f"Expect K to be type 'int', got '{type(K).__name__}'.")
+        if K <= 0:
+            raise ValueError(f"Expect K > 0, got {K}.")
+        resolution: str = parameters.get("resolution", "back")
+        if resolution is not None and not isinstance(resolution, str):
+            raise TypeError(
+                f"Expect resolution to be type 'str', got '{type(resolution).__name__}'."
+            )
+        if resolution not in ["front", "back", "skip"]:
+            raise ValueError(
+                f"Expect resolution to be either ['front', 'back', 'skip'], got {resolution}."
+            )
+        level: str = parameters.get("level", "character")
+        if level is not None and not isinstance(level, str):
+            raise TypeError(
+                f"Expect level to be type 'str', got '{type(level).__name__}'."
+            )
+        if level not in ["word", "character"]:
+            raise ValueError(
+                f"Expect level to be either ['word', 'character'], got {level}."
+            )
+
     def split(self, long_text: str) -> list[str]:
-        k: int = self.config.get("k", None)
-        if k is None:
-            raise KeyError("'K'")
-        lines = self._split(long_text)
-        initializer = UniformInitializer(len(lines), k, "back")
+        """Splits long text into K chunks.
+
+        Args:
+            long_text (str): The text to be split into chunks.
+
+        Returns:
+            list[str]: A list of text chunks.
+
+        Raises:
+            TypeError: If `long_text` is not type 'str'.
+            ValueError: If `long_text` is an empty string.
+
+        Notes:
+        - If `K` is greater than len(lines), the return list will have len(lines) chunks.
+            **Therefore, user should not assume the return list to have K chunks**.
+        """
+        if not isinstance(long_text, str):
+            raise TypeError(
+                f"Expected 'long_text' to be str, got {type(long_text).__name__}."
+            )
+        # Invalid level will be caught at __init__
+        level: str = self.config.get("level", "character")
+        # Missing K will be caught at __init__
+        K: int = self.config.get("K", 1)
+        # Invalid resolution will be caught at __init__
+        resolution: str = self.config.get("resolution", "back")
+        # BEGIN
+        text = long_text.replace("\n\n", "\n").strip("\n ")
+        if len(text) == 0:
+            raise ValueError("Expect long_text to be non-empty string.")
+        lines = list(text) if level == "character" else re.split(r"([.?!])\s*", text)
+        if K > len(lines):
+            logger.warning(
+                "K (%d) is greater than > len(lines) (%d), therefore, only %d chunks are return.",
+                K,
+                len(lines),
+                len(lines),
+            )
+            return lines
+
+        initializer = UniformInitializer(len(lines), K, resolution)
         grouping = initializer.init()
-        output_list = []
+        output_list: list[str] = []
         for g_start, g_end in grouping:
             chunk = lines[g_start:g_end]
-            g_string = self.reconstruct_chunk(chunk)
+            if level == "word":
+                g_string = self.reconstruct_chunk(chunk)
+            else:
+                # reconstruct_chunk is not suitable for character-wise spliting.
+                # Example:
+                # original_text = "Happy World!"
+                # lines = list(original_text)
+                # print(lines) # ['H', 'a', 'p', 'p', 'y', ' ', 'W', 'o', 'r', 'l', 'd', '!']
+                # reconstructed = self.reconstruct_chunk(lines)
+                # print(reconstructed) # H a p p y  W o r l d!
+                g_string = "".join(chunk)
             output_list.append(g_string)
+        # END
         return output_list
