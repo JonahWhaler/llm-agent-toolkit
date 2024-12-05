@@ -62,18 +62,19 @@ class FixedCharacterChunker(Chunker):
             raise TypeError(
                 f"Expected 'long_text' to be str, got {type(long_text).__name__}."
             )
-        if len(long_text) == 0:
+        text = long_text.replace("\n\n", "\n").strip("\n ")
+        if len(text) == 0:
             raise ValueError("Expect long_text to be non-empty string.")
 
         chunk_size: int = self.config.get("chunk_size", 512)
-        if chunk_size > len(long_text):
-            return [long_text]
+        if chunk_size > len(text):
+            return [text]
 
         stride_rate: float = self.config.get("stride_rate", 1.0)
         stride: int = int(chunk_size * stride_rate)
         output_list = []
-        for offset in range(0, len(long_text), stride):
-            chunk = long_text[offset : offset + chunk_size]
+        for offset in range(0, len(text), stride):
+            chunk = text[offset : offset + chunk_size]
             output_list.append(chunk)
         return output_list
 
