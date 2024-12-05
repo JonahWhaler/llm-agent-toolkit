@@ -158,10 +158,24 @@ class Chunker(ABC):
 
     @staticmethod
     def reconstruct_chunk(partial_chunk: list[str]) -> str:
-        reconstructed = ""
+        """
+        Reconstructs a single text string from a list of partial chunks.
+
+        This method ensures proper spacing between chunks and correctly handles punctuation.
+
+        Args:
+            partial_chunk (list[str]): A list of text segments to be combined.
+
+        Returns:
+            str: The reconstructed text string.
+        """
+        reconstructed = []
+        previous_chunk = ""
 
         for chunk in partial_chunk:
-            if reconstructed and chunk not in {".", "?", "!"}:
-                reconstructed += " "
-            reconstructed += chunk
-        return reconstructed
+            if previous_chunk and chunk not in {".", "?", "!"}:
+                reconstructed.append(" ")
+            reconstructed.append(chunk)
+            previous_chunk = chunk
+
+        return "".join(reconstructed)
