@@ -27,8 +27,9 @@ view
 """
 
 
-def run_semantic_chunker(model_name: str, filepath: str, tmp_directory: str):
-
+def run_semantic_chunker(
+    model_name: str, filepath: str, tmp_directory: str, config: dict
+):
     loader = TextLoader()
     content = loader.load(filepath)
     # content = CONTENT
@@ -38,14 +39,36 @@ def run_semantic_chunker(model_name: str, filepath: str, tmp_directory: str):
     )
     sc = chunkers.SemanticChunker(
         encoder=encoder,
-        config={"K": 10, "MAX_ITERATION": 200, "update_rate": 0.4, "min_coverage": 0.9},
+        config=config,
     )
     chunks = sc.split(content)
     for i, chunk in enumerate(chunks, start=1):
         with open(
             f"{tmp_directory}/semantic-{model_name}-{i}.md", "w", encoding="utf-8"
         ) as writer:
-            writer.write(f"[{i}]\n{chunk}")
+            writer.write(f"{chunk}")
+
+
+def run_sa_semantic_chunker(
+    model_name: str, filepath: str, tmp_directory: str, config: dict
+):
+    loader = TextLoader()
+    content = loader.load(filepath)
+    # content = CONTENT
+    encoder = OllamaEncoder(
+        connection_string="http://localhost:11434",
+        model_name=model_name,
+    )
+    sc = chunkers.SimulatedAnnealingSemanticChunker(
+        encoder=encoder,
+        config=config,
+    )
+    chunks = sc.split(content)
+    for i, chunk in enumerate(chunks, start=1):
+        with open(
+            f"{tmp_directory}/sa-semantic-{model_name}-{i}.md", "w", encoding="utf-8"
+        ) as writer:
+            writer.write(f"{chunk}")
 
 
 def how_to_encode(model_name: str):
@@ -71,12 +94,49 @@ def how_to_encode(model_name: str):
     print(f"{a} vs {b} = {cs}")
 
 
+def run_fcc():
+    logger.info("run_fcc")
+    ck = chunkers.FixedCharacterChunker(config={"chunk_size": 50, "stride_rate": 0.8})
+    chunks = ck.split(CONTENT)
+    for i, chunk in enumerate(chunks, start=1):
+        logger.info("<%d><chunk>%s</chunk><len>%d</len></%d>", i, chunk, len(chunk), i)
+
+
+def run_fgc():
+    logger.info("run_fgc")
+    ck = chunkers.FixedGroupChunker(
+        config={"K": 4, "resolution": "skip", "level": "word"}
+    )
+    chunks = ck.split(CONTENT)
+    for i, chunk in enumerate(chunks, start=1):
+        logger.info(
+            "\n\n<%d>\n\t<chunk>\n\t\t%s\n\t</chunk>\n\t<len>\n\t\t%d\n\t</len>\n</%d>",
+            i,
+            chunk,
+            len(chunk),
+            i,
+        )
+
+
 if __name__ == "__main__":
     # MODEL_NAME = "snowflake-arctic-embed"  # CTX_LENGTH=512
-    FILEPATH = r"./dev/whisper_of_the_camellia.txt"
+    FILEPATH = r"./dev/openai-text-generation.md"
     TMP = r"./dev"
-    MODELS = ["snowflake-arctic-embed", "mxbai-embed-large:latest", "bge-m3:latest"]
-    for model_name in MODELS:
-        print(f"\n{model_name}\n")
-        run_semantic_chunker(model_name, FILEPATH, TMP)
+    MODELS = ["bge-m3:latest"]  # "snowflake-arctic-embed", "mxbai-embed-large:latest",
+    CONFIG_1 = {"K": 5, "MAX_ITERATION": 100, "update_rate": 0.4, "min_coverage": 0.9}
+    CONFIG_2 = {
+        "K": 5,
+        "MAX_ITERATION": 20,
+        "update_rate": 0.4,
+        "min_coverage": 0.9,
+        "temperature": 1.0,
+        "cooling_rate": 0.0,
+        "constants": (0, 0.5, 2.0, 0.5),
+    }
+    for mdl_name in MODELS:
+        print(f"\n{mdl_name}\n")
+        # run_sa_semantic_chunker(mdl_name, FILEPATH, TMP, CONFIG_2)
+        run_semantic_chunker(mdl_name, FILEPATH, TMP, CONFIG_1)
     # how_to_encode(MODEL_NAME)
+    # run_fcc()
+    # run_fgc()
