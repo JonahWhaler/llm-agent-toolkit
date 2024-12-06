@@ -358,6 +358,7 @@ class SemanticChunker(Chunker):
         )
         # Bundle `lines` into `K` groups according to the discovered `best_group`
         doc_list = []
+        best_group.sort(key=lambda g: g[0], reverse=False)
         for g_start, g_end in best_group:
             reconstructed_chunk = self.reconstruct_chunk(lines[g_start:g_end])
             doc_list.append(reconstructed_chunk)
@@ -729,6 +730,7 @@ class SimulatedAnnealingSemanticChunker(SemanticChunker):
         )
         # Bundle `lines` into `K` groups according to the discovered `best_group`
         doc_list = []
+        best_group.sort(key=lambda g: g[0], reverse=False)
         for g_start, g_end in best_group:
             reconstructed_chunk = self.reconstruct_chunk(lines[g_start:g_end])
             doc_list.append(reconstructed_chunk)
