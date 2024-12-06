@@ -162,7 +162,7 @@ class SemanticChunker(Chunker):
         cohesion: float = 0
         for g_start, g_end in grouping:
             cohesion += self.calculate_pairwise_similarity(embeddings, g_start, g_end)
-        cohesion /= len(grouping)
+        cohesion /= len(grouping) if grouping else 1
 
         return cohesion
 
@@ -421,7 +421,7 @@ class SimulatedAnnealingSemanticChunker(SemanticChunker):
                 embeddings, g_start, g_end, group_embedding
             )
             cohesion += score
-        cohesion /= len(grouping)
+        cohesion /= len(grouping) if grouping else 1
         C1, C2, C3, C4 = self.constants
 
         return coverage * C1 + utilization * C2 + cohesion * C3 - wastage * C4
