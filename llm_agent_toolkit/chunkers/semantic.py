@@ -9,6 +9,81 @@ logger = logging.getLogger(__name__)
 
 
 class SemanticChunker(Chunker):
+    """`SemanticChunker` is a concrete implementation of the `Chunker` abstract base class.
+
+    It splits long text into semantically coherent chunks using a stochastic approach.
+    The algorithm initializes with a random grouping of lines and iteratively modifies this grouping.
+    If a modification improves the coherence score while maintaining minimum coverage, the change is accepted;
+    otherwise, the grouping reverts to the best known state.
+
+    **Key Features:**
+    * **Stochastic Approach:**
+        * Utilizes randomness in initial grouping and optimization steps to explore diverse groupings.
+    * **Caching Mechanism:**
+        * Caches pairwise similarities and embeddings to optimize performance by avoiding redundant computations.
+    * **Efficient Embedding Management:**
+        * Embeddings are computed internally for each line, which can be computationally expensive.
+        * Embeddings are **not exposed** outside the `split` method and are solely used for the purpose of chunking the input text.
+
+    **Algorithm Overview:**
+
+    1. **Split Text into Lines:**
+        - Divide the input `long_text` into N lines based on punctuation and whitespace.
+          - Example: `"Hello! How are you?"` → `["Hello", "!", "How are you", "?"]`
+
+    2. **Initial Grouping:**
+        - Group the N lines into K initial groups.
+          - Example: `[["Hello", "!"], ["How are you", "?"]]`
+
+    3. **Iterative Optimization (Up to M Iterations):**
+        - **3.1 Compute Score:**
+            - Calculate the coherence score of the current grouping using the evaluation function.
+        - **3.2 Update Best Grouping:**
+            - If the current score is better than the best score and the grouping meets the minimum coverage requirement, update the best score and best grouping.
+        - **3.3 Revert if Necessary:**
+            - If the score does not improve, revert to the best known grouping.
+        - **3.4 Optimize Grouping:**
+            - Modify the current grouping randomly to explore new groupings.
+
+    4. **Construct Final Chunks:**
+        - Based on the best grouping found, reconstruct K coherent text chunks.
+
+    **Evaluation Metrics:**
+
+    - **Pairwise Similarity:**
+        - Computes the cosine similarity between every pair of distinct lines within a group.
+        - The average of these similarities indicates the semantic coherence of the group.
+        - Higher values signify greater coherence.
+
+    - **Average Pairwise Similarity:**
+        - Averages the `Pairwise Similarity` scores across all groups.
+        - Higher average values indicate that the overall grouping is more semantically coherent.
+
+    **Parameters:**
+    - `encoder (Encoder)`: An encoder instance used to generate embeddings for text lines.
+    - `config (dict)`: Configuration dictionary containing the following keys:
+        - `K (int)`: Number of groups to split the text into. Must be a positive integer.
+        - `MAX_ITERATION (int)`: Maximum number of iterations for the optimization process. Must be a positive integer.
+        - `update_rate (float, optional)`: Rate at which the grouping is updated during optimization. Must be between 0 and 1. Defaults to `0.5`.
+        - `min_coverage (float, optional)`: Minimum coverage required for a grouping to be considered valid. Must be between 0 and 1. Defaults to `0.8`.
+
+    **Cost Consideration:**
+        * Generating embeddings for each line may incur significant costs, especially when using paid encoder services or APIs.
+        * **Be mindful of your budget** when processing large texts or a high number of lines to avoid unexpected expenses.
+
+    **Embedding Usage:**
+        * Embeddings are **strictly used internally** within the `split` method for chunking purposes.
+        * Embeddings are **not exposed** or intended for external use outside of the `SemanticChunker`'s internal processes.
+
+    **Countering the Effect of Stochastic Nature:**
+    * `min_coverage` ensures that a sufficient number of lines are included in the final grouping under this stochastic algorithm.
+    * The `drop_duplicates` method is designed to remove duplicated groups, enhancing the diversity of groupings.
+
+    **Notes:**
+    * This implementation does not use statistical threshold to determine when to `break` apart sentences.
+    * Does not have early termination mechanism, rely solely on `MAX_ITERATION`.
+    """
+
     def __init__(
         self,
         encoder: Encoder,
@@ -125,6 +200,22 @@ class SemanticChunker(Chunker):
         start: int,
         end: int,
     ) -> float:
+        """
+        Computes the average pairwise cosine similarity between lines within a group.
+
+        Args:
+            embeddings (List[List[float]]): Embeddings of all lines.
+            start (int): Start index of the group.
+            end (int): End index of the group.
+
+        Returns:
+            float: Average pairwise similarity score.
+
+        range(start, end)
+        x = sum(cosine_similarity(vec_i, vec_j)) where i != j
+        y = end - start
+        result = x / y
+        """
         if end - start <= 1:
             return 0
 
@@ -148,6 +239,19 @@ class SemanticChunker(Chunker):
     def _encode(
         self, lines: list[str], start: int, end: int
     ) -> tuple[list[float], int]:
+        """Cached encoding.
+
+        Args:
+            lines (List[str]): A list of all lines.
+            start (int): The start index
+            end (int): The end index
+
+        Returns:
+            Tuple[List[float], int]: The corresponding embedding and token counts
+
+        Notes:
+        * Only embed the line when it's not found in the cache.
+        """
         key = (start, end)
         if key not in self.__e_cache:
             self.__e_cache[key] = self.__encoder.encode_v2(
@@ -158,6 +262,16 @@ class SemanticChunker(Chunker):
         return self.__e_cache[key]
 
     def eval(self, *args) -> float:
+        """
+        Evaluates the current grouping based on pairwise similarity.
+
+        Args:
+            *args: Variable length argument list. Expected to include embeddings and grouping.
+
+        Returns:
+            float: Cohesion score.
+        """
+        assert len(args) >= 2, "Expect embeddings, grouping."
         embeddings, grouping, *_ = args
         cohesion: float = 0
         for g_start, g_end in grouping:
@@ -167,6 +281,19 @@ class SemanticChunker(Chunker):
         return cohesion
 
     def split(self, long_text: str):
+        """
+        Splits the input `long_text` into semantically coherent chunks.
+
+        Args:
+            long_text (str): The text to be chunked. Must be a non-empty string.
+
+        Returns:
+            List[str]: A list of text chunks, each being a semantically coherent segment of the input `long_text`.
+
+        Raises:
+            TypeError: If `long_text` is not a string.
+            ValueError: If `long_text` is an empty string.
+        """
         if not isinstance(long_text, str):
             raise TypeError(
                 f"Expected 'long_text' to be str, got {type(long_text).__name__}."
@@ -237,6 +364,68 @@ class SemanticChunker(Chunker):
 
 
 class SimulatedAnnealingSemanticChunker(SemanticChunker):
+    """
+    `SimulatedAnnealingSemanticChunker` enhances the `SemanticChunker` by integrating the Simulated Annealing
+    optimization technique to improve the quality of text chunking.
+
+    The simulated annealing approach allows the algorithm to escape `local optima` by probabilistically accepting
+    worse solutions based on the current temperature, thereby exploring a broader range of possible groupings
+    to achieve superior semantic coherence.
+
+    **Enhancements Over `SemanticChunker`:**
+    * **Simulated Annealing Parameters:**
+        * `temperature`: Controls the probability of accepting worse solutions during optimization.
+        * `cooling_rate`: Determines the rate at which the temperature decreases.
+        * `constants`: Weights for combining evaluation metrics (coverage, utilization rate, cohesion, wastage).
+
+    * **Enhanced Evaluation Function:**
+        * Combines multiple metrics—coverage, utilization rate, cohesion, and wastage—using customizable constants to compute the overall score.
+        * Incorporates group centroid similarity, increasing computational and financial costs.
+
+    **Cost Consideration:**
+    * Generating embeddings for each line and each group centroid may incur significant costs, especially when using paid encoder services or APIs.
+    * **Be mindful of your budget** when processing large texts or a high number of lines to avoid unexpected expenses.
+    * The additional computation for group centroid embeddings increases both computational and financial costs compared to the base `SemanticChunker`.
+
+    **Evaluation Metrics:**
+
+    - **Coverage:**
+        - Measures the proportion of lines included in the final grouping relative to the total number of lines.
+        - *Higher values indicate that more lines are effectively utilized in the chunks.*
+
+    - **Utilization Rate:**
+        - Assesses how efficiently the encoder's context length is used across all chunks.
+        - *Higher utilization rates signify better usage of the available context capacity.*
+
+    - **Cohesion:**
+        - Evaluates the semantic coherence within each chunk by averaging the cosine similarity between sentences and their respective group centroids.
+        - *Higher cohesion scores denote more semantically coherent groupings.*
+
+    - **Wastage:**
+        - Calculates the proportion of unused context capacity in the encoder across all chunks.
+        - *Lower wastage rates indicate more efficient use of the encoder's capacity.*
+
+    - **Overall Score:**
+        - Combines the above metrics using user-defined constants to compute a weighted sum, guiding the optimization process.
+        - *The choice of constants allows users to prioritize certain metrics over others based on specific requirements.*
+
+    **Parameters:**
+    - `encoder (Encoder)`: An encoder instance used to generate embeddings for text lines.
+        - **Note:** The encoder is used internally to compute embeddings, which are not exposed outside the `split` method.
+    - `config (dict)`: Configuration dictionary containing the following keys:
+        - `K (int)`: Number of groups to split the text into. Must be a positive integer.
+        - `MAX_ITERATION (int)`: Maximum number of iterations for the optimization process. Must be a positive integer.
+        - `update_rate (float, optional)`: Rate at which the grouping is updated during optimization. Must be between 0 and 1. Defaults to `0.5`.
+        - `min_coverage (float, optional)`: Minimum coverage required for a grouping to be considered valid. Must be between 0 and 1. Defaults to `0.8`.
+        - `temperature (float, optional)`: Initial temperature for the simulated annealing process. Must be between 0 and 1.0. Defaults to `1.0`.
+        - `cooling_rate (float, optional)`: Rate at which the temperature decreases during the simulated annealing process. Must be between 0 and 1.0. Defaults to `0.05`.
+        - `constants (tuple of float, optional)`: Weights for the evaluation metrics in the overall score calculation.
+            Must contain up to four float values (coverage, utilization, cohesion, wastage). Defaults to `(1.0, 1.0, 1.0, 1.0)`.
+
+    **Notes:**
+    * For more detailed information on the general algorithm and evaluation metrics, refer to the `SemanticChunker` documentation.
+    """
+
     def __init__(
         self,
         encoder: Encoder,
@@ -406,6 +595,19 @@ class SimulatedAnnealingSemanticChunker(SemanticChunker):
         )
 
     def eval(self, *args) -> float:
+        """
+        Evaluates the current grouping based on multiple metrics.
+
+        Args:
+            *args: Variable length argument list.
+                Expected order: lines, tokens, embeddings, grouping, RIGHT_BOUND, ...
+
+        Returns:
+            float: The overall score combining coverage, utilization, cohesion, and wastage.
+        """
+        assert (
+            len(args) >= 5
+        ), "Expect lines, tokens, embeddings, grouping, RIGHT_BOUND."
         lines, tokens, embeddings, grouping, RIGHT_BOUND, *_ = args
         coverage = ChunkerMetrics.calculate_coverage(RIGHT_BOUND, grouping)
         utilization = ChunkerMetrics.calculate_utilization_rate(
@@ -427,6 +629,19 @@ class SimulatedAnnealingSemanticChunker(SemanticChunker):
         return coverage * C1 + utilization * C2 + cohesion * C3 - wastage * C4
 
     def split(self, long_text: str):
+        """
+        Splits the input `long_text` into semantically coherent chunks.
+
+        Args:
+            long_text (str): The text to be chunked. Must be a non-empty string.
+
+        Returns:
+            List[str]: A list of text chunks, each being a semantically coherent segment of the input `long_text`.
+
+        Raises:
+            TypeError: If `long_text` is not a string.
+            ValueError: If `long_text` is an empty string.
+        """
         if not isinstance(long_text, str):
             raise TypeError(
                 f"Expected 'long_text' to be str, got {type(long_text).__name__}."
