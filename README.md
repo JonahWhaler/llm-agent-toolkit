@@ -19,6 +19,7 @@ For developers requiring full-range customization or access to the latest featur
   - [Memory:](#memory)
   - [Tool:](#tool)
   - [Loader:](#loader)
+  - [Chunkers\*\*:](#chunkers)
 - [Planned Feature](#planned-feature)
 - [License](#license)
 
@@ -79,6 +80,17 @@ Responsible for converting raw data into text.
 
 **Features**:
 * Covering limited type of documents, images, and audio files.
+
+## Chunkers**:
+Utility to split long text into chunks.
+
+**Features**:
+* **Basic**: 
+  * *FixedCharacterChunker*: Split text into fixed-size character chunks with optional overlapping.
+  * *FixedGroupChunker*: Splits text into K chunks. Supporting two levels, `word` and `character`, default is `character`.
+* **Semantic**:
+  * *SemanticChunker*: Split text into semantically coherent chunks.
+  * *SimulatedAnnealingSemanticChunker*: Enhanced with Simulated Annealing optimization technique.
 
 # Planned Feature
 - A Cookbook with detailed implementation examples.
