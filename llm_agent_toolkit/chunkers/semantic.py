@@ -228,7 +228,7 @@ class SemanticChunker(Chunker):
                         embeddings[vi], embeddings[vj]
                     )
                 similarity = self.__pws_cache[key]
-                # logger.info("%d vs %d => %f", vi, vj, similarity)
+                # logger.info("%d vs %d => %.4f", vi, vj, similarity)
                 pairwise_similarities.append(similarity)
         return (
             sum(pairwise_similarities) / len(pairwise_similarities)
@@ -342,7 +342,7 @@ class SemanticChunker(Chunker):
                 and ChunkerMetrics.calculate_coverage(TOTAL_CAPACITY, grouping)
                 > MIN_COVERAGE
             ):
-                logger.info("[%d] Update %f to %f", iteration, best_score, score)
+                logger.info("[%d] Update %.4f to %.4f", iteration, best_score, score)
                 best_score = score
                 # Update best group
                 best_group = grouping[:]
@@ -351,9 +351,10 @@ class SemanticChunker(Chunker):
                 grouping = best_group[:]
             grouping = self.optimize(grouping, TOTAL_CAPACITY)
             iteration += 1
-        logger.info("Best Score: %f", best_score)
+        logger.info("Best Score: %.4f", best_score)
         logger.info(
-            "Coverage: %f", ChunkerMetrics.calculate_coverage(TOTAL_CAPACITY, grouping)
+            "Coverage: %.4f",
+            ChunkerMetrics.calculate_coverage(TOTAL_CAPACITY, grouping),
         )
         # Bundle `lines` into `K` groups according to the discovered `best_group`
         doc_list = []
@@ -642,6 +643,14 @@ class SimulatedAnnealingSemanticChunker(SemanticChunker):
             TypeError: If `long_text` is not a string.
             ValueError: If `long_text` is an empty string.
         """
+        logger.info("Chunker: SimulatedAnnealingSemanticChunker")
+        logger.info("CONFIG: %s", self.config)
+        logger.info(
+            "Encoder: %s, Context length: %d, Dimension: %d",
+            self.encoder.model_name,
+            self.encoder.ctx_length,
+            self.encoder.dimension,
+        )
         if not isinstance(long_text, str):
             raise TypeError(
                 f"Expected 'long_text' to be str, got {type(long_text).__name__}."
@@ -657,6 +666,7 @@ class SimulatedAnnealingSemanticChunker(SemanticChunker):
         lines = list(filter(lambda line: line, lines))  # Remove invalid lines
         TOTAL_CAPACITY = len(lines)
         # Transform individual parts into embedding
+        logger.info("Embedding %d lines.", TOTAL_CAPACITY)
         embeddings: list[list[float]] = []
         token_counts: list[int] = []
         for index in range(TOTAL_CAPACITY):
@@ -675,6 +685,7 @@ class SimulatedAnnealingSemanticChunker(SemanticChunker):
             )
         MAX_ITERATION: int = self.config.get("MAX_ITERATION", 20)
         # Initialization
+        logger.info("Initializing...")
         initializer = RandomInitializer(TOTAL_CAPACITY, K)
         grouping = initializer.init()
         # [(i_start, i_end), (i+1_start, i+1_end), ..., (k-1_start, k-1_end), (k_start, k_end)]
@@ -682,8 +693,9 @@ class SimulatedAnnealingSemanticChunker(SemanticChunker):
         iteration = 0
         best_score: float = -100.0
         MIN_COVERAGE: float = self.config.get("min_coverage", 0.8)
+        logger.info("BEGIN Optimization")
         while iteration < MAX_ITERATION:
-            logger.info("Iteration [%d]/[%d]", iteration, MAX_ITERATION)
+            # logger.info("Iteration [%d]/[%d]", iteration, MAX_ITERATION)
             score: float = self.eval(
                 lines, token_counts, embeddings, grouping, TOTAL_CAPACITY
             )
@@ -692,7 +704,14 @@ class SimulatedAnnealingSemanticChunker(SemanticChunker):
                 and ChunkerMetrics.calculate_coverage(TOTAL_CAPACITY, grouping)
                 > MIN_COVERAGE
             ):
-                logger.info("[%d] Update %f to %f", iteration, best_score, score)
+                logger.info(
+                    "[%d] Update %.4ff to %.4ff, improved = %.4f",
+                    iteration,
+                    best_score,
+                    score,
+                    score - best_score,
+                )
+                logger.info("Grouping: %s", grouping)
                 best_score = score
                 # Update best group
                 best_group = grouping[:]
@@ -702,9 +721,11 @@ class SimulatedAnnealingSemanticChunker(SemanticChunker):
             grouping = self.optimize(grouping, TOTAL_CAPACITY)
             self.cooldown()
             iteration += 1
-        logger.info("Best Score: %f", best_score)
+        logger.info("END Optimization")
+        logger.info("Best Score: %.4f", best_score)
         logger.info(
-            "Coverage: %f", ChunkerMetrics.calculate_coverage(TOTAL_CAPACITY, grouping)
+            "Coverage: %.4f",
+            ChunkerMetrics.calculate_coverage(TOTAL_CAPACITY, grouping),
         )
         # Bundle `lines` into `K` groups according to the discovered `best_group`
         doc_list = []
