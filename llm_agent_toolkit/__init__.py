@@ -8,7 +8,8 @@ from ._tool import (
 )
 from ._util import ChatCompletionConfig, TranscriptionConfig, ImageGenerationConfig
 from ._audio import AudioHelper
-from . import core, tool, loader, encoder, memory
+from ._chunkers import Chunker, ChunkerMetrics, RandomInitializer, UniformInitializer
+from . import core, tool, loader, encoder, memory, chunkers
 
 __all__ = [
     "core",
@@ -26,4 +27,9 @@ __all__ = [
     "ImageGenerationConfig",
     "TranscriptionConfig",
     "AudioHelper",
+    "Chunker",
+    "ChunkerMetrics",
+    "RandomInitializer",
+    "UniformInitializer",
+    "chunkers",
 ]
