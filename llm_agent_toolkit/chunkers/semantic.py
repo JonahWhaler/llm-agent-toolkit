@@ -466,7 +466,7 @@ class SimulatedAnnealingSemanticChunker(SemanticChunker):
         best_group = grouping
         iteration = 0
         best_score: float = -100.0
-        MIN_COVERAGE: float = self.config.get("min_coverage", 0.9)
+        MIN_COVERAGE: float = self.config.get("min_coverage", 0.8)
         while iteration < MAX_ITERATION:
             logger.info("Iteration [%d]/[%d]", iteration, MAX_ITERATION)
             score: float = self.eval(
