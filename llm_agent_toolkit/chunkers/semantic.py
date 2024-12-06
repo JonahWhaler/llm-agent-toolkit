@@ -351,8 +351,8 @@ class SemanticChunker(Chunker):
                 grouping = best_group[:]
             grouping = self.optimize(grouping, TOTAL_CAPACITY)
             iteration += 1
-        print("Best Score: %f", best_score)
-        print(
+        logger.info("Best Score: %f", best_score)
+        logger.info(
             "Coverage: %f", ChunkerMetrics.calculate_coverage(TOTAL_CAPACITY, grouping)
         )
         # Bundle `lines` into `K` groups according to the discovered `best_group`
@@ -702,6 +702,10 @@ class SimulatedAnnealingSemanticChunker(SemanticChunker):
             grouping = self.optimize(grouping, TOTAL_CAPACITY)
             self.cooldown()
             iteration += 1
+        logger.info("Best Score: %f", best_score)
+        logger.info(
+            "Coverage: %f", ChunkerMetrics.calculate_coverage(TOTAL_CAPACITY, grouping)
+        )
         # Bundle `lines` into `K` groups according to the discovered `best_group`
         doc_list = []
         for g_start, g_end in best_group:
