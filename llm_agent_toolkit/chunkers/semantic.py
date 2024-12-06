@@ -50,7 +50,7 @@ class SemanticChunker(Chunker):
             raise TypeError(
                 f"Expect update_rate to be type 'float', got '{type(update_rate).__name__}'."
             )
-        if 0 > update_rate > 1.0:
+        if update_rate < 0 or update_rate > 1.0:
             raise ValueError(
                 f"Expect update_rate within the range of [0, 1.0], got '{update_rate}'."
             )
@@ -59,7 +59,7 @@ class SemanticChunker(Chunker):
             raise TypeError(
                 f"Expect min_coverage to be type 'float', got '{type(min_coverage).__name__}'."
             )
-        if 0 >= min_coverage > 1:
+        if min_coverage <= 0 or min_coverage > 1:
             raise ValueError(
                 f"Expect min_coverage within the range of (0, 1.0], got '{min_coverage}'."
             )
@@ -272,7 +272,7 @@ class SimulatedAnnealingSemanticChunker(SemanticChunker):
             raise TypeError(
                 f"Expect update_rate to be type 'float', got '{type(update_rate).__name__}'."
             )
-        if 0 > update_rate > 1.0:
+        if update_rate < 0 or update_rate > 1.0:
             raise ValueError(
                 f"Expect update_rate within the range of [0, 1.0], got '{update_rate}'."
             )
@@ -281,7 +281,7 @@ class SimulatedAnnealingSemanticChunker(SemanticChunker):
             raise TypeError(
                 f"Expect temperature to be type 'float', got '{type(temperature).__name__}'."
             )
-        if 0 > temperature > 1.0:
+        if temperature < 0 or temperature > 1.0:
             raise ValueError(
                 f"Expect temperature within the range of [0, 1.0], got '{temperature}'."
             )
@@ -290,7 +290,7 @@ class SimulatedAnnealingSemanticChunker(SemanticChunker):
             raise TypeError(
                 f"Expect cooling_rate to be type 'float', got '{type(cooling_rate).__name__}'."
             )
-        if 0 > cooling_rate > 1.0:
+        if cooling_rate < 0 or cooling_rate > 1.0:
             raise ValueError(
                 f"Expect cooling_rate within the range of [0, 1.0], got '{cooling_rate}'."
             )
@@ -310,7 +310,7 @@ class SimulatedAnnealingSemanticChunker(SemanticChunker):
             raise TypeError(
                 f"Expect min_coverage to be type 'float', got '{type(min_coverage).__name__}'."
             )
-        if 0 >= min_coverage > 1:
+        if min_coverage <= 0 or min_coverage > 1:
             raise ValueError(
                 f"Expect min_coverage within the range of (0, 1.0], got '{min_coverage}'."
             )
