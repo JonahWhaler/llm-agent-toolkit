@@ -714,3 +714,11 @@ class FaissMemory(VectorMemory):
                 ids=[f"{identifier}-{i}" for i in range(len(document_chunks))],
                 embeddings=self.encoder.encode(document_chunks),
             )
+
+    def query(self, query_string: str, **kwargs):
+        n_results: int = kwargs.get("n_results", 5)
+        query_embedding = self.encoder.encode(query_string)
+        return self.vdb.query(
+            query_embedding=query_embedding,
+            n_results=n_results,
+        )
