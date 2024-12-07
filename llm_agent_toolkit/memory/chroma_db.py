@@ -4,7 +4,8 @@ from copy import deepcopy
 import chromadb
 
 from .._encoder import Encoder
-from .._memory import VectorMemory, SplitTextConfig
+from .._memory import VectorMemory
+from .._chunkers import Chunker
 
 
 class ChromaMemory(VectorMemory):
@@ -17,10 +18,10 @@ class ChromaMemory(VectorMemory):
         self,
         vdb: chromadb.ClientAPI,
         encoder: Encoder,
-        split_text_config: SplitTextConfig,
+        chunker: Chunker,
         **kwargs,
     ):
-        super().__init__(vdb, encoder, split_text_config, **kwargs)
+        super().__init__(vdb, encoder, chunker, **kwargs)
         self.__namespace = kwargs.get("namespace", "default")
         overwrite: bool = kwargs.get("overwrite", False)
         if overwrite:
