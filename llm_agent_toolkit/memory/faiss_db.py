@@ -8,9 +8,12 @@ from abc import ABC, abstractmethod
 import faiss  # type: ignore
 import numpy as np
 
+from llm_agent_toolkit._chunkers import Chunker
+
 from ._storage import SQLite3_Storage
 from .._encoder import Encoder
-from .._memory import VectorMemory, SplitTextConfig
+from .._memory import VectorMemory
+from .._chunkers import Chunker
 
 logger = logging.getLogger(__name__)
 
@@ -680,10 +683,10 @@ class FaissMemory(VectorMemory):
         self,
         vdb: FaissDB,
         encoder: Encoder,
-        split_text_config: SplitTextConfig,
+        chunker: Chunker,
         **kwargs,
     ):
-        super().__init__(vdb, encoder, split_text_config, **kwargs)
+        super().__init__(vdb, encoder, chunker, **kwargs)
 
     def add(self, document_string: str, **kwargs):
         identifier = kwargs.get("identifier", str(uuid.uuid4()))

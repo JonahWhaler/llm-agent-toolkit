@@ -1,10 +1,11 @@
-from typing import Deque, TypedDict
+from typing import Deque
 from collections import deque
 from itertools import islice
 from abc import ABC, abstractmethod
 
 from ._util import MessageBlock
 from ._encoder import Encoder
+from ._chunkers import Chunker
 
 
 class ShortTermMemory:
@@ -27,18 +28,11 @@ class ShortTermMemory:
         self.__dq.clear()
 
 
-class SplitTextConfig(TypedDict):
-    chunk_size: int
-    stride_rate: float
-
-
 class VectorMemory(ABC):
-    def __init__(
-        self, vdb, encoder: Encoder, split_text_config: SplitTextConfig, **kwargs
-    ):
+    def __init__(self, vdb, encoder: Encoder, chunker: Chunker, **kwargs):
         self.__vdb = vdb
         self.__encoder = encoder
-        self.__split_text_config = split_text_config
+        self.__chunker = chunker
 
     @property
     def encoder(self):
@@ -61,13 +55,5 @@ class VectorMemory(ABC):
         raise NotImplementedError
 
     def split_text(self, text: str) -> list[str]:
-        chunk_size = self.__split_text_config["chunk_size"]
-        stride_rate = self.__split_text_config["stride_rate"]
-        stride = int(chunk_size * stride_rate)
-        chunks: list[str] = []
-        text_length = len(text)
-        for start in range(0, text_length, stride):
-            end = min(start + chunk_size, text_length)
-            chunk = text[start:end]
-            chunks.append(chunk)
+        chunks = self.__chunker.split(long_text=text)
         return chunks
