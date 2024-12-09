@@ -265,8 +265,8 @@ class FaissIFL2DB(FaissDB):
             indices = indices[0]
             # Post Processing
             output = []
-            for index, distance in zip(indices, distances):
-                value_dict = sqlite.get(key=str(index))
+            for key, distance in zip(indices, distances):
+                value_dict = sqlite.get(key=str(key))
                 assert value_dict is not None, "Inconsistency Detected"
                 # Skip the deleted
                 if "is_deleted" in value_dict:
@@ -607,8 +607,8 @@ class FaissHNSWDB(FaissDB):
             indices = indices[0]
             # Post Processing
             output = []
-            for index, distance in zip(indices, distances):
-                value_dict = sqlite.get(key=str(index))
+            for key, distance in zip(indices, distances):
+                value_dict = sqlite.get(key=str(key))
                 assert value_dict is not None, "Inconsistency Detected"
                 # Skip the deleted
                 if "is_deleted" in value_dict:
