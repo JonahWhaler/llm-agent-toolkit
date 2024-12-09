@@ -52,6 +52,15 @@ class FaissDB(ABC):
     def reconstruct(self, encoder: Encoder) -> None:
         raise NotImplementedError
 
+    @abstractmethod
+    def clear(self) -> None:
+        """Clear all documents from the databases.
+        **Notes:**
+        * Call self.reconstruct to completely purge the deleted.
+        * Current implementation is inefficient.
+        """
+        raise NotImplementedError
+
 
 class FaissIFL2DB(FaissDB):
     """
@@ -357,6 +366,33 @@ class FaissIFL2DB(FaissDB):
             )
             self.__index = tmp_index
         faiss.write_index(tmp_index, self.index_path)
+
+    def clear(self) -> None:
+        """Clearing the data from the databases using self.remove.
+
+        Call self.reconstruct after self.clear to completely purge the deleted.
+
+        Notes:
+        * This is not efficient.
+        """
+        try:
+            sqlite = (
+                self.__sqlite
+                if self.__sqlite is not None
+                else SQLite3_Storage(
+                    db_path=self.db_path, table_name=self.__namespace, overwrite=False
+                )
+            )
+        except Exception as loading_error:
+            logger.error(msg=f"Loading Error: {loading_error}")
+            raise
+        self.__sqlite = sqlite
+        keys = self.__sqlite.keys()
+        deleted = self.remove(keys)
+        logger.info(
+            "Deleted: %s. Please call self.reconstruct to completely purge the deleted.",
+            deleted,
+        )
 
 
 class FaissHNSWDB(FaissDB):
@@ -677,6 +713,33 @@ class FaissHNSWDB(FaissDB):
             self.__index = tmp_index
         faiss.write_index(tmp_index, self.index_path)
 
+    def clear(self) -> None:
+        """Clearing the data from the databases using self.remove.
+
+        Call self.reconstruct after self.clear to completely purge the deleted.
+
+        Notes:
+        * This is not efficient.
+        """
+        try:
+            sqlite = (
+                self.__sqlite
+                if self.__sqlite is not None
+                else SQLite3_Storage(
+                    db_path=self.db_path, table_name=self.__namespace, overwrite=False
+                )
+            )
+        except Exception as loading_error:
+            logger.error(msg=f"Loading Error: {loading_error}")
+            raise
+        self.__sqlite = sqlite
+        keys = self.__sqlite.keys()
+        deleted = self.remove(keys)
+        logger.info(
+            "Deleted: %s. Please call self.reconstruct to completely purge the deleted.",
+            deleted,
+        )
+
 
 class FaissMemory(VectorMemory):
     def __init__(
@@ -714,3 +777,16 @@ class FaissMemory(VectorMemory):
                 ids=[f"{identifier}-{i}" for i in range(len(document_chunks))],
                 embeddings=self.encoder.encode(document_chunks),
             )
+
+    def query(self, query_string: str, **kwargs):
+        n_results: int = kwargs.get("n_results", 5)
+        query_embedding = self.encoder.encode(query_string)
+        return self.vdb.query(
+            query_embedding=query_embedding,
+            n_results=n_results,
+        )
+
+    def clear(self) -> None:
+        assert isinstance(self.vdb, FaissDB)
+        self.vdb.clear()
+        self.vdb.reconstruct(encoder=self.encoder)
