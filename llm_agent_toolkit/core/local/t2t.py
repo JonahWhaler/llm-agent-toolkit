@@ -38,6 +38,8 @@ class T2T_OLM_Core(Core):
     - Loop until a solution is found, or maximum iteration or token count is reached.
     - The caller is responsible for memory management, output parsing and error handling.
     - The caller is responsible for choosing models that support `Tools`.
+    - If model is not available locally, pull it from Ollama's server.
+    - `context_length` is configurable.
     """
 
     def __init__(
@@ -50,6 +52,12 @@ class T2T_OLM_Core(Core):
         assert isinstance(config, ChatCompletionConfig)
         super().__init__(system_prompt, config, tools)
         self.__connection_string = connection_string
+        if not self.__available():
+            self.__try_pull_model()
+        self.__profile = self.__build_profile(model_name=config.name)
+        if tools and self.profile["tool"] is False:
+            logger.warning("Tool might not work on this %s", self.model_name)
+
     def __available(self) -> bool:
         try:
             client = ollama.Client(host=self.CONN_STRING)
