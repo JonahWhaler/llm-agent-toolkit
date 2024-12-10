@@ -1,0 +1,6 @@
+platform,name,context_length,dimension
+ollama,snowflake-arctic-embed:latest,512,1024
+ollama,mxbai-embed-large:latest,512,1024
+ollama,bge-m3:latest,8192,1024
+openai,text-embedding-3-large,8191,"512, 1536"
+openai,text-embedding-3-small,8191,"256, 512, 1024, 3072"
