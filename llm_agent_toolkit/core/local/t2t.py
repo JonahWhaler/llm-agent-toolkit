@@ -67,6 +67,25 @@ class T2T_OLM_Core(Core):
             logger.error("Exception: %s", str(e))
             raise
 
+    def __try_pull_model(self):
+        """
+        Attempt to pull the required model from ollama's server.
+
+        **Raises:**
+            ollama.ResponseError: pull model manifest: file does not exist
+        """
+        try:
+            client = ollama.Client(host=self.CONN_STRING)
+            _ = client.pull(self.model_name, stream=False)
+        except ollama.RequestError as oreqe:
+            logger.error("RequestError: %s", str(oreqe))
+            raise
+        except ollama.ResponseError as orespe:
+            logger.error("ResponseError: %s", str(orespe))
+            raise
+        except Exception as e:
+            logger.error("Exception: %s (%s)", str(e), type(e))
+            raise
     @property
     def CONN_STRING(self) -> str:
         return self.__connection_string
