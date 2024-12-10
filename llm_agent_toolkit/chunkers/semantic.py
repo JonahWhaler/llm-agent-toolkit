@@ -334,6 +334,9 @@ class SemanticChunker(Chunker):
             logger.warning(
                 msg=f"{K} < {ideal_k}. Chunk longer than the encoder's ctx_length will be truncated."
             )
+        if K == 1:
+            return [long_text]
+
         MAX_ITERATION: int = self.config.get("MAX_ITERATION", 20)
         # Initialization
         logger.info("Initializing...")
@@ -703,6 +706,9 @@ class SimulatedAnnealingSemanticChunker(SemanticChunker):
             logger.warning(
                 msg=f"{K} < {ideal_k}. Chunk longer than the encoder's ctx_length will be truncated."
             )
+        if K == 1:
+            return [long_text]
+
         MAX_ITERATION: int = self.config.get("MAX_ITERATION", 20)
         # Initialization
         logger.info("Initializing...")
