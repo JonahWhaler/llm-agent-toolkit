@@ -1,0 +1,11 @@
+name,context_length,text_generation,tool,text_input,image_input,audio_input,text_output,image_output,audio_output,remarks
+gpt-4,8192,TRUE,TRUE,TRUE,TRUE,,,,,
+gpt-3.5-turbo,16385,TRUE,TRUE,TRUE,,,,,,
+gpt-4o,128000,TRUE,TRUE,TRUE,TRUE,,,,,
+o1-mini,128000,TRUE,TRUE,TRUE,,,,,,
+gpt-4-turbo,128000,TRUE,TRUE,TRUE,TRUE,,,,,
+dall-e-2,,,,TRUE,TRUE,,,TRUE,,Support edit and variation
+dall-e-3,,,,TRUE,,,,TRUE,,"Size options: 1024x1024, 1024x1792 or 1792x1024 pixels."
+tts-1,,,,TRUE,,,,,TRUE,Not supported by this project.
+tts-1-hd,,,,TRUE,,,,,TRUE,Not supported by this project.
+whisper-1,,,,,,TRUE,TRUE,,,Maximum file size is 25MB. This project only support transcription.
