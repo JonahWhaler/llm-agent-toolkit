@@ -50,6 +50,22 @@ class T2T_OLM_Core(Core):
         assert isinstance(config, ChatCompletionConfig)
         super().__init__(system_prompt, config, tools)
         self.__connection_string = connection_string
+    def __available(self) -> bool:
+        try:
+            client = ollama.Client(host=self.CONN_STRING)
+            lst = list(client.list())[0]
+            _, m, *_ = lst
+            for _m in m:
+                if _m.model == self.model_name:
+                    logger.info("Found %s => %s", self.model_name, _m)
+                    return True
+            return False
+        except ollama.RequestError as ore:
+            logger.error("RequestError: %s", str(ore))
+            raise
+        except Exception as e:
+            logger.error("Exception: %s", str(e))
+            raise
 
     @property
     def CONN_STRING(self) -> str:
