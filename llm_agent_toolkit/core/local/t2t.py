@@ -219,6 +219,9 @@ class T2T_OLM_Core(Core):
         else:
             temperature = 0.7
             max_tokens = 4096
+
+        max_tokens = min(max_tokens, self.context_length)
+
         iteration = 0
         token_count = 0
         solved = False
@@ -233,6 +236,7 @@ class T2T_OLM_Core(Core):
                     stream=False,
                     options={"temperature": temperature, "num_predict": max_tokens},
                 )
+                token_count += response["eval_count"] + response["prompt_eval_count"]
 
                 llm_generated_content = response["message"]["content"]
                 if llm_generated_content != "":
@@ -303,6 +307,9 @@ class T2T_OLM_Core(Core):
         else:
             temperature = 0.7
             max_tokens = 4096
+
+        max_tokens = min(max_tokens, self.context_length)
+
         iteration = 0
         token_count = 0
         solved = False
@@ -317,6 +324,7 @@ class T2T_OLM_Core(Core):
                     stream=False,
                     options={"temperature": temperature, "num_predict": max_tokens},
                 )
+                token_count += response["eval_count"] + response["prompt_eval_count"]
 
                 llm_generated_content = response["message"]["content"]
                 if llm_generated_content != "":
