@@ -51,6 +51,20 @@ class Core(ABC):
         return self.__config.name
 
     @property
+    def profile(self) -> dict[str, bool | int | str]:
+        return {}
+
+    @property
+    @abstractmethod
+    def context_length(self) -> int:
+        raise NotImplementedError
+
+    @context_length.setter
+    @abstractmethod
+    def context_length(self, value):
+        raise NotImplementedError
+
+    @property
     def config(
         self,
     ) -> (
