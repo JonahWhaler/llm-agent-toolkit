@@ -132,6 +132,44 @@ class T2T_OLM_Core(Core):
             profile["text_generation"] = True
         logger.info("Profile ready")
         return profile
+
+    @property
+    def context_length(self) -> int:
+        return self.profile["context_length"]
+
+    @context_length.setter
+    def context_length(self, value):
+        """
+        Set the context length.
+        It shall be the user's responsiblity to ensure this is a model supported context length.
+
+        Args:
+            context_length (int): Context length to be set.
+
+        Returns:
+            None
+
+        Raises:
+            TypeError: If context_length is not type int.
+            ValueError: If context_length is <= 0.
+        """
+        if not isinstance(value, int):
+            raise TypeError(
+                f"Expect context_length to be type 'int', got '{type(value).__name__}'."
+            )
+        if value <= 0:
+            raise ValueError("Expect context_length > 0.")
+
+        self.__profile["context_length"] = value
+
+    @property
+    def profile(self) -> dict:
+        """
+        Profile is mostly for view purpose only,
+        except the context_length which might be used to control the input to the LLM.
+        """
+        return self.__profile
+
     @property
     def CONN_STRING(self) -> str:
         return self.__connection_string
