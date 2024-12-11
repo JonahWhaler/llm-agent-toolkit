@@ -2,7 +2,7 @@
 import json
 import logging
 import ollama
-from ..._core import Core
+from ..._core import Core, TextGenerator, ToolSupport
 from ..._util import (
     CreatorRole,
     ChatCompletionConfig,
@@ -15,7 +15,7 @@ from .base import OllamaCore, TOOL_PROMPT
 logger = logging.getLogger(__name__)
 
 
-class T2T_OLM_Core(Core, OllamaCore):
+class T2T_OLM_Core(Core, OllamaCore, TextGenerator, ToolSupport):
     """
     `T2T_OLM_Core` is a concrete implementation of the `Core` abstract class.
     `T2T_OLM_Core` is also a child class of `OllamaCore`.
@@ -43,8 +43,9 @@ class T2T_OLM_Core(Core, OllamaCore):
         tools: list[Tool] | None = None,
     ):
         assert isinstance(config, ChatCompletionConfig)
-        Core.__init__(self, system_prompt, config, tools)
+        Core.__init__(self, system_prompt, config)
         OllamaCore.__init__(self, connection_string, config.name)
+        ToolSupport.__init__(self, tools)
         self.__profile = self.build_profile(model_name=config.name)
         if tools and self.profile["tool"] is False:
             logger.warning("Tool might not work on this %s", self.model_name)
@@ -113,7 +114,6 @@ class T2T_OLM_Core(Core, OllamaCore):
             msgs.append(
                 MessageBlock(role=CreatorRole.SYSTEM.value, content=TOOL_PROMPT)
             )
-            logger.info(TOOL_PROMPT)
         else:
             tools_metadata = None
         number_of_primers = len(msgs)
@@ -132,7 +132,7 @@ class T2T_OLM_Core(Core, OllamaCore):
         try:
             client = ollama.Client(host=self.CONN_STRING)
             while iteration < self.config.max_iteration and token_count < max_tokens:
-                # print(f"\n\nIteration: {iteration}")
+                # logger.info("\n\nIteration: %d", iteration)
                 response = client.chat(
                     model=self.model_name,
                     messages=msgs,
@@ -156,7 +156,7 @@ class T2T_OLM_Core(Core, OllamaCore):
                     solved = True
                     break
 
-                output = self.__call_tools(tool_calls)
+                output = self.call_tools(tool_calls)
                 msgs.extend(output)
 
                 iteration += 1
@@ -203,7 +203,6 @@ class T2T_OLM_Core(Core, OllamaCore):
             msgs.append(
                 MessageBlock(role=CreatorRole.SYSTEM.value, content=TOOL_PROMPT)
             )
-            logger.info(TOOL_PROMPT)
         else:
             tools_metadata = None
         number_of_primers = len(msgs)
@@ -222,7 +221,7 @@ class T2T_OLM_Core(Core, OllamaCore):
         try:
             client = ollama.AsyncClient(host=self.CONN_STRING)
             while iteration < self.config.max_iteration and token_count < max_tokens:
-                # print(f"\n\nIteration: {iteration}")
+                # logger.info("\n\nIteration: %d", iteration)
                 response = await client.chat(
                     model=self.model_name,
                     messages=msgs,
@@ -246,7 +245,7 @@ class T2T_OLM_Core(Core, OllamaCore):
                     solved = True
                     break
 
-                output = await self.__call_tools_async(tool_calls)
+                output = await self.call_tools_async(tool_calls)
                 msgs.extend(output)
 
                 iteration += 1
@@ -267,9 +266,7 @@ class T2T_OLM_Core(Core, OllamaCore):
             logger.error("Error: %s", e)
             raise
 
-    async def __call_tools_async(
-        self, selected_tools: list
-    ) -> list[MessageBlock | dict]:
+    async def call_tools_async(self, selected_tools: list) -> list[MessageBlock | dict]:
         """
         Asynchronously call every selected tools.
 
@@ -311,7 +308,7 @@ class T2T_OLM_Core(Core, OllamaCore):
 
         return output
 
-    def __call_tools(self, selected_tools: list) -> list[MessageBlock | dict]:
+    def call_tools(self, selected_tools: list) -> list[MessageBlock | dict]:
         """
         Synchronously call every selected tools.
 
