@@ -24,7 +24,6 @@ class Core(ABC):
     - system_prompt: str: The system prompt for the LLM model.
     - model_name: str: The name of the LLM model.
     - config: ChatCompletionConfig | ImageGenerationConfig: The configuration for the LLM model.
-    - tools: list: The tools available for the LLM model.
 
     Notes:
     - TODO: Allow structured profile
@@ -34,11 +33,9 @@ class Core(ABC):
         self,
         system_prompt: str,
         config: ChatCompletionConfig | ImageGenerationConfig | TranscriptionConfig,
-        tools: list[Tool] | None = None,
     ):
         self.__system_prompt = system_prompt
         self.__config = config
-        self.__tools = tools
 
     @property
     def system_prompt(self) -> str:
@@ -55,16 +52,6 @@ class Core(ABC):
         return {}
 
     @property
-    @abstractmethod
-    def context_length(self) -> int:
-        raise NotImplementedError
-
-    @context_length.setter
-    @abstractmethod
-    def context_length(self, value):
-        raise NotImplementedError
-
-    @property
     def config(
         self,
     ) -> (
@@ -72,11 +59,6 @@ class Core(ABC):
     ):
         """Return the configuration for the LLM model."""
         return self.__config
-
-    @property
-    def tools(self) -> list[Tool] | None:
-        """Return the tools available for the LLM model."""
-        return self.__tools
 
     @abstractmethod
     async def run_async(
@@ -90,6 +72,36 @@ class Core(ABC):
         self, query: str, context: list[MessageBlock | dict] | None, **kwargs
     ) -> list[MessageBlock | dict]:
         """Synchronously run the LLM model with the given query and context."""
+        raise NotImplementedError
+
+
+class TextGenerator(ABC):
+    @property
+    @abstractmethod
+    def context_length(self) -> int:
+        raise NotImplementedError
+
+    @context_length.setter
+    @abstractmethod
+    def context_length(self, value):
+        raise NotImplementedError
+
+
+class ToolSupport(ABC):
+    def __init__(self, tools: list[Tool] | None = None):
+        self.__tools = tools
+
+    @property
+    def tools(self) -> list[Tool] | None:
+        """Return the tools available for the LLM model."""
+        return self.__tools
+
+    @abstractmethod
+    def call_tools(self, selected_tools: list) -> list[MessageBlock | dict]:
+        raise NotImplementedError
+
+    @abstractmethod
+    async def call_tools_async(self, selected_tools: list) -> list[MessageBlock | dict]:
         raise NotImplementedError
 
 
