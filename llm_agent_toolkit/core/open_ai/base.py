@@ -59,7 +59,7 @@ class OpenAICore:
         if "text_generation" not in profile:
             # Assume supported
             profile["text_generation"] = True
-        if profile["text-generation"]:
+        if profile["text_generation"]:
             if "context_length" not in profile:
                 # Most supported context length
                 profile["context_length"] = 4096
