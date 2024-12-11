@@ -259,12 +259,14 @@ class T2T_OLM_Core(Core):
 
             if not solved:
                 if iteration == self.config.max_iteration:
-                    warnings.warn(
-                        f"Maximum iteration reached. {iteration}/{self.config.max_iteration}"
+                    logger.warning(
+                        "Maximum iteration reached. %d/%d",
+                        iteration,
+                        self.config.max_iteration,
                     )
                 elif token_count >= max_tokens:
-                    warnings.warn(
-                        f"Maximum token count reached. {token_count}/{max_tokens}"
+                    logger.warning(
+                        "Maximum token count reached. %d/%d", token_count, max_tokens
                     )
             return msgs[number_of_primers:]  # Return only the generated messages
         except Exception as e:
@@ -347,12 +349,14 @@ class T2T_OLM_Core(Core):
 
             if not solved:
                 if iteration == self.config.max_iteration:
-                    warnings.warn(
-                        f"Maximum iteration reached. {iteration}/{self.config.max_iteration}"
+                    logger.warning(
+                        "Maximum iteration reached. %d/%d",
+                        iteration,
+                        self.config.max_iteration,
                     )
                 elif token_count >= max_tokens:
-                    warnings.warn(
-                        f"Maximum token count reached. {token_count}/{max_tokens}"
+                    logger.warning(
+                        "Maximum token count reached. %d/%d", token_count, max_tokens
                     )
             return msgs[number_of_primers:]  # Return only the generated messages
         except Exception as e:

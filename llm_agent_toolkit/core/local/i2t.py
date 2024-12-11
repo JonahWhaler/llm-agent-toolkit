@@ -1,5 +1,5 @@
 import os
-import warnings
+import logging
 import ollama
 from ..._core import I2T_Core
 from ..._util import (
@@ -8,12 +8,7 @@ from ..._util import (
     MessageBlock,
 )
 
-
-TOOL_PROMPT = """
-Utilize tools to solve the problems. 
-Results from tools will be kept in the context. 
-Calling the tools repeatedly is highly discouraged.
-"""
+logger = logging.getLogger(__name__)
 
 
 class I2T_OLM_Core(I2T_Core):
@@ -148,16 +143,18 @@ class I2T_OLM_Core(I2T_Core):
 
             if not solved:
                 if iteration == self.config.max_iteration:
-                    warnings.warn(
-                        f"Maximum iteration reached. {iteration}/{self.config.max_iteration}"
+                    logger.warning(
+                        "Maximum iteration reached. %d/%d",
+                        iteration,
+                        self.config.max_iteration,
                     )
                 elif token_count >= max_tokens:
-                    warnings.warn(
-                        f"Maximum token count reached. {token_count}/{max_tokens}"
+                    logger.warning(
+                        "Maximum token count reached. %d/%d", token_count, max_tokens
                     )
             return msgs[number_of_primers:]  # Return only the generated messages
         except Exception as e:
-            # print(f"run: {e}")
+            logger.error("Error: %s", e)
             raise
 
     async def run_async(
@@ -242,16 +239,18 @@ class I2T_OLM_Core(I2T_Core):
 
             if not solved:
                 if iteration == self.config.max_iteration:
-                    warnings.warn(
-                        f"Maximum iteration reached. {iteration}/{self.config.max_iteration}"
+                    logger.warning(
+                        "Maximum iteration reached. %d/%d",
+                        iteration,
+                        self.config.max_iteration,
                     )
                 elif token_count >= max_tokens:
-                    warnings.warn(
-                        f"Maximum token count reached. {token_count}/{max_tokens}"
+                    logger.warning(
+                        "Maximum token count reached. %d/%d", token_count, max_tokens
                     )
             return msgs[number_of_primers:]  # Return only the generated messages
         except Exception as e:
-            # print(f"run: {e}")
+            logger.error("Error: %s", e)
             raise
 
     async def __call_tools_async(
