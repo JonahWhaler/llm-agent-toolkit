@@ -1,5 +1,4 @@
 import os
-import warnings
 import logging
 import openai
 from ..._core import Core
