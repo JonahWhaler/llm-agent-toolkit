@@ -1,7 +1,7 @@
 name,context_length,text_generation,tool,text_input,image_input,audio_input,text_output,image_output,audio_output,remarks
-moondream:latest,2048,TRUE,,TRUE,TRUE,,,,,
+moondream:latest,2048,TRUE,,TRUE,TRUE,,TRUE,,,
 llama3:8b,8192,TRUE,,TRUE,,,TRUE,,,
-llava-llama3:latest,8192,TRUE,,TRUE,TRUE,,,,,
+llava-llama3:latest,8192,TRUE,,TRUE,TRUE,,TRUE,,,
 qwen2.5:14b,32768,TRUE,TRUE,TRUE,,,TRUE,,,
 qwen2.5-coder:7b,32768,TRUE,TRUE,TRUE,,,TRUE,,,
 qwen2.5-coder:3b,32768,TRUE,TRUE,TRUE,,,TRUE,,,
