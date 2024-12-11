@@ -79,7 +79,7 @@ class T2T_OAI_Core(Core):
             max_tokens = self.config.max_tokens
         else:
             temperature = 0.7
-            max_tokens = 4096
+            max_tokens = 8192
         iteration = 0
         token_count = 0
         solved = False
@@ -164,7 +164,7 @@ class T2T_OAI_Core(Core):
             max_tokens = self.config.max_tokens
         else:
             temperature = 0.7
-            max_tokens = 4096
+            max_tokens = 8192
         iteration = 0
         token_count = 0
         solved = False
