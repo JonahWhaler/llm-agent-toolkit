@@ -1,4 +1,5 @@
 import os
+import logging
 import base64
 import openai
 from ..._core import Core
@@ -7,11 +8,16 @@ from ..._util import (
     ImageGenerationConfig,
     MessageBlock,
 )
+from .base import OpenAICore
+
+logger = logging.getLogger(__name__)
 
 
-class T2I_OAI_Core(Core):
+class T2I_OAI_Core(Core, OpenAICore):
     """
     `T2I_OAI_Core` is a concrete implementation of the `Core` abstract class.
+    `T2I_OAI_Core` is also a child class of `OpenAICore`.
+
     It facilitates synchronous and asynchronous communication with OpenAI's API to generate images with the given query.
 
     Methods:
@@ -23,7 +29,7 @@ class T2I_OAI_Core(Core):
         `Context` is not supported.
 
     Notes:
-    - Supported image format: png, jpeg, gif, webp
+    - Generated image are store with png extension.
     - Tools are not supported in current version.
     - Context is not supported in current version.
     """
@@ -34,8 +40,20 @@ class T2I_OAI_Core(Core):
         config: ImageGenerationConfig,
     ):
         assert isinstance(config, ImageGenerationConfig)
-        super().__init__(system_prompt, config, None)
         assert config.response_format == "b64_json"
+        Core.__init__(self, system_prompt, config)
+        OpenAICore.__init__(self, config.name)
+        self.__profile = self.build_profile(config.name)
+        if not self.profile["image_output"]:
+            logger.warning("%s does not support image generation.", config.name)
+
+    @property
+    def profile(self) -> dict:
+        """
+        Profile is mostly for view purpose only,
+        except the context_length which might be used to control the input to the LLM.
+        """
+        return self.__profile
 
     async def run_async(
         self, query: str, context: list[MessageBlock | dict] | None, **kwargs
@@ -83,7 +101,7 @@ class T2I_OAI_Core(Core):
 
             return [*output]
         except Exception as e:
-            # print(f"run_async: {e}")
+            logger.error("Error: %s", e)
             raise
 
     def run(
@@ -131,5 +149,5 @@ class T2I_OAI_Core(Core):
 
             return [*output]
         except Exception as e:
-            # print(f"run_async: {e}")
+            logger.error("Error: %s", e)
             raise

@@ -1,5 +1,6 @@
 import os
 import io
+import logging
 import openai
 
 from ..._core import A2T_Core
@@ -9,11 +10,16 @@ from ..._util import (
     TranscriptionConfig,
     MessageBlock,
 )
+from .base import OpenAICore
+
+logger = logging.getLogger(__name__)
 
 
-class A2T_OAI_Core(A2T_Core):
+class A2T_OAI_Core(A2T_Core, OpenAICore):
     """
     `A2T_OAI_Core` is a concrete implementation of the `A2T_Core` abstract class.
+    `A2T_OAI_Core` is also a child class of `OpenAICore`.
+
     It facilitates synchronous and asynchronous communication with OpenAI's API to transcribe audio files.
 
     Methods:
@@ -25,6 +31,7 @@ class A2T_OAI_Core(A2T_Core):
     Notes:
     - Only accept audio file in OGG and MP3 format!!!
     - Large audio files will be split into multiple chunks, overlapping is supported.
+    - Generated file are stored with md format.
     - Tools are not supported in current version.
     - Context is not supported in current version.
     """
@@ -33,9 +40,21 @@ class A2T_OAI_Core(A2T_Core):
         self,
         system_prompt: str,
         config: TranscriptionConfig,
-        tools: list | None = None,
     ):
-        super().__init__(system_prompt, config, None)
+        assert isinstance(config, TranscriptionConfig)
+        A2T_Core.__init__(self, system_prompt, config)
+        OpenAICore.__init__(self, config.name)
+        self.__profile = self.build_profile(config.name)
+        if not self.profile["audio_input"]:
+            logger.warning("%s does not support audio input.", config.name)
+
+    @property
+    def profile(self) -> dict:
+        """
+        Profile is mostly for view purpose only,
+        except the context_length which might be used to control the input to the LLM.
+        """
+        return self.__profile
 
     async def run_async(
         self, query: str, context: list[MessageBlock | dict] | None, **kwargs
@@ -97,7 +116,7 @@ class A2T_OAI_Core(A2T_Core):
                 )
             return [*output]
         except Exception as e:
-            # print(f"run_async: {e}")
+            logger.error("Exception: %s", e)
             raise
 
     def run(
@@ -161,5 +180,5 @@ class A2T_OAI_Core(A2T_Core):
                 )
             return [*output]
         except Exception as e:
-            # print(f"run_async: {e}")
+            logger.error("Exception: %s", e)
             raise

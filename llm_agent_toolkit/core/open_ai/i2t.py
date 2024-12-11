@@ -1,24 +1,26 @@
 import os
-import warnings
+import logging
 import base64
 import openai
-from ..._core import I2T_Core
+from ..._core import I2T_Core, TextGenerator, ToolSupport
 from ..._util import (
     CreatorRole,
     ChatCompletionConfig,
     MessageBlock,
 )
+from .base import OpenAICore, TOOL_PROMPT
 
-TOOL_PROMPT = """
-Utilize tools to solve the problems. 
-Results from tools will be kept in the context. 
-Calling the tools repeatedly is highly discouraged.
-"""
+logger = logging.getLogger(__name__)
 
 
-class I2T_OAI_Core(I2T_Core):
+class I2T_OAI_Core(I2T_Core, OpenAICore, TextGenerator, ToolSupport):
     """
     `I2T_OAI_Core` is a concrete implementation of the `I2T_Core` abstract base class.
+    `I2T_OAI_Core` is also a child class of:
+    * `OpenAICore`
+    * `TextGenerator`
+    * `ToolSupport`
+
     It facilitates synchronous and asynchronous communication with OpenAI's API to interpret images.
 
     **Methods:**
@@ -28,9 +30,9 @@ class I2T_OAI_Core(I2T_Core):
         Asynchronously run the LLM model to interpret images.
     - get_image_url(filepath: str) -> str:
         Returns the URL of the image from the specified file path.
-    - __call_tools_async(selectd_tools: list) -> list[MessageBlock | dict]:
+    - call_tools_async(selected_tools: list) -> list[MessageBlock | dict]:
         Asynchronously call tools.
-    - __call_tools(selectd_tools: list) -> list[MessageBlock | dict]:
+    - call_tools(selected_tools: list) -> list[MessageBlock | dict]:
         Synchronously call tools.
 
     **Notes:**
@@ -47,7 +49,51 @@ class I2T_OAI_Core(I2T_Core):
         tools: list | None = None,
     ):
         assert isinstance(config, ChatCompletionConfig)
-        super().__init__(system_prompt, config, tools)
+        I2T_Core.__init__(self, system_prompt, config)
+        OpenAICore.__init__(self, config.name)
+        ToolSupport.__init__(self, tools)
+        self.__profile = self.build_profile(config.name)
+        if tools and self.profile["tool"] is False:
+            logger.warning("Tool might not work on this %s", self.model_name)
+        if self.profile["image_input"] is False:
+            logger.warning("Vision might not work on this %s", self.model_name)
+
+    @property
+    def context_length(self) -> int:
+        return self.profile["context_length"]
+
+    @context_length.setter
+    def context_length(self, value):
+        """
+        Set the context length.
+        It shall be the user's responsiblity to ensure this is a model supported context length.
+
+        Args:
+            context_length (int): Context length to be set.
+
+        Returns:
+            None
+
+        Raises:
+            TypeError: If context_length is not type int.
+            ValueError: If context_length is <= 0.
+        """
+        if not isinstance(value, int):
+            raise TypeError(
+                f"Expect context_length to be type 'int', got '{type(value).__name__}'."
+            )
+        if value <= 0:
+            raise ValueError("Expect context_length > 0.")
+
+        self.__profile["context_length"] = value
+
+    @property
+    def profile(self) -> dict:
+        """
+        Profile is mostly for view purpose only,
+        except the context_length which might be used to control the input to the LLM.
+        """
+        return self.__profile
 
     async def run_async(
         self, query: str, context: list[MessageBlock | dict] | None, **kwargs
@@ -72,10 +118,10 @@ class I2T_OAI_Core(I2T_Core):
 
         filepath: str | None = kwargs.get("filepath", None)
         if filepath:
-            ext = os.path.splitext(filepath)[-1]
-            ext = ext.lower()
-            if ext not in I2T_OAI_Core.SUPPORTED_IMAGE_FORMATS:
-                raise ValueError(f"Unsupported image type: {ext}")
+            # ext = os.path.splitext(filepath)[-1]
+            # ext = ext.lower()
+            # if ext not in I2T_OAI_Core.SUPPORTED_IMAGE_FORMATS:
+            #     raise ValueError(f"Unsupported image type: {ext}")
             img_url = self.get_image_url(filepath)
             msgs.append(
                 {
@@ -100,7 +146,10 @@ class I2T_OAI_Core(I2T_Core):
             max_tokens = self.config.max_tokens
         else:
             temperature = 0.7
-            max_tokens = 4096
+            max_tokens = 128_000
+
+        max_tokens = min(max_tokens, self.context_length)
+
         iteration = 0
         token_count = 0
         solved = False
@@ -113,7 +162,7 @@ class I2T_OAI_Core(I2T_Core):
                     model=self.model_name,
                     messages=msgs,  # type: ignore
                     frequency_penalty=0.5,
-                    max_tokens=max_tokens,
+                    max_tokens=min(self.context_length - token_count - 1000, 16384),
                     temperature=temperature,
                     n=self.config.return_n,
                     functions=tools_metadata,  # type: ignore
@@ -132,23 +181,25 @@ class I2T_OAI_Core(I2T_Core):
                     solved = True
                     break
 
-                output = await self.__call_tools_async(tool_calls)
+                output = await self.call_tools_async(tool_calls)
 
                 msgs.extend(output)
                 iteration += 1
 
             if not solved:
                 if iteration == self.config.max_iteration:
-                    warnings.warn(
-                        f"Maximum iteration reached. {iteration}/{self.config.max_iteration}"
+                    logger.warning(
+                        "Maximum iteration reached. %d/%d",
+                        iteration,
+                        self.config.max_iteration,
                     )
                 elif token_count >= max_tokens:
-                    warnings.warn(
-                        f"Maximum token count reached. {token_count}/{max_tokens}"
+                    logger.warning(
+                        "Maximum token count reached. %d/%d", token_count, max_tokens
                     )
             return msgs[number_of_primers:]  # Return only the generated messages
         except Exception as e:
-            # print(f"run: {e}")
+            logger.error("Error: %s", e)
             raise
 
     def run(
@@ -174,10 +225,10 @@ class I2T_OAI_Core(I2T_Core):
 
         filepath: str | None = kwargs.get("filepath", None)
         if filepath:
-            ext = os.path.splitext(filepath)[-1]
-            ext = ext.lower()
-            if ext not in I2T_OAI_Core.SUPPORTED_IMAGE_FORMATS:
-                raise ValueError(f"Unsupported image type: {ext}")
+            # ext = os.path.splitext(filepath)[-1]
+            # ext = ext.lower()
+            # if ext not in I2T_OAI_Core.SUPPORTED_IMAGE_FORMATS:
+            #     raise ValueError(f"Unsupported image type: {ext}")
             img_url = self.get_image_url(filepath)
             msgs.append(
                 {
@@ -201,19 +252,22 @@ class I2T_OAI_Core(I2T_Core):
             max_tokens = self.config.max_tokens
         else:
             temperature = 0.7
-            max_tokens = 4096
+            max_tokens = 128_000
+
+        max_tokens = min(max_tokens, self.context_length)
+
         iteration = 0
         token_count = 0
         solved = False
         try:
             client = openai.OpenAI(api_key=os.environ["OPENAI_API_KEY"])
             while iteration < self.config.max_iteration and token_count < max_tokens:
-                # print(f"\n\nIteration: {iteration}")
+                logger.info("\n\nIteration: %d", iteration)
                 response = client.chat.completions.create(
                     model=self.model_name,
                     messages=msgs,  # type: ignore
                     frequency_penalty=0.5,
-                    max_tokens=max_tokens,
+                    max_tokens=min(self.context_length - token_count - 1000, 16384),
                     temperature=temperature,
                     n=self.config.return_n,
                     tools=tools_metadata,  # type: ignore
@@ -228,53 +282,52 @@ class I2T_OAI_Core(I2T_Core):
                     )
 
                 tool_calls = choice.message.tool_calls
-
+                logger.info(">> tool_calls: %s", tool_calls)
                 if tool_calls is None:
                     solved = True
                     break
 
-                output = self.__call_tools(tool_calls)
+                output = self.call_tools(tool_calls)
 
                 msgs.extend(output)
                 iteration += 1
 
             if not solved:
                 if iteration == self.config.max_iteration:
-                    warnings.warn(
-                        f"Maximum iteration reached. {iteration}/{self.config.max_iteration}"
+                    logger.warning(
+                        "Maximum iteration reached. %d/%d",
+                        iteration,
+                        self.config.max_iteration,
                     )
                 elif token_count >= max_tokens:
-                    warnings.warn(
-                        f"Maximum token count reached. {token_count}/{max_tokens}"
+                    logger.warning(
+                        "Maximum token count reached. %d/%d", token_count, max_tokens
                     )
             return msgs[number_of_primers:]  # Return only the generated messages
         except Exception as e:
-            # print(f"run: {e}")
+            logger.error("Error: %s", e)
             raise
 
     @staticmethod
     def get_image_url(filepath: str):
-        ext = filepath.split(".")[-1].lower()
-        ext = "jpeg" if ext == "jpg" else ext
+        ext = os.path.splitext(filepath)[-1]
         if ext not in I2T_OAI_Core.SUPPORTED_IMAGE_FORMATS:
             raise ValueError(f"Unsupported image type: {ext}")
-        prefix = f"data:image/{ext};base64"
+        prefix = f"data:image/{ext[1:]};base64"
         try:
             with open(filepath, "rb") as f:
                 encoded_image = base64.b64encode(f.read()).decode("utf-8")
                 return f"{prefix},{encoded_image}"
         except Exception as e:
-            # print(f"get_image_url: {e}")
+            logger.error("Error: %s", e)
             raise
 
-    async def __call_tools_async(
-        self, selectd_tools: list
-    ) -> list[MessageBlock | dict]:
+    async def call_tools_async(self, selected_tools: list) -> list[MessageBlock | dict]:
         """
         Asynchronously call every selected tools.
 
         Args:
-            selectd_tools (list): A list of selected tools.
+            selected_tools (list): A list of selected tools.
 
         Returns:
             list: A list of messages generated by the tools.
@@ -285,7 +338,7 @@ class I2T_OAI_Core(I2T_Core):
             - Does not raise exception on failed tool execution, an error message is returned instead to guide the calling LLM.
         """
         output: list[MessageBlock | dict] = []
-        for tool_call in selectd_tools:
+        for tool_call in selected_tools:
             for tool in self.tools:  # type: ignore
                 if tool.info["function"]["name"] != tool_call.function.name:
                     continue
@@ -311,12 +364,12 @@ class I2T_OAI_Core(I2T_Core):
 
         return output
 
-    def __call_tools(self, selectd_tools: list) -> list[MessageBlock | dict]:
+    def call_tools(self, selected_tools: list) -> list[MessageBlock | dict]:
         """
         Synchronously call every selected tools.
 
         Args:
-            selectd_tools (list): A list of selected tools.
+            selected_tools (list): A list of selected tools.
 
         Returns:
             list: A list of messages generated by the tools.
@@ -327,7 +380,7 @@ class I2T_OAI_Core(I2T_Core):
             - Does not raise exception on failed tool execution, an error message is returned instead to guide the calling LLM.
         """
         output: list[MessageBlock | dict] = []
-        for tool_call in selectd_tools:
+        for tool_call in selected_tools:
             for tool in self.tools:  # type: ignore
                 if tool.info["function"]["name"] != tool_call.function.name:
                     continue
