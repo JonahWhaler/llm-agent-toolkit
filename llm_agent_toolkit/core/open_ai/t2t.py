@@ -116,16 +116,18 @@ class T2T_OAI_Core(Core):
 
             if not solved:
                 if iteration == self.config.max_iteration:
-                    warnings.warn(
-                        f"Maximum iteration reached. {iteration}/{self.config.max_iteration}"
+                    logger.warning(
+                        "Maximum iteration reached. %d/%d",
+                        iteration,
+                        self.config.max_iteration,
                     )
                 elif token_count >= max_tokens:
-                    warnings.warn(
-                        f"Maximum token count reached. {token_count}/{max_tokens}"
+                    logger.warning(
+                        "Maximum token count reached. %d/%d", token_count, max_tokens
                     )
             return msgs[number_of_primers:]  # Return only the generated messages
         except Exception as e:
-            # print(f"run_async: {e}")
+            logger.error("Error: %s", e)
             raise
 
     def run(
@@ -202,16 +204,18 @@ class T2T_OAI_Core(Core):
 
             if not solved:
                 if iteration == self.config.max_iteration:
-                    warnings.warn(
-                        f"Maximum iteration reached. {iteration}/{self.config.max_iteration}"
+                    logger.warning(
+                        "Maximum iteration reached. %d/%d",
+                        iteration,
+                        self.config.max_iteration,
                     )
                 elif token_count >= max_tokens:
-                    warnings.warn(
-                        f"Maximum token count reached. {token_count}/{max_tokens}"
+                    logger.warning(
+                        "Maximum token count reached. %d/%d", token_count, max_tokens
                     )
             return msgs[number_of_primers:]  # Return only the generated messages
         except Exception as e:
-            # print(f"run: {e}")
+            logger.error("Error: %s", e)
             raise
 
     async def __call_tools_async(
