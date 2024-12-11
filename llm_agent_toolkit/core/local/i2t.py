@@ -29,14 +29,14 @@ class I2T_OLM_Core(I2T_Core):
         Synchronously call tools.
 
     **Notes:**
-    - Supported image format: .png, .jpeg, .gif, .webp
+    - Supported image format: .png, .jpeg, .jpg, .gif, .webp
     - Tools are supported.
     - The caller is responsible for memory management, output parsing and error handling.
     - The caller is responsible for choosing models that support `Tools`.
     - The caller is responsible for choosing models that support `Vision`.
     """
 
-    SUPPORTED_IMAGE_FORMATS = (".png", ".jpeg", ".gif", ".webp")
+    SUPPORTED_IMAGE_FORMATS = (".png", ".jpeg", ".jpg", ".gif", ".webp")
 
     def __init__(
         self,
