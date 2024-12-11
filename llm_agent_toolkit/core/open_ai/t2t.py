@@ -8,7 +8,7 @@ from ..._util import (
     MessageBlock,
 )
 from ..._tool import Tool
-
+from .base import OpenAICore
 
 logger = logging.getLogger(__name__)
 
@@ -20,9 +20,10 @@ Calling the tools repeatedly is highly discouraged.
 """
 
 
-class T2T_OAI_Core(Core):
+class T2T_OAI_Core(Core, OpenAICore):
     """
     `T2T_OAI_Core` is a concrete implementation of the `Core` abstract class.
+    `T2T_OAI_Core` is also a child class of `OpenAICore`.
     It facilitates synchronous and asynchronous communication with OpenAI's API.
 
     Methods:
@@ -34,6 +35,8 @@ class T2T_OAI_Core(Core):
     Notes:
     - Loop until a solution is found, or maximum iteration or token count is reached.
     - The caller is responsible for memory management, output parsing and error handling.
+    - If model is not available under OpenAI's listing, raise ValueError.
+    - `context_length` is configurable.
     """
 
     def __init__(
@@ -43,7 +46,48 @@ class T2T_OAI_Core(Core):
         tools: list[Tool] | None = None,
     ):
         assert isinstance(config, ChatCompletionConfig)
-        super().__init__(system_prompt, config, tools)
+        Core.__init__(self, system_prompt, config, tools)
+        OpenAICore.__init__(self, config.name)
+        self.__profile = self.build_profile(config.name)
+        if tools and self.profile["tool"] is False:
+            logger.warning("Tool might not work on this %s", self.model_name)
+
+    @property
+    def context_length(self) -> int:
+        return self.profile["context_length"]
+
+    @context_length.setter
+    def context_length(self, value):
+        """
+        Set the context length.
+        It shall be the user's responsiblity to ensure this is a model supported context length.
+
+        Args:
+            context_length (int): Context length to be set.
+
+        Returns:
+            None
+
+        Raises:
+            TypeError: If context_length is not type int.
+            ValueError: If context_length is <= 0.
+        """
+        if not isinstance(value, int):
+            raise TypeError(
+                f"Expect context_length to be type 'int', got '{type(value).__name__}'."
+            )
+        if value <= 0:
+            raise ValueError("Expect context_length > 0.")
+
+        self.__profile["context_length"] = value
+
+    @property
+    def profile(self) -> dict:
+        """
+        Profile is mostly for view purpose only,
+        except the context_length which might be used to control the input to the LLM.
+        """
+        return self.__profile
 
     async def run_async(
         self, query: str, context: list[MessageBlock | dict] | None, **kwargs
@@ -80,6 +124,9 @@ class T2T_OAI_Core(Core):
         else:
             temperature = 0.7
             max_tokens = 8192
+
+        max_tokens = min(max_tokens, self.context_length)
+
         iteration = 0
         token_count = 0
         solved = False
@@ -165,6 +212,9 @@ class T2T_OAI_Core(Core):
         else:
             temperature = 0.7
             max_tokens = 8192
+
+        max_tokens = min(max_tokens, self.context_length)
+
         iteration = 0
         token_count = 0
         solved = False
