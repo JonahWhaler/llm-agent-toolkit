@@ -2,6 +2,7 @@ name,context_length,text_generation,tool,text_input,image_input,audio_input,text
 gpt-4,8192,TRUE,TRUE,TRUE,TRUE,,TRUE,,,
 gpt-3.5-turbo,16385,TRUE,TRUE,TRUE,,,TRUE,,,
 gpt-4o,128000,TRUE,TRUE,TRUE,TRUE,,TRUE,,,
+gpt-4o-mini,128000,TRUE,TRUE,TRUE,TRUE,,TRUE,,,
 o1-mini,128000,TRUE,TRUE,TRUE,,,TRUE,,,
 gpt-4-turbo,128000,TRUE,TRUE,TRUE,TRUE,,TRUE,,,
 dall-e-2,,,,TRUE,TRUE,,,TRUE,,Support edit and variation
