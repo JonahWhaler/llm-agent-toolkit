@@ -7,13 +7,15 @@ from ..._util import (
     ChatCompletionConfig,
     MessageBlock,
 )
+from .base import OllamaCore, TOOL_PROMPT
 
 logger = logging.getLogger(__name__)
 
 
-class I2T_OLM_Core(I2T_Core):
+class I2T_OLM_Core(I2T_Core, OllamaCore):
     """
     `I2T_OLM_Core` is a concrete implementation of the `I2T_Core` abstract base class.
+    `I2T_OLM_Core` is also a child class of `OllamaCore`.
     It facilitates synchronous and asynchronous communication with ollama's API to interpret images.
 
     **Methods:**
@@ -45,14 +47,51 @@ class I2T_OLM_Core(I2T_Core):
         config: ChatCompletionConfig,
         tools: list | None = None,
     ):
-        super().__init__(system_prompt, config, None)
-        self.__connection_string = connection_string
-        if tools is not None:
-            warnings.warn("Tools may not be supported by vision models.")
+        I2T_Core.__init__(self, system_prompt, config, None)
+        OllamaCore.__init__(self, connection_string, config.name)
+        # self.__connection_string = connection_string
+        self.__profile = self.build_profile(model_name=config.name)
+        if tools and self.profile["tool"] is False:
+            logger.warning("Tool might not work on this %s", self.model_name)
+        if self.profile["image_input"] is False:
+            logger.warning("Vision might not work on this %s", self.model_name)
 
     @property
-    def CONN_STRING(self) -> str:
-        return self.__connection_string
+    def context_length(self) -> int:
+        return self.profile["context_length"]
+
+    @context_length.setter
+    def context_length(self, value):
+        """
+        Set the context length.
+        It shall be the user's responsiblity to ensure this is a model supported context length.
+
+        Args:
+            context_length (int): Context length to be set.
+
+        Returns:
+            None
+
+        Raises:
+            TypeError: If context_length is not type int.
+            ValueError: If context_length is <= 0.
+        """
+        if not isinstance(value, int):
+            raise TypeError(
+                f"Expect context_length to be type 'int', got '{type(value).__name__}'."
+            )
+        if value <= 0:
+            raise ValueError("Expect context_length > 0.")
+
+        self.__profile["context_length"] = value
+
+    @property
+    def profile(self) -> dict:
+        """
+        Profile is mostly for view purpose only,
+        except the context_length which might be used to control the input to the LLM.
+        """
+        return self.__profile
 
     @staticmethod
     def get_image_url(filepath: str) -> str:
@@ -107,6 +146,9 @@ class I2T_OLM_Core(I2T_Core):
         else:
             temperature = 0.7
             max_tokens = 4096
+
+        max_tokens = min(max_tokens, self.context_length)
+
         iteration = 0
         token_count = 0
         solved = False
@@ -122,6 +164,8 @@ class I2T_OLM_Core(I2T_Core):
                     stream=False,
                     options={"temperature": temperature, "num_predict": max_tokens},
                 )
+                token_count += response["eval_count"] + response["prompt_eval_count"]
+
                 llm_generated_content = response["message"]["content"]
                 if llm_generated_content != "":
                     msgs.append(
@@ -139,7 +183,6 @@ class I2T_OLM_Core(I2T_Core):
                 output = self.__call_tools(tool_calls)
                 msgs.extend(output)
 
-                token_count += response["prompt_eval_count"] + response["eval_count"]
                 iteration += 1
 
             if not solved:
@@ -205,6 +248,9 @@ class I2T_OLM_Core(I2T_Core):
         else:
             temperature = 0.7
             max_tokens = 4096
+
+        max_tokens = min(max_tokens, self.context_length)
+
         iteration = 0
         token_count = 0
         solved = False
@@ -220,6 +266,8 @@ class I2T_OLM_Core(I2T_Core):
                     stream=False,
                     options={"temperature": temperature, "num_predict": max_tokens},
                 )
+                token_count += response["eval_count"] + response["prompt_eval_count"]
+
                 llm_generated_content = response["message"]["content"]
                 if llm_generated_content != "":
                     msgs.append(

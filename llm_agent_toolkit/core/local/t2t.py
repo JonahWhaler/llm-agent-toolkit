@@ -1,6 +1,5 @@
 # import os
 import json
-import warnings
 import logging
 import ollama
 from ..._core import Core
@@ -11,21 +10,15 @@ from ..._util import (
 )
 
 from ..._tool import Tool
-
+from .base import OllamaCore, TOOL_PROMPT
 
 logger = logging.getLogger(__name__)
 
 
-TOOL_PROMPT = """
-Utilize tools to solve the problems. 
-Results from tools will be kept in the context. 
-Calling the tools repeatedly is highly discouraged.
-"""
-
-
-class T2T_OLM_Core(Core):
+class T2T_OLM_Core(Core, OllamaCore):
     """
     `T2T_OLM_Core` is a concrete implementation of the `Core` abstract class.
+    `T2T_OLM_Core` is also a child class of `OllamaCore`.
     It facilitates synchronous and asynchronous communication with ollama's API.
 
     Methods:
@@ -50,96 +43,11 @@ class T2T_OLM_Core(Core):
         tools: list[Tool] | None = None,
     ):
         assert isinstance(config, ChatCompletionConfig)
-        super().__init__(system_prompt, config, tools)
-        self.__connection_string = connection_string
-        if not self.__available():
-            self.__try_pull_model()
-        self.__profile = self.__build_profile(model_name=config.name)
+        Core.__init__(self, system_prompt, config, tools)
+        OllamaCore.__init__(self, connection_string, config.name)
+        self.__profile = self.build_profile(model_name=config.name)
         if tools and self.profile["tool"] is False:
             logger.warning("Tool might not work on this %s", self.model_name)
-
-    def __available(self) -> bool:
-        try:
-            client = ollama.Client(host=self.CONN_STRING)
-            lst = list(client.list())[0]
-            _, m, *_ = lst
-            for _m in m:
-                if _m.model == self.model_name:
-                    logger.info("Found %s => %s", self.model_name, _m)
-                    return True
-            return False
-        except ollama.RequestError as ore:
-            logger.error("RequestError: %s", str(ore))
-            raise
-        except Exception as e:
-            logger.error("Exception: %s", str(e))
-            raise
-
-    def __try_pull_model(self):
-        """
-        Attempt to pull the required model from ollama's server.
-
-        **Raises:**
-            ollama.ResponseError: pull model manifest: file does not exist
-        """
-        try:
-            client = ollama.Client(host=self.CONN_STRING)
-            _ = client.pull(self.model_name, stream=False)
-        except ollama.RequestError as oreqe:
-            logger.error("RequestError: %s", str(oreqe))
-            raise
-        except ollama.ResponseError as orespe:
-            logger.error("ResponseError: %s", str(orespe))
-            raise
-        except Exception as e:
-            logger.error("Exception: %s (%s)", str(e), type(e))
-            raise
-
-    @staticmethod
-    def __build_profile(model_name: str) -> dict[str, bool | int | str]:
-        """
-        Build the profile dict based on information found in ./llm_agent_toolkit/core/local/ollama.csv
-
-        These are the models which the developer has experience with.
-        If `model_name` is not found in the csv file, default value will be applied.
-
-        Call .set_context_length to set the context length, default value is 2048.
-        """
-        logger.info("Building profile...")
-        profile: dict[str, bool | int | str] = {"name": model_name}
-        with open(
-            "./llm_agent_toolkit/core/local/ollama.csv", "r", encoding="utf-8"
-        ) as csv:
-            header = csv.readline()
-            columns = header.strip().split(",")
-            while True:
-                line = csv.readline()
-                if not line:
-                    break
-                values = line.strip().split(",")
-                if values[0] == model_name:
-                    for column, value in zip(columns[1:], values[1:]):
-                        if column == "context_length":
-                            profile[column] = int(value)
-                        elif column == "remarks":
-                            profile[column] = value
-                        elif value == "TRUE":
-                            profile[column] = True
-                        else:
-                            profile[column] = False
-                    break
-
-        if "context_length" not in profile:
-            # Most supported context length
-            profile["context_length"] = 2048
-        if "tool" not in profile:
-            # Assume supported
-            profile["tool"] = True
-        if "text_generation" not in profile:
-            # Assume supported
-            profile["text_generation"] = True
-        logger.info("Profile ready")
-        return profile
 
     @property
     def context_length(self) -> int:
@@ -177,10 +85,6 @@ class T2T_OLM_Core(Core):
         except the context_length which might be used to control the input to the LLM.
         """
         return self.__profile
-
-    @property
-    def CONN_STRING(self) -> str:
-        return self.__connection_string
 
     def run(
         self, query: str, context: list[MessageBlock | dict] | None, **kwargs
