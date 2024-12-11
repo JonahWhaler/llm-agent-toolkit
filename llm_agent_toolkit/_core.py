@@ -122,13 +122,11 @@ class I2T_Core(Core, ABC):
         self,
         system_prompt: str,
         config: ChatCompletionConfig,
-        tools: list | None = None,
     ):
         Core.__init__(
             self,
             system_prompt=system_prompt,
             config=config,
-            tools=tools,
         )
 
     @staticmethod
@@ -137,28 +135,12 @@ class I2T_Core(Core, ABC):
         """Return the image url extracted from the file path."""
         raise NotImplementedError
 
-    @abstractmethod
-    async def run_async(
-        self, query: str, context: list[MessageBlock | dict] | None, **kwargs
-    ) -> list[MessageBlock | dict]:
-        """Asynchronously run the LLM model with the given query and context."""
-        raise NotImplementedError
-
-    @abstractmethod
-    def run(
-        self, query: str, context: list[MessageBlock | dict] | None, **kwargs
-    ) -> list[MessageBlock | dict]:
-        """Synchronously run the LLM model with the given query and context."""
-        raise NotImplementedError
-
 
 class A2T_Core(Core, ABC):
     """
     Abstract class for audio-to-text LLM models, inherits from `Core`.
 
     Abstract methods:
-    - to_chunks(input_path: str, tmp_directory: str, config: dict) -> str:
-        Split the audio file into multiple chunks.
     - run_async(query: str, context: list[ContextMessage | dict] | None, **kwargs) -> list[OpenAIMessage | dict]:
         Asynchronously run the LLM model with the given query and context.
     - run(query: str, context: list[ContextMessage | dict] | None, **kwargs) -> list[OpenAIMessage | dict]:
@@ -169,25 +151,6 @@ class A2T_Core(Core, ABC):
         self,
         system_prompt: str,
         config: TranscriptionConfig,
-        tools: list | None = None,
     ):
-        Core.__init__(
-            self,
-            system_prompt=system_prompt,
-            config=config,
-            tools=tools,
-        )
-
-    @abstractmethod
-    async def run_async(
-        self, query: str, context: list[MessageBlock | dict] | None, **kwargs
-    ) -> list[MessageBlock | dict]:
-        """Asynchronously run the LLM model with the given query and context."""
-        raise NotImplementedError
-
-    @abstractmethod
-    def run(
-        self, query: str, context: list[MessageBlock | dict] | None, **kwargs
-    ) -> list[MessageBlock | dict]:
-        """Synchronously run the LLM model with the given query and context."""
-        raise NotImplementedError
+        assert isinstance(config, TranscriptionConfig)
+        Core.__init__(self, system_prompt=system_prompt, config=config)
