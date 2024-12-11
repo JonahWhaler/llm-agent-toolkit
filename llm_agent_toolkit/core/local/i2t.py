@@ -84,6 +84,7 @@ class I2T_OLM_Core(I2T_Core):
         if filepath:
             # Validation Step
             ext = os.path.splitext(filepath)[-1]
+            ext = ext.lower()
             if ext not in I2T_OLM_Core.SUPPORTED_IMAGE_FORMATS:
                 raise ValueError(f"Unsupported image type: {ext}")
             msgs.append(
@@ -182,6 +183,7 @@ class I2T_OLM_Core(I2T_Core):
         if filepath:
             # Validation Step
             ext = os.path.splitext(filepath)[-1]
+            ext = ext.lower()
             if ext not in I2T_OLM_Core.SUPPORTED_IMAGE_FORMATS:
                 raise ValueError(f"Unsupported image type: {ext}")
             msgs.append(
