@@ -69,3 +69,10 @@ class OpenAICore:
 
         logger.info("Profile ready")
         return profile
+
+
+TOOL_PROMPT = """
+Utilize tools to solve the problems. 
+Results from tools will be kept in the context. 
+Calling the tools repeatedly is highly discouraged.
+"""
