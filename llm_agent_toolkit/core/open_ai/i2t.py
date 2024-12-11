@@ -34,11 +34,11 @@ class I2T_OAI_Core(I2T_Core):
         Synchronously call tools.
 
     **Notes:**
-    - Supported image format: .png, .jpeg, .gif, .webp
+    - Supported image format: .png, .jpeg, .jpg, .gif, .webp
     - Tools are supported.
     """
 
-    SUPPORTED_IMAGE_FORMATS = (".png", ".jpeg", ".gif", ".webp")
+    SUPPORTED_IMAGE_FORMATS = (".png", ".jpeg", ".jpg", ".gif", ".webp")
 
     def __init__(
         self,
@@ -71,7 +71,11 @@ class I2T_OAI_Core(I2T_Core):
             msgs.extend(context)
 
         filepath: str | None = kwargs.get("filepath", None)
-        if filepath is not None:
+        if filepath:
+            ext = os.path.splitext(filepath)[-1]
+            ext = ext.lower()
+            if ext not in I2T_OAI_Core.SUPPORTED_IMAGE_FORMATS:
+                raise ValueError(f"Unsupported image type: {ext}")
             img_url = self.get_image_url(filepath)
             msgs.append(
                 {
@@ -169,7 +173,11 @@ class I2T_OAI_Core(I2T_Core):
             msgs.extend(context)
 
         filepath: str | None = kwargs.get("filepath", None)
-        if filepath is not None:
+        if filepath:
+            ext = os.path.splitext(filepath)[-1]
+            ext = ext.lower()
+            if ext not in I2T_OAI_Core.SUPPORTED_IMAGE_FORMATS:
+                raise ValueError(f"Unsupported image type: {ext}")
             img_url = self.get_image_url(filepath)
             msgs.append(
                 {
