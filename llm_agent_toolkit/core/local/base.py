@@ -74,7 +74,6 @@ class OllamaCore:
 
         Call .set_context_length to set the context length, default value is 2048.
         """
-        logger.info("Building profile...")
         profile: dict[str, bool | int | str] = {"name": model_name}
         with open(
             "./llm_agent_toolkit/core/local/ollama.csv", "r", encoding="utf-8"
@@ -107,7 +106,6 @@ class OllamaCore:
         if "text_generation" not in profile:
             # Assume supported
             profile["text_generation"] = True
-        logger.info("Profile ready")
         return profile
 
 
