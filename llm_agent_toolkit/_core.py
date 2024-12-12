@@ -105,52 +105,41 @@ class ToolSupport(ABC):
         raise NotImplementedError
 
 
-class I2T_Core(Core, ABC):
+class ImageInterpreter(ABC):
     """
-    Abstract class for image-to-text LLM models, inherits from `Core`.
+    Abstract class for image-to-text LLM models.
 
     Abstract methods:
-    - get_image_url(filepath: str) -> str:
-        Returns the URL of the image from the specified file path.
-    - run_async(query: str, context: list[ContextMessage | dict] | None, **kwargs) -> list[OpenAIMessage | dict]:
-        Asynchronously run the LLM model with the given query and context.
-    - run(query: str, context: list[ContextMessage | dict] | None, **kwargs) -> list[OpenAIMessage | dict]:
-        Synchronously run the LLM model with the given query and context.
+    - interpret_async(query: str, context: list[ContextMessage | dict] | None, filepath: str, **kwargs) -> list[OpenAIMessage | dict]:
+        Asynchronously run the LLM model to interpret the image in `filepath`.
+    - interpret(query: str, context: list[ContextMessage | dict] | None, filepath: str, **kwargs) -> list[OpenAIMessage | dict]:
+        Synchronously run the LLM model to interpret the image in `filepath`.
     """
 
-    def __init__(
-        self,
-        system_prompt: str,
-        config: ChatCompletionConfig,
-    ):
-        Core.__init__(
-            self,
-            system_prompt=system_prompt,
-            config=config,
-        )
-
-    @staticmethod
     @abstractmethod
-    def get_image_url(filepath: str) -> str:
-        """Return the image url extracted from the file path."""
+    async def interpret_async(
+        self,
+        query: str,
+        context: list[MessageBlock | dict] | None,
+        filepath: str,
+        **kwargs
+    ) -> list[MessageBlock | dict]:
+        """Asynchronously run the LLM model to interpret the image in `filepath`.
+
+        Use this method to explicitly express the intention to interpret an image.
+        """
         raise NotImplementedError
 
-
-class A2T_Core(Core, ABC):
-    """
-    Abstract class for audio-to-text LLM models, inherits from `Core`.
-
-    Abstract methods:
-    - run_async(query: str, context: list[ContextMessage | dict] | None, **kwargs) -> list[OpenAIMessage | dict]:
-        Asynchronously run the LLM model with the given query and context.
-    - run(query: str, context: list[ContextMessage | dict] | None, **kwargs) -> list[OpenAIMessage | dict]:
-        Synchronously run the LLM model with the given query and context.
-    """
-
-    def __init__(
+    @abstractmethod
+    def interpret(
         self,
-        system_prompt: str,
-        config: TranscriptionConfig,
-    ):
-        assert isinstance(config, TranscriptionConfig)
-        Core.__init__(self, system_prompt=system_prompt, config=config)
+        query: str,
+        context: list[MessageBlock | dict] | None,
+        filepath: str,
+        **kwargs
+    ) -> list[MessageBlock | dict]:
+        """Synchronously run the LLM model to interpret the image in `filepath`.
+
+        Use this method to explicitly express the intention to interpret an image.
+        """
+        raise NotImplementedError
