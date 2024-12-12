@@ -1,18 +1,14 @@
 """
-Description:
-- This file defines the abstract base class `Core`, which is the core of the LLM agent toolkit.
-- `I2T_Core` and `A2T_Core` are the abstract subclasses of `Core` for image-to-text and audio-to-text LLM models respectively.
+Abstract Base Classes: `Core`
+Interfaces: `ImageInterpreter` and `ToolSupport`.
+
+Assumptions:
+* Any classes that inherit `Core` are capable of handling chat completion.
 """
 
 from abc import abstractmethod, ABC
 
-from ._util import (
-    ChatCompletionConfig,
-    ModelConfig,
-    ImageGenerationConfig,
-    MessageBlock,
-    TranscriptionConfig,
-)
+from ._util import ChatCompletionConfig, MessageBlock
 from ._tool import Tool
 
 
@@ -23,16 +19,13 @@ class Core(ABC):
     Attr:
     - system_prompt: str: The system prompt for the LLM model.
     - model_name: str: The name of the LLM model.
-    - config: ChatCompletionConfig | ImageGenerationConfig: The configuration for the LLM model.
-
-    Notes:
-    - TODO: Allow structured profile
+    - config: ChatCompletionConfig: The configuration for the LLM model.
     """
 
     def __init__(
         self,
         system_prompt: str,
-        config: ChatCompletionConfig | ImageGenerationConfig | TranscriptionConfig,
+        config: ChatCompletionConfig,
     ):
         self.__system_prompt = system_prompt
         self.__config = config
@@ -54,9 +47,7 @@ class Core(ABC):
     @property
     def config(
         self,
-    ) -> (
-        ModelConfig | ChatCompletionConfig | ImageGenerationConfig | TranscriptionConfig
-    ):
+    ) -> ChatCompletionConfig:
         """Return the configuration for the LLM model."""
         return self.__config
 
@@ -74,8 +65,6 @@ class Core(ABC):
         """Synchronously run the LLM model with the given query and context."""
         raise NotImplementedError
 
-
-class TextGenerator(ABC):
     @property
     @abstractmethod
     def context_length(self) -> int:
