@@ -32,7 +32,6 @@ class OpenAICore:
 
     @staticmethod
     def build_profile(model_name: str) -> dict[str, bool | int | str]:
-        logger.info("Building profile...")
         profile: dict[str, bool | int | str] = {"name": model_name}
         with open(
             "./llm_agent_toolkit/core/open_ai/openai.csv", "r", encoding="utf-8"
@@ -67,7 +66,6 @@ class OpenAICore:
                 # Assume supported
                 profile["tool"] = True
 
-        logger.info("Profile ready")
         return profile
 
 
