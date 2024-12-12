@@ -281,13 +281,28 @@ def uppercase(text: str) -> str:
     return text.upper()
 
 
+async def what_weather(date: str) -> str:
+    """Forecast the weather of the given date.
+
+    Args:
+        date (str): DD-MM-YYYY
+
+    Returns:
+        str: One of [Sunny, Rainy, Stormy]
+    """
+    cs = int(date[:2]) + int(date[3:5]) + int(date[7:])
+    x = cs % 5
+    await asyncio.sleep(1.0)
+    return "Sunny" if x < 2 else "Rainy" if x < 3 else "Stormy"
+
+
 def exec_i2t_w_tool():
     from llm_agent_toolkit import ChatCompletionConfig
     from llm_agent_toolkit.core.open_ai import Image_to_Text
     from llm_agent_toolkit.tool import LazyTool
 
     SYSTEM_PROMPT = "You are Whales, faithful AI assistant."
-    QUERY = "Whats in the image? Return your response with uppercase."
+    QUERY = "Whats in the image? Should I bring umbrella to this place on 31-Jan-2024? Return your response with uppercase."
     MODEL_NAME = "gpt-4o-mini"
 
     config = ChatCompletionConfig(
@@ -299,11 +314,12 @@ def exec_i2t_w_tool():
     )
 
     string_tool = LazyTool(uppercase, is_coroutine_function=False)
+    weather_tool = LazyTool(what_weather, is_coroutine_function=True)
 
     llm = Image_to_Text(
         system_prompt=SYSTEM_PROMPT,
         config=config,
-        tools=[string_tool],
+        tools=[string_tool, weather_tool],
     )
     results = llm.run(query=QUERY, context=None, filepath=FILEPATH)
     logger.info("Query: %s", QUERY)
@@ -311,6 +327,63 @@ def exec_i2t_w_tool():
         logger.info(">>>> %s\n", result)
 
 
+async def aexec_i2t_w_tool():
+    from llm_agent_toolkit import ChatCompletionConfig
+    from llm_agent_toolkit.core.open_ai import Image_to_Text
+    from llm_agent_toolkit.tool import LazyTool
+
+    SYSTEM_PROMPT = "You are Whales, faithful AI assistant."
+    QUERY = "Whats in the image? Should I bring umbrella to this place on 31-Jan-2024? Return your response with uppercase."
+    MODEL_NAME = "gpt-4o-mini"
+
+    config = ChatCompletionConfig(
+        name=MODEL_NAME,
+        return_n=1,
+        max_iteration=5,
+        max_tokens=128_000,
+        temperature=0.7,
+    )
+
+    string_tool = LazyTool(uppercase, is_coroutine_function=False)
+    weather_tool = LazyTool(what_weather, is_coroutine_function=True)
+
+    llm = Image_to_Text(
+        system_prompt=SYSTEM_PROMPT,
+        config=config,
+        tools=[string_tool, weather_tool],
+    )
+
+    results = await llm.interpret_async(query=QUERY, context=None, filepath=FILEPATH)
+    logger.info("Query: %s", QUERY)
+    for result in results:
+        logger.info(">>>> %s\n", result)
+
+
+def synchronous_tasks():
+    exec_i2t()
+    exec_i2t_w_tool()
+    exec_i2t_wo_file()
+    exec_t2t_w_tool()
+    exec_t2t_wo_tool()
+
+
+async def asynchronous_tasks():
+    tasks = [
+        aexec_i2t(),
+        aexec_i2t_w_tool(),
+        aexec_t2t_wo_tool(),
+        aexec_i2t_wo_file(),
+        aexec_t2t_w_tool(),
+        aexec_t2t_wo_tool(),
+    ]
+    await asyncio.gather(*tasks)
+
+
+def try_openai_examples():
+    synchronous_tasks()
+    asyncio.run(asynchronous_tasks())
+
+
 if __name__ == "__main__":
     load_dotenv()
-    exec_i2t_w_tool()
+    try_openai_examples()
