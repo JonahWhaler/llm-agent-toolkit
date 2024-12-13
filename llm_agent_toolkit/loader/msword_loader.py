@@ -1,5 +1,5 @@
 import os
-import warnings
+import logging
 import zipfile
 from io import StringIO, BytesIO
 import re
@@ -7,13 +7,14 @@ from contextlib import contextmanager
 
 from docx import Document
 from docx.document import Document as _Document
-from docx.table import _Cell, Table
+from docx.table import Table
 
 from .._loader import BaseLoader
-from .._core import Core, I2T_Core
+from .._core import ImageInterpreter
 from .._util import MessageBlock
 
 
+logger = logging.getLogger(__name__)
 """
 Dependencies:
 ----------
@@ -26,20 +27,12 @@ class MsWordLoader(BaseLoader):
         self,
         text_only: bool = True,
         tmp_directory: str | None = None,
-        core: Core | None = None,
+        image_interpreter: ImageInterpreter | None = None,
     ):
         self.__text_only = text_only
-        self.__core = core
+        self.__image_interpreter = image_interpreter
         self.__tmp_directory = tmp_directory
         if not text_only:
-            assert isinstance(core, I2T_Core)
-
-            if core.config.return_n != 1:
-                warnings.warn(
-                    "Configured to return {} responses from `core`. "
-                    "Only first response will be used.".format(core.config.return_n)
-                )
-
             assert isinstance(tmp_directory, str)
             tmp_directory = tmp_directory.strip()
             if not tmp_directory:
@@ -48,15 +41,17 @@ class MsWordLoader(BaseLoader):
                 )
 
             if not os.path.exists(tmp_directory):
-                warnings.warn(
-                    "Temporary directory not exists. "
-                    "Will create one with name: {}".format(tmp_directory)
+                logger.warning(
+                    "Temporary directory not exists. Will create one with name: %s",
+                    tmp_directory,
                 )
                 os.makedirs(tmp_directory)
 
     @staticmethod
     def raise_if_invalid(input_path: str) -> None:
-        if not all([input_path is not None, type(input_path) is str, input_path != ""]):
+        if not all(
+            [input_path is not None, isinstance(input_path, str), input_path != ""]
+        ):
             raise ValueError("Invalid input path: Path must be a non-empty string.")
 
         if input_path[-5:] != ".docx":
@@ -151,7 +146,7 @@ class MsWordLoader(BaseLoader):
             # markdown_content.append("\n")
 
         if len(markdown_content) > 0:
-            markdown_content.insert(0, f"\n# Tables\n")
+            markdown_content.insert(0, "\n# Tables\n")
 
         return markdown_content
 
@@ -311,23 +306,26 @@ class MsWordLoader(BaseLoader):
                     image_alt_texts, key1=f"Picture {counter}", key2=str(counter)
                 )
 
-                if self.__core is None:
+                if self.__text_only or self.__image_interpreter is None:
                     image_description = "Image description not available"
                 else:
                     image_data = docx.read(file)
                     image_name = os.path.basename(file)  # image{index}.png
                     with self.temporary_file(image_data, image_name) as image_path:
-                        responses: list[MessageBlock | dict] = self.__core.run(
-                            query="Describe this image",
-                            context=None,
-                            filepath=image_path,
+                        responses: list[MessageBlock | dict] = (
+                            self.__image_interpreter.interpret(
+                                query="Describe this image",
+                                context=None,
+                                filepath=image_path,
+                            )
                         )
                         image_description = responses[0]["content"]
+
                 markdown_content.append(
                     f"## {os.path.basename(file)}\nDescription: {image_description}\n\nAlt Text: {alt_text}\n"
                 )
         if len(markdown_content) > 0:
-            markdown_content.insert(0, f"\n# Images\n")
+            markdown_content.insert(0, "\n# Images\n")
 
         return markdown_content
 
@@ -348,25 +346,26 @@ class MsWordLoader(BaseLoader):
                     image_alt_texts, key1=f"Picture {counter}", key2=str(counter)
                 )
 
-                if self.__core is None:
+                if self.__text_only or self.__image_interpreter is None:
                     image_description = "Image description not available"
                 else:
                     image_data = docx.read(file)
                     image_name = os.path.basename(file)  # image{index}.png
                     with self.temporary_file(image_data, image_name) as image_path:
                         responses: list[MessageBlock | dict] = (
-                            await self.__core.run_async(
+                            await self.__image_interpreter.interpret_async(
                                 query="Describe this image",
                                 context=None,
                                 filepath=image_path,
                             )
                         )
                         image_description = responses[0]["content"]
+
                 markdown_content.append(
                     f"## {os.path.basename(file)}\nDescription: {image_description}\n\nAlt Text: {alt_text}\n"
                 )
         if len(markdown_content) > 0:
-            markdown_content.insert(0, f"\n# Images\n")
+            markdown_content.insert(0, "\n# Images\n")
 
         return markdown_content
 

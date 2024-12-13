@@ -1,9 +1,11 @@
 import os
-import warnings
+import logging
 
 from .._loader import BaseLoader
-from .._core import Core, I2T_Core
+from .._core import ImageInterpreter
 from .._util import MessageBlock
+
+logger = logging.getLogger(__name__)
 
 
 class ImageToTextLoader(BaseLoader):
@@ -30,7 +32,7 @@ class ImageToTextLoader(BaseLoader):
     ----------
     - SUPPORTED_EXTENSIONS (tuple): A tuple of supported image file extensions.
     - __prompt (str): The prompt used to guide the image processing (e.g., "What's in the image?").
-    - __core (I2T_Core): The core processing unit responsible for converting images to text.
+    - __image_interpreter (ImageInterpreter): The core processing unit responsible for converting images to text.
 
     Methods:
     ----------
@@ -46,47 +48,24 @@ class ImageToTextLoader(BaseLoader):
     - UnsupportedFileFormatError: If the file format is unsupported.
     - FileNotFoundError: If the specified file does not exist.
     - Exception: Propagates any unexpected exceptions raised during processing.
-
-    Notes:
-    ----------
-    - Ensure that the `I2T_Core` core is properly configured and initialized before using this loader.
-
     """
 
     SUPPORTED_EXTENSIONS = (".png", ".jpg", ".jpeg", ".gif", ".webp")
 
-    def __init__(self, core: Core, prompt: str = "What's in the image?"):
+    def __init__(
+        self, image_interpreter: ImageInterpreter, prompt: str = "What's in the image?"
+    ):
         """
         Initializes a new instance of `ImageToTextLoader` with the specified core processing unit.
 
         Parameters:
         ----------
-        - core (I2T_Core): An instance of `I2T_Core` responsible for converting images to text.
+        - image_interpreter (ImageInterpreter): An instance of `ImageInterpreter` responsible for converting images to text.
         - prompt (str, optional): The prompt to guide image processing. Defaults to "What's in the image?".
-
-        Raises:
-        ----------
-        - TypeError: If the core is not an instance of `I2T_Core`.
-
-        Warnings:
-        ----------
-        - If the core's configuration `n` is not 1.
         """
-        if not isinstance(core, I2T_Core):
-            raise TypeError(
-                "Expect `core` to be an instance of `I2T_Core`, got: {}".format(
-                    type(core)
-                )
-            )
-
-        if core.config.return_n != 1:
-            warnings.warn(
-                "Configured to return {} responses from `core`. "
-                "Only first response will be used.".format(core.config.return_n)
-            )
 
         self.__prompt = prompt
-        self.__core = core
+        self.__image_interpreter = image_interpreter
 
     @staticmethod
     def raise_if_invalid(input_path: str) -> None:
@@ -131,11 +110,12 @@ class ImageToTextLoader(BaseLoader):
 
         Parameters:
         ----------
-        - input_path (str): The file path of the image to process.
+            input_path (str): The file path of the image to process.
 
         Returns:
         ----------
-        - str: The textual description of the image content.
+            str: The textual description of the image content.
+                If return_n > 1, the variant are joined with '#######'.
 
         Raises:
         ----------
@@ -146,10 +126,10 @@ class ImageToTextLoader(BaseLoader):
         ImageToTextLoader.raise_if_invalid(input_path)
 
         try:
-            responses: list[MessageBlock | dict] = self.__core.run(
+            responses: list[MessageBlock | dict] = self.__image_interpreter.interpret(
                 query=self.__prompt, context=None, filepath=input_path
             )
-            return responses[-1]["content"]
+            return self.post_processing(responses)
         except Exception as e:
             raise e
 
@@ -159,11 +139,12 @@ class ImageToTextLoader(BaseLoader):
 
         Parameters:
         ----------
-        - input_path (str): The file path of the image to process.
+            input_path (str): The file path of the image to process.
 
         Returns:
         ----------
-        - str: The textual description of the image content.
+            str: The textual description of the image content.
+                If return_n was > 1, the variant are joined with '#######'.
 
         Raises:
         ----------
@@ -174,9 +155,18 @@ class ImageToTextLoader(BaseLoader):
         ImageToTextLoader.raise_if_invalid(input_path)
 
         try:
-            responses: list[MessageBlock | dict] = await self.__core.run_async(
-                query=self.__prompt, context=None, filepath=input_path
+            responses: list[MessageBlock | dict] = (
+                await self.__image_interpreter.interpret_async(
+                    query=self.__prompt, context=None, filepath=input_path
+                )
             )
-            return responses[-1]["content"]
+            return self.post_processing(responses)
         except Exception as e:
             raise e
+
+    @staticmethod
+    def post_processing(responses: list[MessageBlock | dict]) -> str:
+        contents: list[str] = []
+        for response in responses:
+            contents.append(response["content"])
+        return "#######".join(contents)
