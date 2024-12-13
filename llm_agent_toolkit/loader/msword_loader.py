@@ -154,7 +154,7 @@ class MsWordLoader(BaseLoader):
             # markdown_content.append("\n")
 
         if len(markdown_content) > 0:
-            markdown_content.insert(0, f"\n# Tables\n")
+            markdown_content.insert(0, "\n# Tables\n")
 
         return markdown_content
 
@@ -330,7 +330,7 @@ class MsWordLoader(BaseLoader):
                     f"## {os.path.basename(file)}\nDescription: {image_description}\n\nAlt Text: {alt_text}\n"
                 )
         if len(markdown_content) > 0:
-            markdown_content.insert(0, f"\n# Images\n")
+            markdown_content.insert(0, "\n# Images\n")
 
         return markdown_content
 
@@ -369,7 +369,7 @@ class MsWordLoader(BaseLoader):
                     f"## {os.path.basename(file)}\nDescription: {image_description}\n\nAlt Text: {alt_text}\n"
                 )
         if len(markdown_content) > 0:
-            markdown_content.insert(0, f"\n# Images\n")
+            markdown_content.insert(0, "\n# Images\n")
 
         return markdown_content
 
