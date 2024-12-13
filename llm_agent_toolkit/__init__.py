@@ -13,7 +13,17 @@ from ._core import Core
 from ._memory import VectorMemory
 from ._encoder import Encoder
 from ._loader import BaseLoader
-from . import core, tool, loader, encoder, memory, chunkers
+from ._special_core import Transcriber, ImageGenerator
+from . import (
+    core,
+    tool,
+    loader,
+    encoder,
+    memory,
+    chunkers,
+    transcriber,
+    image_generator,
+)
 
 __all__ = [
     "core",
@@ -21,6 +31,10 @@ __all__ = [
     "loader",
     "encoder",
     "memory",
+    "transcriber",
+    "Transcriber",
+    "image_generator",
+    "ImageGenerator",
     "Tool",
     "FunctionInfo",
     "FunctionInfoDict",
