@@ -9,7 +9,7 @@ from fitz import Page, Document
 import pdfplumber
 
 from .._loader import BaseLoader
-from .._core import Core, I2T_Core
+from .._core import ImageInterpreter
 from .._util import MessageBlock
 
 logger = logging.getLogger(__name__)
@@ -37,7 +37,7 @@ class PDFLoader(BaseLoader):
     ----------
     - SUPPORTED_EXTENSIONS (tuple): A tuple of supported image file extensions.
     - __prompt (str): The prompt used to guide the image processing (e.g., "What's in the image?").
-    - __core (I2T_Core): The core processing unit responsible for converting images to text.
+    - __image_interpreter (ImageInterpreter): The core processing unit responsible for converting images to text.
 
     Methods:
     ----------
@@ -54,7 +54,7 @@ class PDFLoader(BaseLoader):
 
     Notes:
     ----------
-    - Ensure that the `I2T_Core` core is properly configured and initialized before using this loader.
+    - Ensure that the `ImageInterpreter` core is properly configured and initialized before using this loader.
     """
 
     SUPPORTED_EXTENSIONS = (".pdf",)
@@ -63,18 +63,11 @@ class PDFLoader(BaseLoader):
         self,
         text_only: bool = True,
         tmp_directory: str | None = None,
-        core: Core | None = None,
+        image_interpreter: ImageInterpreter | None = None,
     ):
-        self.__core = core
+        self.__image_interpreter = image_interpreter
         self.__tmp_directory = tmp_directory
         if not text_only:
-            assert isinstance(core, I2T_Core)
-            if core.config.return_n != 1:
-                warnings.warn(
-                    "Configured to return {} responses from `core`. "
-                    "Only first response will be used.".format(core.config.return_n)
-                )
-
             assert isinstance(tmp_directory, str)
             tmp_directory = tmp_directory.strip()
             if not tmp_directory:
@@ -161,14 +154,14 @@ class PDFLoader(BaseLoader):
             raise e
 
     def extract_img_description(self, image_bytes: bytes, image_name: str) -> str:
-        if self.__core is None:
+        if self.__image_interpreter is None:
             return "Image description not available"
 
         image_caption = (
             f"filename={image_name}. This is an attachment found in a pdf file."
         )
         with self.temporary_file(image_bytes, image_name) as tmp_path:
-            responses: list[MessageBlock | dict] = self.__core.run(
+            responses: list[MessageBlock | dict] = self.__image_interpreter.interpret(
                 query=image_caption, context=None, filepath=tmp_path
             )
             return responses[0]["content"]
@@ -176,15 +169,17 @@ class PDFLoader(BaseLoader):
     async def extract_img_description_async(
         self, image_bytes: bytes, image_name: str
     ) -> str:
-        if self.__core is None:
+        if self.__image_interpreter is None:
             return "Image description not available"
 
         image_caption = (
             f"filename={image_name}. This is an attachment found in a pdf file."
         )
         with self.temporary_file(image_bytes, image_name) as tmp_path:
-            responses: list[MessageBlock | dict] = await self.__core.run_async(
-                query=image_caption, context=None, filepath=tmp_path
+            responses: list[MessageBlock | dict] = (
+                await self.__image_interpreter.interpret_async(
+                    query=image_caption, context=None, filepath=tmp_path
+                )
             )
             return responses[0]["content"]
 
@@ -266,7 +261,7 @@ class PDFLoader(BaseLoader):
     ) -> list[str]:
         markdown_content = []
 
-        if self.__core:
+        if self.__image_interpreter:
             image_description = self.extract_img_description(image_bytes, image_name)
         else:
             image_description = "Image description not available"
@@ -283,7 +278,7 @@ class PDFLoader(BaseLoader):
     ) -> list[str]:
         markdown_content = []
 
-        if self.__core:
+        if self.__image_interpreter:
             image_description = await self.extract_img_description_async(
                 image_bytes, image_name
             )
