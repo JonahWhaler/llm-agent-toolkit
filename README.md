@@ -1,4 +1,4 @@
-# LLM Agent Toolkit: Modular Components for AI WOrkflows
+# LLM Agent Toolkit: Modular Components for AI Workflows
 LLM Agent Toolkit provides minimal, modular interfaces for core components in LLM-based applications. Simplify workflows with stateless interaction, embedding encoders, memory management, tool integration, and data loaders, designed for compatibility and scalability. It prioritizes simplicity and modularity by proposing minimal wrappers designed to work across common tools, discouraging direct access to underlying technologies. Specific implementations and examples will be documented separately in a Cookbook (planned).
 
 PyPI: ![PyPI Downloads](https://static.pepy.tech/badge/llm-agent-toolkit)
@@ -9,7 +9,7 @@ Using this toolkit simplifies integration by providing unified and modular inter
 For developers requiring full-range customization or access to the latest features, it is recommended to consider using native libraries like `ollama` and `openai` directly.
 
 # Table of Contents
-- [LLM Agent Toolkit: Modular Components for AI WOrkflows](#llm-agent-toolkit-modular-components-for-ai-workflows)
+- [LLM Agent Toolkit: Modular Components for AI Workflows](#llm-agent-toolkit-modular-components-for-ai-workflows)
   - [Attention!!!](#attention)
 - [Table of Contents](#table-of-contents)
 - [Installation](#installation)
@@ -19,7 +19,7 @@ For developers requiring full-range customization or access to the latest featur
   - [Memory:](#memory)
   - [Tool:](#tool)
   - [Loader:](#loader)
-  - [Chunkers\*\*:](#chunkers)
+  - [Chunkers:](#chunkers)
 - [Planned Feature](#planned-feature)
 - [License](#license)
 
@@ -81,7 +81,7 @@ Responsible for converting raw data into text.
 **Features**:
 * Covering limited type of documents, images, and audio files.
 
-## Chunkers**:
+## Chunkers:
 Utility to split long text into chunks.
 
 **Features**:
