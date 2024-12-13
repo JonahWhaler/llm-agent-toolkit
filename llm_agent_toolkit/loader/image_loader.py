@@ -110,11 +110,12 @@ class ImageToTextLoader(BaseLoader):
 
         Parameters:
         ----------
-        - input_path (str): The file path of the image to process.
+            input_path (str): The file path of the image to process.
 
         Returns:
         ----------
-        - str: The textual description of the image content.
+            str: The textual description of the image content.
+                If return_n > 1, the variant are joined with '#######'.
 
         Raises:
         ----------
@@ -128,7 +129,7 @@ class ImageToTextLoader(BaseLoader):
             responses: list[MessageBlock | dict] = self.__image_interpreter.interpret(
                 query=self.__prompt, context=None, filepath=input_path
             )
-            return responses[-1]["content"]
+            return self.post_processing(responses)
         except Exception as e:
             raise e
 
@@ -138,11 +139,12 @@ class ImageToTextLoader(BaseLoader):
 
         Parameters:
         ----------
-        - input_path (str): The file path of the image to process.
+            input_path (str): The file path of the image to process.
 
         Returns:
         ----------
-        - str: The textual description of the image content.
+            str: The textual description of the image content.
+                If return_n was > 1, the variant are joined with '#######'.
 
         Raises:
         ----------
@@ -158,6 +160,13 @@ class ImageToTextLoader(BaseLoader):
                     query=self.__prompt, context=None, filepath=input_path
                 )
             )
-            return responses[-1]["content"]
+            return self.post_processing(responses)
         except Exception as e:
             raise e
+
+    @staticmethod
+    def post_processing(responses: list[MessageBlock | dict]) -> str:
+        contents: list[str] = []
+        for response in responses:
+            contents.append(response["content"])
+        return "#######".join(contents)
