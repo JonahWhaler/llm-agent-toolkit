@@ -218,7 +218,6 @@ class PDFLoader(BaseLoader):
 
         markdown_content = ["\n## Images\n"]
         for img_index, img in enumerate(images, start=1):
-            print(f"${img_index}: {img}")
             xref = img[0]
             base_image = doc.extract_image(xref)
             if base_image:
