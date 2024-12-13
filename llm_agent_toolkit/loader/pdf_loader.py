@@ -5,7 +5,8 @@ from contextlib import contextmanager
 
 # PyMuPDF
 import fitz  # type: ignore
-from fitz import Page, Document
+
+# from fitz import Page, Document
 import pdfplumber
 
 from .._loader import BaseLoader
