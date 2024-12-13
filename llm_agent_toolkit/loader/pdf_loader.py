@@ -91,7 +91,9 @@ class PDFLoader(BaseLoader):
 
     @staticmethod
     def raise_if_invalid(input_path: str) -> None:
-        if not all([input_path is not None, type(input_path) is str, input_path != ""]):
+        if not all(
+            [input_path is not None, isinstance(input_path, str), input_path != ""]
+        ):
             raise ValueError("Invalid input path: Path must be a non-empty string.")
 
         if input_path[-4:] != ".pdf":
