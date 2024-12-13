@@ -7,7 +7,7 @@ from contextlib import contextmanager
 
 from docx import Document
 from docx.document import Document as _Document
-from docx.table import _Cell, Table
+from docx.table import Table
 
 from .._loader import BaseLoader
 from .._core import Core, I2T_Core
