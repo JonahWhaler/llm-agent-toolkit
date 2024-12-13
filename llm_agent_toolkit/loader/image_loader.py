@@ -1,9 +1,11 @@
 import os
-import warnings
+import logging
 
 from .._loader import BaseLoader
 from .._core import Core, I2T_Core
 from .._util import MessageBlock
+
+logger = logging.getLogger(__name__)
 
 
 class ImageToTextLoader(BaseLoader):
