@@ -1,6 +1,6 @@
 import os
 import io
-import warnings
+import logging
 from contextlib import contextmanager
 
 # PyMuPDF
@@ -12,6 +12,7 @@ from .._loader import BaseLoader
 from .._core import Core, I2T_Core
 from .._util import MessageBlock
 
+logger = logging.getLogger(__name__)
 
 """
 Dependencies:
@@ -82,9 +83,9 @@ class PDFLoader(BaseLoader):
                 )
 
             if not os.path.exists(tmp_directory):
-                warnings.warn(
-                    "Temporary directory not exists. "
-                    "Will create one with name: {}".format(tmp_directory)
+                logger.warning(
+                    "Temporary directory not exists. Will create one with name: %s",
+                    tmp_directory,
                 )
                 os.makedirs(tmp_directory)
 
