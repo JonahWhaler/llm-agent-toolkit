@@ -1,0 +1,13 @@
+name,context_length,text_generation,tool,text_input,image_input,audio_input,text_output,image_output,audio_output,remarks
+moondream:latest,2048,TRUE,,TRUE,TRUE,,TRUE,,,
+llama3:8b,8192,TRUE,,TRUE,,,TRUE,,,
+llava-llama3:latest,8192,TRUE,,TRUE,TRUE,,TRUE,,,
+qwen2.5:14b,32768,TRUE,TRUE,TRUE,,,TRUE,,,
+qwen2.5-coder:7b,32768,TRUE,TRUE,TRUE,,,TRUE,,,
+qwen2.5-coder:3b,32768,TRUE,TRUE,TRUE,,,TRUE,,,
+qwen2.5:7b,32768,TRUE,TRUE,TRUE,,,TRUE,,,
+llava:7b,32768,TRUE,,TRUE,TRUE,,TRUE,,,
+llama3.2:3b,131072,TRUE,TRUE,TRUE,,,TRUE,,,
+llama3.2:1b,131072,TRUE,TRUE,TRUE,,,TRUE,,,
+llama3.2-vision:11b,131072,TRUE,,TRUE,TRUE,,TRUE,,,
+mistral-nemo:latest,128000,TRUE,TRUE,TRUE,,,TRUE,,,Context-length=1024000
