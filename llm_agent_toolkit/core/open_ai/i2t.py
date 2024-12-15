@@ -8,7 +8,7 @@ from ..._util import (
     ChatCompletionConfig,
     MessageBlock,
 )
-from ..._tool import Tool
+from ..._tool import Tool, ToolMetadata
 from .base import OpenAICore, TOOL_PROMPT
 
 logger = logging.getLogger(__name__)
@@ -57,48 +57,11 @@ class I2T_OAI_Core(Core, OpenAICore, ImageInterpreter, ToolSupport):
         Core.__init__(self, system_prompt, config)
         OpenAICore.__init__(self, config.name)
         ToolSupport.__init__(self, tools)
-        self.__profile = self.build_profile(config.name)
+        self.profile = self.build_profile(config.name)
         if tools and self.profile["tool"] is False:
             logger.warning("Tool might not work on this %s", self.model_name)
         if self.profile["image_input"] is False:
             logger.warning("Vision might not work on this %s", self.model_name)
-
-    @property
-    def context_length(self) -> int:
-        return self.profile["context_length"]
-
-    @context_length.setter
-    def context_length(self, value):
-        """
-        Set the context length.
-        It shall be the user's responsiblity to ensure this is a model supported context length.
-
-        Args:
-            context_length (int): Context length to be set.
-
-        Returns:
-            None
-
-        Raises:
-            TypeError: If context_length is not type int.
-            ValueError: If context_length is <= 0.
-        """
-        if not isinstance(value, int):
-            raise TypeError(
-                f"Expect context_length to be type 'int', got '{type(value).__name__}'."
-            )
-        if value <= 0:
-            raise ValueError("Expect context_length > 0.")
-
-        self.__profile["context_length"] = value
-
-    @property
-    def profile(self) -> dict:
-        """
-        Profile is mostly for view purpose only,
-        except the context_length which might be used to control the input to the LLM.
-        """
-        return self.__profile
 
     async def run_async(
         self, query: str, context: list[MessageBlock | dict] | None, **kwargs
@@ -119,7 +82,7 @@ class I2T_OAI_Core(Core, OpenAICore, ImageInterpreter, ToolSupport):
             MessageBlock(role=CreatorRole.SYSTEM.value, content=self.system_prompt)
         ]
 
-        if context is not None:
+        if context:
             msgs.extend(context)
 
         filepath: str | None = kwargs.get("filepath", None)
@@ -132,45 +95,48 @@ class I2T_OAI_Core(Core, OpenAICore, ImageInterpreter, ToolSupport):
                 }
             )
         msgs.append(MessageBlock(role=CreatorRole.USER.value, content=query))
-        if self.tools is not None:
-            tools_metadata = []
-            for tool in self.tools:
-                tools_metadata.append(tool.info)
+
+        tools_metadata: list[ToolMetadata] | None = None
+        if self.tools:
+            tools_metadata = [tool.info for tool in self.tools]
             msgs.append(
                 MessageBlock(role=CreatorRole.SYSTEM.value, content=TOOL_PROMPT)
             )
-        else:
-            tools_metadata = None
 
         number_of_primers = len(msgs)
-        if isinstance(self.config, ChatCompletionConfig):
-            temperature = self.config.temperature
-            max_tokens = self.config.max_tokens
-        else:
-            temperature = 0.7
-            max_tokens = 128_000
 
-        max_tokens = min(max_tokens, self.context_length)
+        max_tokens = min(self.config.max_tokens, self.context_length)
+        MAX_OUTPUT_TOKENS = min(
+            max_tokens, self.max_output_tokens, self.config.max_output_tokens
+        )
+        prompt_token_count = self.calculate_token_count(msgs, tools_metadata)
+        max_output_tokens = min(
+            MAX_OUTPUT_TOKENS,
+            self.context_length - prompt_token_count,
+        )
 
-        iteration = 0
-        token_count = 0
-        solved = False
+        accumulated_token_count = 0  # Accumulated token count across iterations
+        iteration, solved = 0, False
 
         try:
             client = openai.AsyncOpenAI(api_key=os.environ["OPENAI_API_KEY"])
-            while iteration < self.config.max_iteration and token_count < max_tokens:
+            while (
+                not solved
+                and max_output_tokens > 0
+                and iteration < self.config.max_iteration
+                and accumulated_token_count < max_tokens
+            ):
                 # logger.info("\n\nIteration: %d", iteration)
                 response = await client.chat.completions.create(
                     model=self.model_name,
                     messages=msgs,  # type: ignore
                     frequency_penalty=0.5,
-                    max_tokens=min(self.context_length - token_count - 1000, 16384),
-                    temperature=temperature,
+                    max_tokens=max_output_tokens,
+                    temperature=self.config.temperature,
                     n=self.config.return_n,
                     tools=tools_metadata,  # type: ignore
                 )
-                if response.usage:
-                    token_count += response.usage.total_tokens
+
                 choice = response.choices[0]
                 _content = getattr(choice.message, "content", "Not Available")
                 if _content:
@@ -179,26 +145,39 @@ class I2T_OAI_Core(Core, OpenAICore, ImageInterpreter, ToolSupport):
                     )
 
                 tool_calls = choice.message.tool_calls
-                if tool_calls is None:
-                    solved = True
-                    break
+                if tool_calls:
+                    output = await self.call_tools_async(tool_calls)
+                    msgs.extend(output)
 
-                output = await self.call_tools_async(tool_calls)
-
-                msgs.extend(output)
+                solved = tool_calls is None
+                prompt_token_count = self.calculate_token_count(msgs, tools_metadata)
+                max_output_tokens = min(
+                    MAX_OUTPUT_TOKENS,
+                    self.context_length - prompt_token_count,
+                )
                 iteration += 1
+                accumulated_token_count += (
+                    response.usage.total_tokens if response.usage else 0
+                )
+            # End while
 
             if not solved:
+                warning_message = "Warning: "
                 if iteration == self.config.max_iteration:
-                    logger.warning(
-                        "Maximum iteration reached. %d/%d",
-                        iteration,
-                        self.config.max_iteration,
+                    warning_message += f"Maximum iteration reached. {iteration}/{self.config.max_iteration}\n"
+                elif accumulated_token_count >= max_tokens:
+                    warning_message += f"Maximum token count reached. {accumulated_token_count}/{max_tokens}\n"
+                elif max_output_tokens <= 0:
+                    warning_message += f"Maximum output tokens <= 0. {prompt_token_count}/{self.context_length}\n"
+                else:
+                    warning_message += "Unknown reason"
+                logger.warning(warning_message)
+                msgs.append(
+                    MessageBlock(
+                        role=CreatorRole.ASSISTANT.value,
+                        content=warning_message,
                     )
-                elif token_count >= max_tokens:
-                    logger.warning(
-                        "Maximum token count reached. %d/%d", token_count, max_tokens
-                    )
+                )
             return msgs[number_of_primers:]  # Return only the generated messages
         except Exception as e:
             logger.error("Exception: %s", e)
@@ -223,7 +202,7 @@ class I2T_OAI_Core(Core, OpenAICore, ImageInterpreter, ToolSupport):
             MessageBlock(role=CreatorRole.SYSTEM.value, content=self.system_prompt)
         ]
 
-        if context is not None:
+        if context:
             msgs.extend(context)
 
         filepath: str | None = kwargs.get("filepath", None)
@@ -236,43 +215,48 @@ class I2T_OAI_Core(Core, OpenAICore, ImageInterpreter, ToolSupport):
                 }
             )
         msgs.append(MessageBlock(role=CreatorRole.USER.value, content=query))
-        if self.tools is not None:
-            tools_metadata = []
-            for tool in self.tools:
-                tools_metadata.append(tool.info)
+
+        tools_metadata: list[ToolMetadata] | None = None
+        if self.tools:
+            tools_metadata = [tool.info for tool in self.tools]
             msgs.append(
                 MessageBlock(role=CreatorRole.SYSTEM.value, content=TOOL_PROMPT)
             )
-        else:
-            tools_metadata = None
+
         number_of_primers = len(msgs)
-        if isinstance(self.config, ChatCompletionConfig):
-            temperature = self.config.temperature
-            max_tokens = self.config.max_tokens
-        else:
-            temperature = 0.7
-            max_tokens = 128_000
 
-        max_tokens = min(max_tokens, self.context_length)
+        max_tokens = min(self.config.max_tokens, self.context_length)
+        MAX_OUTPUT_TOKENS = min(
+            max_tokens, self.max_output_tokens, self.config.max_output_tokens
+        )
+        prompt_token_count = self.calculate_token_count(msgs, tools_metadata)
+        max_output_tokens = min(
+            MAX_OUTPUT_TOKENS,
+            self.context_length - prompt_token_count,
+        )
 
-        iteration = 0
-        token_count = 0
-        solved = False
+        accumulated_token_count = 0  # Accumulated token count across iterations
+        iteration, solved = 0, False
+
         try:
             client = openai.OpenAI(api_key=os.environ["OPENAI_API_KEY"])
-            while iteration < self.config.max_iteration and token_count < max_tokens:
+            while (
+                not solved
+                and max_output_tokens > 0
+                and iteration < self.config.max_iteration
+                and accumulated_token_count < max_tokens
+            ):
                 # logger.info("\n\nIteration: %d", iteration)
                 response = client.chat.completions.create(
                     model=self.model_name,
                     messages=msgs,  # type: ignore
                     frequency_penalty=0.5,
-                    max_tokens=min(self.context_length - token_count - 1000, 16384),
-                    temperature=temperature,
+                    max_tokens=max_output_tokens,
+                    temperature=self.config.temperature,
                     n=self.config.return_n,
                     tools=tools_metadata,  # type: ignore
                 )
-                if response.usage:
-                    token_count += response.usage.total_tokens
+
                 choice = response.choices[0]
                 _content = getattr(choice.message, "content", "Not Available")
                 if _content:
@@ -281,26 +265,39 @@ class I2T_OAI_Core(Core, OpenAICore, ImageInterpreter, ToolSupport):
                     )
 
                 tool_calls = choice.message.tool_calls
-                if tool_calls is None:
-                    solved = True
-                    break
+                if tool_calls:
+                    output = self.call_tools(tool_calls)
+                    msgs.extend(output)
 
-                output = self.call_tools(tool_calls)
-
-                msgs.extend(output)
+                solved = tool_calls is None
+                prompt_token_count = self.calculate_token_count(msgs, tools_metadata)
+                max_output_tokens = min(
+                    MAX_OUTPUT_TOKENS,
+                    self.context_length - prompt_token_count,
+                )
                 iteration += 1
+                accumulated_token_count += (
+                    response.usage.total_tokens if response.usage else 0
+                )
+            # End while
 
             if not solved:
+                warning_message = "Warning: "
                 if iteration == self.config.max_iteration:
-                    logger.warning(
-                        "Maximum iteration reached. %d/%d",
-                        iteration,
-                        self.config.max_iteration,
+                    warning_message += f"Maximum iteration reached. {iteration}/{self.config.max_iteration}\n"
+                elif accumulated_token_count >= max_tokens:
+                    warning_message += f"Maximum token count reached. {accumulated_token_count}/{max_tokens}\n"
+                elif max_output_tokens <= 0:
+                    warning_message += f"Maximum output tokens <= 0. {prompt_token_count}/{self.context_length}\n"
+                else:
+                    warning_message += "Unknown reason"
+                logger.warning(warning_message)
+                msgs.append(
+                    MessageBlock(
+                        role=CreatorRole.ASSISTANT.value,
+                        content=warning_message,
                     )
-                elif token_count >= max_tokens:
-                    logger.warning(
-                        "Maximum token count reached. %d/%d", token_count, max_tokens
-                    )
+                )
             return msgs[number_of_primers:]  # Return only the generated messages
         except Exception as e:
             logger.error("Exception: %s", e)
