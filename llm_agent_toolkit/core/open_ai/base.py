@@ -1,6 +1,11 @@
 import os
+import json
 import logging
 import openai
+import tiktoken
+
+from ..._util import CreatorRole, MessageBlock
+from ..._tool import ToolMetadata
 
 logger = logging.getLogger(__name__)
 
@@ -12,6 +17,7 @@ class OpenAICore:
     Methods:
     * __available(None) -> bool
     * build_profile(model_name: str) -> dict[str, bool | int | str]
+    * calculate_token_count(msgs: list[MessageBlock | dict], tools: list[ToolMetadata] | None = None)
     """
 
     def __init__(self, model_name: str):
@@ -74,6 +80,34 @@ class OpenAICore:
                 profile["tool"] = True
 
         return profile
+
+    def calculate_token_count(
+        self, msgs: list[MessageBlock | dict], tools: list[ToolMetadata] | None = None
+    ) -> int:
+        """Calculate the token count for the given messages and tools.
+        Call tiktoken to calculate the token count.
+
+        Args:
+            msgs (list[MessageBlock | dict]): A list of messages.
+            tools (list[ToolMetadata] | None, optional): A list of tools. Defaults to None.
+
+        Returns:
+            int: The token count.
+        """
+        token_count: int = 0
+        encoding = tiktoken.encoding_for_model(self.__model_name)
+        for msg in msgs:
+            # Incase the dict does not comply with the MessageBlock format
+            if "content" in msg and msg["content"]:
+                token_count += len(encoding.encode(msg["content"]))
+            if "role" in msg and msg["role"] == CreatorRole.FUNCTION.value:
+                token_count += len(encoding.encode(msg["name"]))
+
+        if tools:
+            for tool in tools:
+                token_count += len(encoding.encode(json.dumps(tool)))
+
+        return token_count
 
 
 TOOL_PROMPT = """
