@@ -32,6 +32,12 @@ class OpenAICore:
 
     @staticmethod
     def build_profile(model_name: str) -> dict[str, bool | int | str]:
+        """
+        Build the profile dict based on information found in ./llm_agent_toolkit/core/open_ai/openai.csv
+
+        These are the models which the developer has experience with.
+        If `model_name` is not found in the csv file, default value will be applied.
+        """
         profile: dict[str, bool | int | str] = {"name": model_name}
         with open(
             "./llm_agent_toolkit/core/open_ai/openai.csv", "r", encoding="utf-8"
@@ -45,7 +51,7 @@ class OpenAICore:
                 values = line.strip().split(",")
                 if values[0] == model_name:
                     for column, value in zip(columns[1:], values[1:]):
-                        if column == "context_length":
+                        if column in ["context_length", "max_output_tokens"]:
                             profile[column] = int(value)
                         elif column == "remarks":
                             profile[column] = value
@@ -55,6 +61,7 @@ class OpenAICore:
                             profile[column] = False
                     break
 
+        # Assign default values
         if "text_generation" not in profile:
             # Assume supported
             profile["text_generation"] = True
