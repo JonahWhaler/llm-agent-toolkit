@@ -272,3 +272,53 @@ class OllamaEncoder(Encoder):
         except Exception as e:
             logger.error(msg=f"{self.model_name}.encode failed. Error: {str(e)}")
             raise
+
+    async def encode_async(self, text: str, **kwargs) -> list[float]:
+        """Transform string to embedding.
+
+        Args:
+            text (str): Content to be embedded.
+            kwargs (dict): Ignored
+
+        Returns:
+            list[float]: Embedding
+
+        Notes:
+        * truncate=True
+        """
+        try:
+            client = ollama.AsyncClient(host=self.CONN_STRING)
+            response = await client.embed(
+                model=self.model_name, input=text, truncate=True
+            )
+            response_body = response.model_dump()
+            embeddings = [float(x) for x in response_body["embeddings"][0]]
+            return embeddings
+        except Exception as e:
+            logger.error(msg=f"{self.model_name}.encode failed. Error: {str(e)}")
+            raise
+
+    async def encode_v2_async(self, text: str, **kwargs) -> tuple[list[float], int]:
+        """Transform string to embedding.
+
+        Args:
+            text (str): Content to be embedded.
+            kwargs (dict): Ignored.
+
+        Returns:
+            tuple: Embedding, Token Count
+
+        Notes:
+        * truncate=True
+        """
+        try:
+            client = ollama.AsyncClient(host=self.CONN_STRING)
+            response = await client.embed(
+                model=self.model_name, input=text, truncate=True
+            )
+            response_body = response.model_dump()
+            embeddings = [float(x) for x in response_body["embeddings"][0]]
+            return embeddings, response_body["prompt_eval_count"]
+        except Exception as e:
+            logger.error(msg=f"{self.model_name}.encode failed. Error: {str(e)}")
+            raise
