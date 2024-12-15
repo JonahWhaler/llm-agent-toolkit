@@ -1,5 +1,9 @@
+import json
 import logging
 import ollama
+
+from ..._util import CreatorRole, MessageBlock
+from ..._tool import ToolMetadata
 
 logger = logging.getLogger(__name__)
 
@@ -15,6 +19,7 @@ class OllamaCore:
     * __available(None) -> bool
     * __try_pull_model(None) -> None
     * build_profile(model_name: str) -> dict[str, bool | int | str]
+    * calculate_token_count(msgs: list[MessageBlock | dict], tools: list[ToolMetadata] | None = None)
     """
 
     def __init__(self, connection_string: str, model_name: str):
@@ -71,8 +76,6 @@ class OllamaCore:
 
         These are the models which the developer has experience with.
         If `model_name` is not found in the csv file, default value will be applied.
-
-        Call .set_context_length to set the context length, default value is 2048.
         """
         profile: dict[str, bool | int | str] = {"name": model_name}
         with open(
@@ -89,6 +92,8 @@ class OllamaCore:
                     for column, value in zip(columns[1:], values[1:]):
                         if column == "context_length":
                             profile[column] = int(value)
+                        elif column == "max_output_tokens":
+                            profile[column] = 2048 if value == "" else int(value)
                         elif column == "remarks":
                             profile[column] = value
                         elif value == "TRUE":
@@ -97,6 +102,7 @@ class OllamaCore:
                             profile[column] = False
                     break
 
+        # Assign default values
         if "context_length" not in profile:
             # Most supported context length
             profile["context_length"] = 2048
@@ -106,7 +112,38 @@ class OllamaCore:
         if "text_generation" not in profile:
             # Assume supported
             profile["text_generation"] = True
+
         return profile
+
+    def calculate_token_count(
+        self, msgs: list[MessageBlock | dict], tools: list[ToolMetadata] | None = None
+    ) -> int:
+        """Calculate the token count for the given messages and tools.
+        Efficient but not accurate. Child classes should implement a more accurate version.
+
+        Args:
+            msgs (list[MessageBlock | dict]): A list of messages.
+            tools (list[ToolMetadata] | None, optional): A list of tools. Defaults to None.
+
+        Returns:
+            int: The token count. Number of characters divided by 2.
+
+        Notes:
+        * Decided to divide by 2 because my usecase most like involve using utf-8 encoding.
+        """
+        character_count: int = 0
+        for msg in msgs:
+            # Incase the dict does not comply with the MessageBlock format
+            if "content" in msg and msg["content"]:
+                character_count += len(msg["content"])
+            if "role" in msg and msg["role"] == CreatorRole.TOOL.value:
+                character_count += len(msg["name"])
+
+        if tools:
+            for tool in tools:
+                character_count += len(json.dumps(tool))
+
+        return character_count // 2
 
 
 TOOL_PROMPT = """

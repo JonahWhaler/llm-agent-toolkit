@@ -29,13 +29,27 @@ class ModelConfig(BaseModel):
 
 
 class ChatCompletionConfig(ModelConfig):
+    """
+    Attributes:
+        max_tokens (int): The maximum number of tokens a run is allowed to spend.
+        max_output_tokens (int): The maximum number of tokens a generation is allowed to generate.
+        temperature (float): Controls the randomness of the generated text.
+    """
+
     max_tokens: int = 4096
+    max_output_tokens: int = 2048
     temperature: float = 0.7
 
     @field_validator("max_tokens")
     def max_tokens_must_be_positive(cls, v):  # pylint: disable=no-self-argument
         if v <= 0:
             raise ValueError("max_tokens must be positive")
+        return v
+
+    @field_validator("max_output_tokens")
+    def max_output_tokens_must_be_positive(cls, v):  # pylint: disable=no-self-argument
+        if v <= 0:
+            raise ValueError("max_output_tokens must be positive")
         return v
 
     @field_validator("temperature")

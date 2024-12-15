@@ -19,7 +19,8 @@ class Core(ABC):
     Attr:
     - system_prompt: str: The system prompt for the LLM model.
     - model_name: str: The name of the LLM model.
-    - config: ChatCompletionConfig: The configuration for the LLM model.
+    - config: ChatCompletionConfig: The configuration for the LLM model, it define the boundary of the execution.
+    - profile: The profile of the chosen LLM model, it define the boundary of the LLM.
     """
 
     def __init__(
@@ -29,6 +30,7 @@ class Core(ABC):
     ):
         self.__system_prompt = system_prompt
         self.__config = config
+        self.__profile: dict[str, bool | int | str] = {}
 
     @property
     def system_prompt(self) -> str:
@@ -42,7 +44,15 @@ class Core(ABC):
 
     @property
     def profile(self) -> dict[str, bool | int | str]:
-        return {}
+        """
+        Profile is mostly for view purpose only,
+        except the context_length which might be used to control the input to the LLM.
+        """
+        return self.__profile
+
+    @profile.setter
+    def profile(self, value: dict[str, bool | int | str]):
+        self.__profile = value
 
     @property
     def config(
@@ -50,6 +60,69 @@ class Core(ABC):
     ) -> ChatCompletionConfig:
         """Return the configuration for the LLM model."""
         return self.__config
+
+    @property
+    def context_length(self) -> int:
+        ret = self.profile.get("context_length", 2048)
+        assert isinstance(ret, int)
+        return ret
+
+    @context_length.setter
+    def context_length(self, value: int):
+        """
+        Set the context length.
+        It shall be the user's responsiblity to ensure this is a model supported context length.
+
+        Args:
+            context_length (int): Context length to be set.
+
+        Returns:
+            None
+
+        Raises:
+            TypeError: If context_length is not type int.
+            ValueError: If context_length is <= 0.
+        """
+        if not isinstance(value, int):
+            raise TypeError(
+                f"Expect context_length to be type 'int', got '{type(value).__name__}'."
+            )
+        if value <= 0:
+            raise ValueError("Expect context_length > 0.")
+
+        self.profile["context_length"] = value
+
+    @property
+    def max_output_tokens(self) -> int:
+        ret = self.profile.get("max_output_tokens", 2048)
+        assert isinstance(ret, int)
+        return ret
+
+    @max_output_tokens.setter
+    @abstractmethod
+    def max_output_tokens(self, value: int):
+        """
+        Set the max output tokens.
+        It shall be the user's responsiblity to ensure this is a model supported max output tokens.
+
+        Args:
+            max_output_tokens (int): Max output tokens to be set.
+
+        Returns:
+            None
+
+        Raises:
+            TypeError: If max_output_tokens is not type int.
+            ValueError: If max_output_tokens is <= 0.
+        """
+        if not isinstance(value, int):
+            raise TypeError(
+                f"Expect max_output_tokens to be type 'int', got '{type(value).__name__}'."
+            )
+        if value <= 0:
+            raise ValueError("Expect max_output_tokens > 0.")
+
+        self.profile["max_output_tokens"] = value
 
     @abstractmethod
     async def run_async(
@@ -63,16 +136,6 @@ class Core(ABC):
         self, query: str, context: list[MessageBlock | dict] | None, **kwargs
     ) -> list[MessageBlock | dict]:
         """Synchronously run the LLM model with the given query and context."""
-        raise NotImplementedError
-
-    @property
-    @abstractmethod
-    def context_length(self) -> int:
-        raise NotImplementedError
-
-    @context_length.setter
-    @abstractmethod
-    def context_length(self, value):
         raise NotImplementedError
 
 
@@ -111,7 +174,7 @@ class ImageInterpreter(ABC):
         query: str,
         context: list[MessageBlock | dict] | None,
         filepath: str,
-        **kwargs
+        **kwargs,
     ) -> list[MessageBlock | dict]:
         """Asynchronously run the LLM model to interpret the image in `filepath`.
 
@@ -125,7 +188,7 @@ class ImageInterpreter(ABC):
         query: str,
         context: list[MessageBlock | dict] | None,
         filepath: str,
-        **kwargs
+        **kwargs,
     ) -> list[MessageBlock | dict]:
         """Synchronously run the LLM model to interpret the image in `filepath`.
 
