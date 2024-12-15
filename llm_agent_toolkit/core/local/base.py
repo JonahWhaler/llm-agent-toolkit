@@ -89,6 +89,8 @@ class OllamaCore:
                     for column, value in zip(columns[1:], values[1:]):
                         if column == "context_length":
                             profile[column] = int(value)
+                        elif column == "max_output_tokens":
+                            profile[column] = 2048 if value == "" else int(value)
                         elif column == "remarks":
                             profile[column] = value
                         elif value == "TRUE":
