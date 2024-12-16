@@ -66,6 +66,8 @@ Offers essential context retention capabilities.
     * Combines embedding and storage for retrieval-augmented workflows.
     * Includes optional metadata management for filtering results.
     * Support Faiss and Chroma
+3. *Async Vector Memory*:
+    * Same as Vector Memory with async support.
 
 ## Tool:
 A unified interface for augmenting the LLM's functionality.

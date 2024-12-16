@@ -57,3 +57,34 @@ class VectorMemory(ABC):
     def split_text(self, text: str) -> list[str]:
         chunks = self.__chunker.split(long_text=text)
         return chunks
+
+
+class AsyncVectorMemory(ABC):
+    def __init__(self, vdb, encoder: Encoder, chunker: Chunker, **kwargs):
+        self.__vdb = vdb
+        self.__encoder = encoder
+        self.__chunker = chunker
+
+    @property
+    def encoder(self):
+        return self.__encoder
+
+    @property
+    def vdb(self):
+        return self.__vdb
+
+    @abstractmethod
+    async def add(self, document_string: str, **kwargs):
+        raise NotImplementedError
+
+    @abstractmethod
+    async def query(self, query_string: str, **kwargs):
+        raise NotImplementedError
+
+    @abstractmethod
+    async def clear(self):
+        raise NotImplementedError
+
+    def split_text(self, text: str) -> list[str]:
+        chunks = self.__chunker.split(long_text=text)
+        return chunks
