@@ -55,6 +55,38 @@ class Encoder(ABC):
         """
         raise NotImplementedError
 
+    @abstractmethod
+    async def encode_async(self, text: str, **kwargs) -> list[float]:
+        """Asynchronously transform string to embedding.
+
+        Args:
+            text (str): Content to be embedded.
+            kwargs (dict): Optional additional arguments to customize encoding.
+                            This is intended for use by subclasses to extend or modify
+                            the behavior of the `encode` method, such as configuring
+                            tokenization, truncation, padding, or any model-specific parameters.
+
+        Returns:
+            list[float]: Embedding
+        """
+        raise NotImplementedError
+
+    @abstractmethod
+    async def encode_v2_async(self, text: str, **kwargs) -> tuple[list[float], int]:
+        """Asynchronously transform string to embedding.
+
+        Args:
+            text(str): Content to be embedded.
+            kwargs (dict): Optional additional arguments to customize encoding.
+                            This is intended for use by subclasses to extend or modify
+                            the behavior of the `encode_v2` method, such as configuring
+                            tokenization, truncation, padding, or any model-specific parameters.
+
+        Returns:
+            tuple: Embedding, Token Count
+        """
+        raise NotImplementedError
+
 
 class EncoderProfile(TypedDict):
     name: str
