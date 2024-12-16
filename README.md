@@ -1,4 +1,4 @@
-![Banner](./repo-banner.jpeg)
+![Banner](https://raw.githubusercontent.com/JonahWhaler/llm-agent-toolkit/main/images/repo-banner.jpeg)
 
 # LLM Agent Toolkit: Modular Components for AI Workflows
 LLM Agent Toolkit provides minimal, modular interfaces for core components in LLM-based applications. Simplify workflows with stateless interaction, embedding encoders, memory management, tool integration, and data loaders, designed for compatibility and scalability. It prioritizes simplicity and modularity by proposing minimal wrappers designed to work across common tools, discouraging direct access to underlying technologies. Specific implementations and examples will be documented separately in a Cookbook (planned).
