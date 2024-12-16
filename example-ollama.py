@@ -18,6 +18,13 @@ logger = logging.getLogger(__name__)
 
 CONNECTION_STRING = "http://localhost:11434"
 FILEPATH = "./dev/classroom.jpg"
+STANDARD_CHAT_COMPLETION_CONFIG = {
+    "return_n": 1,
+    "max_iteration": 5,
+    "max_tokens": 4096,
+    "max_output_tokens": 2048,
+    "temperature": 0.7,
+}
 
 
 def adder(a: int, b: int) -> int:
@@ -60,12 +67,8 @@ def exec_t2t_wo_tool():
     MODEL_NAME = "llama3.2:3b"
 
     config = ChatCompletionConfig(
-        name=MODEL_NAME,
-        return_n=1,
-        max_iteration=1,
-        max_tokens=4096,
-        temperature=0.7,
-    )
+        name=MODEL_NAME, **STANDARD_CHAT_COMPLETION_CONFIG
+    )  # max_iteration takes no effect when no tool is used
     llm = Text_to_Text(
         connection_string=CONNECTION_STRING,
         system_prompt=SYSTEM_PROMPT,
@@ -87,12 +90,8 @@ async def aexec_t2t_wo_tool():
     MODEL_NAME = "llama3.2:3b"
 
     config = ChatCompletionConfig(
-        name=MODEL_NAME,
-        return_n=1,
-        max_iteration=1,
-        max_tokens=4096,
-        temperature=0.7,
-    )
+        name=MODEL_NAME, **STANDARD_CHAT_COMPLETION_CONFIG
+    )  # max_iteration takes no effect when no tool is used
     llm = Text_to_Text(
         connection_string=CONNECTION_STRING,
         system_prompt=SYSTEM_PROMPT,
@@ -114,13 +113,7 @@ def exec_t2t_w_tool():
     QUERY = "10 + 5 / 5 = ?"
     MODEL_NAME = "qwen2.5:7b"
 
-    config = ChatCompletionConfig(
-        name=MODEL_NAME,
-        return_n=1,
-        max_iteration=5,
-        max_tokens=4096,
-        temperature=0.7,
-    )
+    config = ChatCompletionConfig(name=MODEL_NAME, **STANDARD_CHAT_COMPLETION_CONFIG)
     add_tool = LazyTool(adder, is_coroutine_function=False)
     div_tool = LazyTool(divider, is_coroutine_function=True)
 
@@ -145,13 +138,7 @@ async def aexec_t2t_w_tool():
     QUERY = "10 + 5 / 5 = ?"
     MODEL_NAME = "qwen2.5:7b"
 
-    config = ChatCompletionConfig(
-        name=MODEL_NAME,
-        return_n=1,
-        max_iteration=5,
-        max_tokens=4096,
-        temperature=0.7,
-    )
+    config = ChatCompletionConfig(name=MODEL_NAME, **STANDARD_CHAT_COMPLETION_CONFIG)
     add_tool = LazyTool(adder, is_coroutine_function=False)
     div_tool = LazyTool(divider, is_coroutine_function=True)
 
@@ -176,12 +163,8 @@ def exec_i2t():
     MODEL_NAME = "llava:7b"
 
     config = ChatCompletionConfig(
-        name=MODEL_NAME,
-        return_n=1,
-        max_iteration=1,
-        max_tokens=4096,
-        temperature=0.7,
-    )
+        name=MODEL_NAME, **STANDARD_CHAT_COMPLETION_CONFIG
+    )  # max_iteration takes no effect when no tool is used
 
     llm = Image_to_Text(
         connection_string=CONNECTION_STRING,
@@ -203,12 +186,8 @@ async def aexec_i2t():
     MODEL_NAME = "llava:7b"
 
     config = ChatCompletionConfig(
-        name=MODEL_NAME,
-        return_n=1,
-        max_iteration=1,
-        max_tokens=4096,
-        temperature=0.7,
-    )
+        name=MODEL_NAME, **STANDARD_CHAT_COMPLETION_CONFIG
+    )  # max_iteration takes no effect when no tool is used
 
     llm = Image_to_Text(
         connection_string=CONNECTION_STRING,
@@ -230,12 +209,8 @@ def exec_i2t_wo_file():
     MODEL_NAME = "llava:7b"
 
     config = ChatCompletionConfig(
-        name=MODEL_NAME,
-        return_n=1,
-        max_iteration=1,
-        max_tokens=4096,
-        temperature=0.7,
-    )
+        name=MODEL_NAME, **STANDARD_CHAT_COMPLETION_CONFIG
+    )  # max_iteration takes no effect when no tool is used
 
     llm = Image_to_Text(
         connection_string=CONNECTION_STRING,
@@ -257,12 +232,8 @@ async def aexec_i2t_wo_file():
     MODEL_NAME = "llava:7b"
 
     config = ChatCompletionConfig(
-        name=MODEL_NAME,
-        return_n=1,
-        max_iteration=1,
-        max_tokens=4096,
-        temperature=0.7,
-    )
+        name=MODEL_NAME, **STANDARD_CHAT_COMPLETION_CONFIG
+    )  # max_iteration takes no effect when no tool is used
 
     llm = Image_to_Text(
         connection_string=CONNECTION_STRING,
@@ -300,6 +271,31 @@ def exec_t2e_v2():
     logger.info(">>>> Token Count: %d", token_count)
 
 
+async def aexec_t2e():
+    from llm_agent_toolkit.encoder.local import OllamaEncoder
+
+    MODEL_NAME = "bge-m3:latest"
+    PLAIN_TEXT = "This is awesome!"
+
+    encoder = OllamaEncoder(connection_string=CONNECTION_STRING, model_name=MODEL_NAME)
+    embedding = await encoder.encode_async(text=PLAIN_TEXT)
+    logger.info("Plain Text: %s", PLAIN_TEXT)
+    logger.info(">>>> Dimension: %d", len(embedding))
+
+
+async def aexec_t2e_v2():
+    from llm_agent_toolkit.encoder.local import OllamaEncoder
+
+    MODEL_NAME = "bge-m3:latest"
+    PLAIN_TEXT = "This is awesome!"
+
+    encoder = OllamaEncoder(connection_string=CONNECTION_STRING, model_name=MODEL_NAME)
+    embedding, token_count = await encoder.encode_v2_async(text=PLAIN_TEXT)
+    logger.info("Plain Text: %s", PLAIN_TEXT)
+    logger.info(">>>> Dimension: %d", len(embedding))
+    logger.info(">>>> Token Count: %d", token_count)
+
+
 def synchronous_tasks():
     exec_t2t_wo_tool()
     exec_t2t_w_tool()
@@ -315,6 +311,8 @@ async def asynchronous_tasks():
         aexec_t2t_w_tool(),
         aexec_i2t(),
         aexec_i2t_wo_file(),
+        aexec_t2e(),
+        aexec_t2e_v2(),
     ]
     await asyncio.gather(*tasks)
 
