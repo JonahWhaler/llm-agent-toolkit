@@ -153,6 +153,69 @@ class TransformerEncoder(Encoder):
             logger.error(msg=f"{self.model_name}.encode failed. Error: {str(e)}")
             raise
 
+    async def encode_async(self, text: str, **kwargs) -> list[float]:
+        """Transform string to embedding.
+
+        Args:
+            text (str): Content to be embedded.
+            kwargs (dict): Ignored
+
+        Returns:
+            list[float]: Embedding
+
+        Notes:
+        * truncate=True
+        * padding=False
+        * add_special_tokens=True
+        * Not asynchronous! Implemented for the sake of interface consistency.
+        """
+        try:
+            tokenizer = AutoTokenizer.from_pretrained(self.model_name, use_fast=True)
+            tokens = tokenizer(
+                text,
+                return_tensors="pt",
+                truncation=True,
+                padding=False,
+                add_special_tokens=True,
+            )
+            model = AutoModel.from_pretrained(self.model_name)
+            return self.__to_embedding(model, tokens)
+        except Exception as e:
+            logger.error(msg=f"{self.model_name}.encode failed. Error: {str(e)}")
+            raise
+
+    async def encode_v2_async(self, text: str, **kwargs) -> tuple[list[float], int]:
+        """Transform string to embedding.
+
+        Args:
+            text (str): Content to be embedded.
+            kwargs (dict): Ignored.
+
+        Returns:
+            tuple: Embedding, Token Count
+
+        Notes:
+        * truncate=True
+        * padding=False
+        * add_special_tokens=True
+        * Not asynchronous! Implemented for the sake of interface consistency.
+        """
+        try:
+            tokenizer = AutoTokenizer.from_pretrained(self.model_name, use_fast=True)
+            tokens = tokenizer(
+                text,
+                return_tensors="pt",
+                truncation=True,
+                padding=False,
+                add_special_tokens=True,
+            )
+            token_count = len(tokens["input_ids"][0])
+            model = AutoModel.from_pretrained(self.model_name)
+            return self.__to_embedding(model, tokens), token_count
+        except Exception as e:
+            logger.error(msg=f"{self.model_name}.encode failed. Error: {str(e)}")
+            raise
+
     @staticmethod
     def __to_embedding(model, tokens):
         """Transform tokens to embedding (detailed steps)."""
