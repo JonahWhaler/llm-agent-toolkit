@@ -20,6 +20,8 @@ class OpenAICore:
     * calculate_token_count(msgs: list[MessageBlock | dict], tools: list[ToolMetadata] | None = None)
     """
 
+    csv_path: str | None = None
+
     def __init__(self, model_name: str):
         self.__model_name = model_name
         if not self.__available():
@@ -45,28 +47,30 @@ class OpenAICore:
         If `model_name` is not found in the csv file, default value will be applied.
         """
         profile: dict[str, bool | int | str] = {"name": model_name}
-        with open(
-            "./llm_agent_toolkit/core/open_ai/openai.csv", "r", encoding="utf-8"
-        ) as csv:
-            header = csv.readline()
-            columns = header.strip().split(",")
-            while True:
-                line = csv.readline()
-                if not line:
-                    break
-                values = line.strip().split(",")
-                if values[0] == model_name:
-                    for column, value in zip(columns[1:], values[1:]):
-                        if column in ["context_length", "max_output_tokens"]:
-                            profile[column] = int(value)
-                        elif column == "remarks":
-                            profile[column] = value
-                        elif value == "TRUE":
-                            profile[column] = True
-                        else:
-                            profile[column] = False
-                    break
 
+        # If OpenAI.csv_path is set
+        if OpenAICore.csv_path:
+            with open(OpenAICore.csv_path, "r", encoding="utf-8") as csv:
+                header = csv.readline()
+                columns = header.strip().split(",")
+                while True:
+                    line = csv.readline()
+                    if not line:
+                        break
+                    values = line.strip().split(",")
+                    if values[0] == model_name:
+                        for column, value in zip(columns[1:], values[1:]):
+                            if column in ["context_length", "max_output_tokens"]:
+                                profile[column] = int(value)
+                            elif column == "remarks":
+                                profile[column] = value
+                            elif value == "TRUE":
+                                profile[column] = True
+                            else:
+                                profile[column] = False
+                        break
+
+        # If OpenAI.csv_path is not set
         # Assign default values
         if "text_generation" not in profile:
             # Assume supported
@@ -80,6 +84,47 @@ class OpenAICore:
                 profile["tool"] = True
 
         return profile
+
+    @classmethod
+    def load_csv(cls, input_path: str):
+        COLUMNS_STRING = "name,context_length,max_output_tokens,text_generation,tool,text_input,image_input,audio_input,text_output,image_output,audio_output,remarks"
+        EXPECTED_COLUMNS = set(COLUMNS_STRING.split(","))
+        # Begin validation
+        with open(input_path, "r", encoding="utf-8") as csv:
+            header = csv.readline()
+            header = header.strip()
+            columns = header.split(",")
+            # Expect no columns is missing
+            diff = EXPECTED_COLUMNS - set(columns)
+            if diff:
+                raise ValueError(f"Missing columns in {input_path}: {', '.join(diff)}")
+            # Expect all columns are in exact order
+            if header != COLUMNS_STRING:
+                raise ValueError(
+                    f"Invalid header in {input_path}: \n{header}\n{COLUMNS_STRING}"
+                )
+
+            for line in csv:
+                values = line.strip().split(",")
+                name: str = values[0]
+                for column, value in zip(columns, values):
+                    if column in ["name", "remarks"]:
+                        assert isinstance(
+                            value, str
+                        ), f"{name}.{column} must be a string."
+                    elif column in ["context_length", "max_output_tokens"] and value:
+                        try:
+                            _ = int(value)
+                        except ValueError:
+                            print(f"{name}.{column} must be an integer.")
+                            raise
+                    elif value:
+                        assert value.lower() in [
+                            "true",
+                            "false",
+                        ], f"{name}.{column} must be a boolean."
+        # End validation
+        OpenAICore.csv_path = input_path
 
     def calculate_token_count(
         self, msgs: list[MessageBlock | dict], tools: list[ToolMetadata] | None = None
