@@ -5,7 +5,7 @@ DESCRIPTION = "LLM Agent Toolkit provides minimal, modular interfaces for core c
 # python3 setup.py sdist bdist_wheel
 # twine upload --skip-existing dist/* --verbose
 
-VERSION = "0.0.16.3"
+VERSION = "0.0.16.14"
 
 with open("./README.md", "r", encoding="utf-8") as f:
     long_description = f.read()
@@ -53,4 +53,5 @@ setup(
         "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
         "Programming Language :: Python :: 3.10",
     ],
+    include_package_data=True,
 )
