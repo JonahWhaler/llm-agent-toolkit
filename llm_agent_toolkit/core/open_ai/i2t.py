@@ -315,6 +315,7 @@ class I2T_OAI_Core(Core, OpenAICore, ImageInterpreter, ToolSupport):
                 return f"data:image/{ext};base64,{encoded_image}"
         except FileNotFoundError as fnfe:
             logger.error("FileNotFoundError: %s", fnfe, exc_info=True)
+            raise
         except Exception as e:
             logger.error("Exception: %s", e, exc_info=True)
             raise
