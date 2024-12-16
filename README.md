@@ -33,12 +33,12 @@ For developers requiring full-range customization or access to the latest featur
 # Fundamental Components
 ## Core: 
 
-A stateless interface to interact with the LLM.
+A stateless chat completion interface to interact with the LLM.
 
 **Purpose**: Serves as the central execution layer that abstracts interaction with the underlying LLM model.
 
 **Features**:
-* Supports multiple input-output modalities (e.g., Text-to-Text, Text-to-Image).
+* Supports Text-to-Text and Image-to-Text.
 * Enables iterative executions for multi-step workflows.
 * Facilitates tool invocation as part of the workflow.
 * Support models from OpenAI and Ollama
@@ -51,7 +51,8 @@ A standardized wrapper for embedding models.
 **Features**:
 * Abstracts away model-specific details (e.g., dimensionality, framework differences).
 * Allows flexible integration with downstream components like Memory or retrieval mechanisms.
-* Support OpenAI, Ollama and Transformers
+* Support OpenAI, Ollama and Transformers.
+* Support asynchronous operation.
 
 ## Memory: 
 Offers essential context retention capabilities.
