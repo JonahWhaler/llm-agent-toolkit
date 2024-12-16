@@ -19,6 +19,7 @@ SYSTEM_PROMPT = "You are Whales, the faithful AI assistant."
 CONFIG = ChatCompletionConfig(
     name=VISION_MODEL, return_n=1, max_iteration=1, max_tokens=4096, temperature=1.5
 )
+IMAGE_INTERPRETER = Image_to_Text(CONNECTION_STRING, SYSTEM_PROMPT, CONFIG)
 
 TMP_DIRECTORY = "./dev"
 DOC_PATH = "./dev/sample.docx"
@@ -29,8 +30,9 @@ IMG_PATH = "./dev/sample.jpeg"
 def exec_image_loader():
     from llm_agent_toolkit.loader import ImageToTextLoader
 
-    ii = Image_to_Text(CONNECTION_STRING, SYSTEM_PROMPT, CONFIG)
-    ldr = ImageToTextLoader(ii, "What's in the image? Tell me in details.")
+    ldr = ImageToTextLoader(
+        IMAGE_INTERPRETER, "What's in the image? Tell me in details."
+    )
     img_description = ldr.load(input_path=IMG_PATH)
     logger.info("%s -> %s", IMG_PATH, img_description)
 
@@ -38,8 +40,9 @@ def exec_image_loader():
 async def aexec_image_loader():
     from llm_agent_toolkit.loader import ImageToTextLoader
 
-    ii = Image_to_Text(CONNECTION_STRING, SYSTEM_PROMPT, CONFIG)
-    ldr = ImageToTextLoader(ii, "What's in the image? Tell me in details.")
+    ldr = ImageToTextLoader(
+        IMAGE_INTERPRETER, "What's in the image? Tell me in details."
+    )
     img_description = await ldr.load_async(input_path=IMG_PATH)
     logger.info("%s -> %s", IMG_PATH, img_description)
 
@@ -69,8 +72,11 @@ async def aexec_pdf_loader():
 def exec_pdf_loader_w_ii():
     from llm_agent_toolkit.loader import PDFLoader
 
-    ii = Image_to_Text(CONNECTION_STRING, SYSTEM_PROMPT, CONFIG)
-    ldr = PDFLoader(text_only=False, tmp_directory=TMP_DIRECTORY, image_interpreter=ii)
+    ldr = PDFLoader(
+        text_only=False,
+        tmp_directory=TMP_DIRECTORY,
+        image_interpreter=IMAGE_INTERPRETER,
+    )
     pdf_content = ldr.load(PDF_PATH)
     export_path = f"{TMP_DIRECTORY}/pdf_w_image-description.md"
     logger.info("%s -> %s", PDF_PATH, export_path)
@@ -81,8 +87,11 @@ def exec_pdf_loader_w_ii():
 async def aexec_pdf_loader_w_ii():
     from llm_agent_toolkit.loader import PDFLoader
 
-    ii = Image_to_Text(CONNECTION_STRING, SYSTEM_PROMPT, CONFIG)
-    ldr = PDFLoader(text_only=False, tmp_directory=TMP_DIRECTORY, image_interpreter=ii)
+    ldr = PDFLoader(
+        text_only=False,
+        tmp_directory=TMP_DIRECTORY,
+        image_interpreter=IMAGE_INTERPRETER,
+    )
     pdf_content = await ldr.load_async(PDF_PATH)
     export_path = f"{TMP_DIRECTORY}/pdf_w_image-description.md"
     logger.info("%s -> %s", PDF_PATH, export_path)
@@ -115,9 +124,10 @@ async def aexec_msw_loader():
 def exec_msw_loader_w_ii():
     from llm_agent_toolkit.loader import MsWordLoader
 
-    ii = Image_to_Text(CONNECTION_STRING, SYSTEM_PROMPT, CONFIG)
     ldr = MsWordLoader(
-        text_only=False, tmp_directory=TMP_DIRECTORY, image_interpreter=ii
+        text_only=False,
+        tmp_directory=TMP_DIRECTORY,
+        image_interpreter=IMAGE_INTERPRETER,
     )
     doc_content = ldr.load(DOC_PATH)
     export_path = f"{TMP_DIRECTORY}/doc_w_image-description.md"
@@ -129,9 +139,10 @@ def exec_msw_loader_w_ii():
 async def aexec_msw_loader_w_ii():
     from llm_agent_toolkit.loader import MsWordLoader
 
-    ii = Image_to_Text(CONNECTION_STRING, SYSTEM_PROMPT, CONFIG)
     ldr = MsWordLoader(
-        text_only=False, tmp_directory=TMP_DIRECTORY, image_interpreter=ii
+        text_only=False,
+        tmp_directory=TMP_DIRECTORY,
+        image_interpreter=IMAGE_INTERPRETER,
     )
     doc_content = await ldr.load_async(DOC_PATH)
     export_path = f"{TMP_DIRECTORY}/doc_w_image-description.md"

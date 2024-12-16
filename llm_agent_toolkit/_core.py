@@ -99,7 +99,6 @@ class Core(ABC):
         return ret
 
     @max_output_tokens.setter
-    @abstractmethod
     def max_output_tokens(self, value: int):
         """
         Set the max output tokens.
