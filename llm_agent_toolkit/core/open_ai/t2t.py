@@ -47,7 +47,7 @@ class T2T_OAI_Core(Core, OpenAICore, ToolSupport):
         OpenAICore.__init__(self, config.name)
         ToolSupport.__init__(self, tools)
         self.profile = self.build_profile(config.name)
-        if tools and self.profile["tool"] is False:
+        if tools and self.profile.get("tool", False) is False:
             logger.warning("Tool might not work on this %s", self.model_name)
 
     async def run_async(

@@ -51,7 +51,7 @@ class I2T_OLM_Core(Core, OllamaCore, ImageInterpreter):  # , ToolSupport
         Core.__init__(self, system_prompt, config)
         OllamaCore.__init__(self, connection_string, config.name)
         self.profile = self.build_profile(model_name=config.name)
-        if self.profile["image_input"] is False:
+        if self.profile.get("image_input", False) is False:
             logger.warning("Vision might not work on this %s", self.model_name)
 
     async def run_async(

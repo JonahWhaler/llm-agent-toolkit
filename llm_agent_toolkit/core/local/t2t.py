@@ -49,7 +49,7 @@ class T2T_OLM_Core(Core, OllamaCore, ToolSupport):
         OllamaCore.__init__(self, connection_string, config.name)
         ToolSupport.__init__(self, tools)
         self.profile = self.build_profile(model_name=config.name)
-        if tools and self.profile["tool"] is False:
+        if tools and self.profile.get("tool", False) is False:
             logger.warning("Tool might not work on this %s", self.model_name)
 
     async def run_async(
