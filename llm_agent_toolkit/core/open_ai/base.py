@@ -144,7 +144,11 @@ class OpenAICore:
         for msg in msgs:
             # Incase the dict does not comply with the MessageBlock format
             if "content" in msg and msg["content"]:
-                token_count += len(encoding.encode(msg["content"]))
+                if not isinstance(msg["content"], list):
+                    token_count += len(encoding.encode(msg["content"]))
+                else:
+                    tmp = json.dumps(msg["content"])
+                    token_count += len(encoding.encode(tmp))
             if "role" in msg and msg["role"] == CreatorRole.FUNCTION.value:
                 token_count += len(encoding.encode(msg["name"]))
 
