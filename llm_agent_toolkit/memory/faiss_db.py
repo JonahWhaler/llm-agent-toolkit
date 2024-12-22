@@ -750,6 +750,9 @@ class FaissMemory(VectorMemory):
         **kwargs,
     ):
         super().__init__(vdb, encoder, chunker, **kwargs)
+        overwrite: bool = kwargs.get("overwrite", False)
+        if overwrite is True:
+            self.clear()
 
     def add(self, document_string: str, **kwargs):
         identifier = kwargs.get("identifier", str(uuid.uuid4()))
