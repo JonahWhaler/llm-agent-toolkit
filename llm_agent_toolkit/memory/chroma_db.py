@@ -25,6 +25,9 @@ class ChromaMemory(VectorMemory):
         super().__init__(vdb, encoder, chunker, **kwargs)
         self.__namespace = kwargs.get("namespace", "default")
         overwrite: bool = kwargs.get("overwrite", False)
+
+        assert isinstance(self.vdb, chromadb.ClientAPI)
+
         if overwrite:
             try:
                 self.vdb.delete_collection(name=self.__namespace)
@@ -43,6 +46,7 @@ class ChromaMemory(VectorMemory):
             )
 
     def add(self, document_string: str, **kwargs):
+        assert isinstance(self.vdb, chromadb.ClientAPI)
         collection = self.vdb.get_or_create_collection(name=self.__namespace)
         identifier = kwargs.get("identifier", str(uuid.uuid4()))
         metadata = kwargs.get("metadata", {})
@@ -65,6 +69,7 @@ class ChromaMemory(VectorMemory):
         )
 
     def query(self, query_string: str, **kwargs):
+        assert isinstance(self.vdb, chromadb.ClientAPI)
         return_n = kwargs.get("return_n", 5)
         advance_filter = kwargs.get("advance_filter", None)
         output_types = kwargs.get(
