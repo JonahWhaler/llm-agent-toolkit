@@ -1,4 +1,6 @@
+import logging
 import asyncio
+from concurrent.futures import ThreadPoolExecutor
 import uuid
 from copy import deepcopy
 
@@ -7,6 +9,8 @@ import chromadb
 from .._encoder import Encoder
 from .._memory import VectorMemory, AsyncVectorMemory
 from .._chunkers import Chunker
+
+logger = logging.getLogger(__name__)
 
 
 class ChromaMemory(VectorMemory):
@@ -100,40 +104,77 @@ class ChromaMemory(VectorMemory):
         self.vdb.delete_collection(name=self.__namespace)
 
 
+def _add_(
+    collection: chromadb.Collection,
+    ids: list[str],
+    embeddings: list,
+    documents: list[str],
+    metadatas: list | None,
+):
+    collection.add(
+        ids=ids,
+        embeddings=embeddings,
+        metadatas=metadatas,
+        documents=documents,
+    )
+
+
+def _query_(
+    collection: chromadb.Collection,
+    query_embedding: list,
+    n_results: int,
+    where: dict | None,
+    include: list,
+):
+    return collection.query(
+        query_embeddings=query_embedding,
+        n_results=n_results,
+        where=where,
+        include=include,
+    )
+
+
+def _delete_collection_(client: chromadb.ClientAPI, collection_name: str):
+    return client.delete_collection(name=collection_name)
+
+
 class AsyncChromaMemory(AsyncVectorMemory):
     def __init__(
         self,
-        vdb: chromadb.AsyncClientAPI,
+        vdb: chromadb.ClientAPI,
         encoder: Encoder,
         chunker: Chunker,
+        max_workers: int = 4,
         **kwargs,
     ) -> None:
         super().__init__(vdb, encoder, chunker, **kwargs)
         self.__namespace = kwargs.get("namespace", "default")
         self.__overwrite: bool = kwargs.get("overwrite", False)
+        self.__executor = ThreadPoolExecutor(max_workers=max_workers)
+        self.init()
 
-    async def init(self) -> None:
-        assert isinstance(self.vdb, chromadb.AsyncClientAPI)
+    def init(self) -> None:
+        assert isinstance(self.vdb, chromadb.ClientAPI)
         if self.__overwrite:
             try:
-                await self.vdb.delete_collection(name=self.__namespace)
+                self.vdb.delete_collection(name=self.__namespace)
                 # delete_collection raises InvalidCollectionException
                 # if attempt to delete non-exists collection
             except (chromadb.errors.InvalidCollectionException, ValueError):
                 pass  # self.__namespace is not found in the vector database
             finally:
-                await self.vdb.create_collection(
+                self.vdb.create_collection(
                     name=self.__namespace, metadata={"hnsw:space": "cosine"}
                 )
         else:
             # Create collection if not already present
-            await self.vdb.get_or_create_collection(
+            self.vdb.get_or_create_collection(
                 name=self.__namespace, metadata={"hnsw:space": "cosine"}
             )
 
-    async def add(self, document_string: str, **kwargs):
-        assert isinstance(self.vdb, chromadb.AsyncClientAPI)
-        collection = await self.vdb.get_or_create_collection(name=self.__namespace)
+    async def add(self, document_string: str, **kwargs) -> None:
+        assert isinstance(self.vdb, chromadb.ClientAPI)
+        collection = self.vdb.get_or_create_collection(name=self.__namespace)
         identifier = kwargs.get("identifier", str(uuid.uuid4()))
         metadata = kwargs.get("metadata", {})
         document_chunks = self.split_text(document_string)
@@ -150,28 +191,42 @@ class AsyncChromaMemory(AsyncVectorMemory):
         emb_tasks = [self.encoder.encode_async(chunk) for chunk in document_chunks]
         embeddings = await asyncio.gather(*emb_tasks)
 
-        await collection.add(
-            documents=document_chunks, metadatas=metas, ids=ids, embeddings=embeddings
-        )
+        try:
+            loop = asyncio.get_running_loop()
+            await loop.run_in_executor(
+                self.__executor,
+                _add_,
+                collection,
+                ids,
+                embeddings,
+                document_chunks,
+                metas,
+            )
+        except Exception as e:
+            logger.error("Failed to add document: %s", e)
+            raise
 
     async def query(self, query_string, **kwargs):
-        assert isinstance(self.vdb, chromadb.AsyncClientAPI)
+        assert isinstance(self.vdb, chromadb.ClientAPI)
         return_n = kwargs.get("return_n", 5)
         advance_filter = kwargs.get("advance_filter", None)
         output_types = kwargs.get(
             "output_types", ["documents", "metadatas", "distances"]
         )
-        params = {
-            "n_results": return_n,
-            "where": advance_filter,
-            "include": output_types,
-        }
-        collection = await self.vdb.get_or_create_collection(name=self.__namespace)
+        collection = self.vdb.get_or_create_collection(name=self.__namespace)
         query_embedding = await self.encoder.encode_async(query_string)
-        results = await collection.query(
-            query_embedding,
-            **params,
+
+        loop = asyncio.get_running_loop()
+        results = await loop.run_in_executor(
+            self.__executor,
+            _query_,
+            collection,
+            [query_embedding],
+            return_n,
+            advance_filter,
+            output_types,
         )
+
         return {
             "query": query_string,
             "result": {
@@ -184,4 +239,7 @@ class AsyncChromaMemory(AsyncVectorMemory):
 
     async def clear(self):
         assert isinstance(self.vdb, chromadb.AsyncClientAPI)
-        await self.vdb.delete_collection(name=self.__namespace)
+        loop = asyncio.get_running_loop()
+        await loop.run_in_executor(
+            self.__executor, _delete_collection_, self.vdb, self.__namespace
+        )
