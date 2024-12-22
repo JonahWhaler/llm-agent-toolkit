@@ -4,6 +4,7 @@ from copy import deepcopy
 import logging
 from enum import Enum
 from abc import ABC, abstractmethod
+from typing import Any
 
 import faiss  # type: ignore
 import numpy as np
@@ -38,7 +39,7 @@ class FaissDB(ABC):
     def query(
         self,
         query_embedding,
-        n_results: int = 5,
+        return_n: int = 5,
         where: dict | None = None,
         include: list[str] | None = None,
     ) -> list[dict]:
@@ -214,7 +215,7 @@ class FaissIFL2DB(FaissDB):
     def query(
         self,
         query_embedding,
-        n_results: int = 5,
+        return_n: int = 5,
         where: dict | None = None,
         include: list[str] | None = None,
     ) -> list[dict]:
@@ -223,7 +224,7 @@ class FaissIFL2DB(FaissDB):
 
         Args:
         query_embedding (list[float]): Embedding of the query.
-        n_results (int, optional): Number of results to return. Defaults to 5.
+        return_n (int, optional): Number of results to return. Defaults to 5.
         where (dict, optional): Filter to apply to the results. Defaults to None.
         include (list[str], optional): List of fields to include in the results. Defaults to None.
 
@@ -239,6 +240,12 @@ class FaissIFL2DB(FaissDB):
         - TODO: Support `where`
         """
         assert len(query_embedding) == self.__dimension
+        if include:
+            assert isinstance(include, list)
+            for i in include:
+                assert i in ["documents", "metadatas", "distances"]
+            assert len(include) <= 3 and len(include) > 0
+
         try:
             index = (
                 self.__index
@@ -260,7 +267,7 @@ class FaissIFL2DB(FaissDB):
             np_query_embedding = np.array(query_embedding, dtype=np.float32)
             np_query_embedding = np.expand_dims(np_query_embedding, axis=0)
             assert np_query_embedding.shape == (1, self.__dimension)
-            distances, indices = index.search(np_query_embedding, k=n_results)
+            distances, indices = index.search(np_query_embedding, k=return_n)
             distances = distances[0]
             indices = indices[0]
             # Post Processing
@@ -272,15 +279,17 @@ class FaissIFL2DB(FaissDB):
                 if "is_deleted" in value_dict:
                     if value_dict["is_deleted"] is True:
                         continue
-                _output_object = {
-                    "id": value_dict["id"],
-                    "distance": distance,
-                    "document": value_dict["document"],
-                }
+                _output_object = {"id": value_dict["id"]}
                 # Include selected fields
                 if include is not None:
                     for key in include:
-                        _output_object[key] = value_dict[key]
+                        # if key == "metadatas":
+                        #     continue
+                        if key == "distances":
+                            _output_object["distance"] = distance
+                        else:
+                            _output_object[key[:-1]] = value_dict[key[:-1]]
+
                 output.append(_output_object)
 
             return output
@@ -555,7 +564,7 @@ class FaissHNSWDB(FaissDB):
     def query(
         self,
         query_embedding,
-        n_results: int = 5,
+        return_n: int = 5,
         where: dict | None = None,
         include: list[str] | None = None,
     ) -> list[dict]:
@@ -564,7 +573,7 @@ class FaissHNSWDB(FaissDB):
 
         Args:
         query_embedding (list[float]): Embedding of the query.
-        n_results (int, optional): Number of results to return. Defaults to 5.
+        return_n (int, optional): Number of results to return. Defaults to 5.
         where (dict, optional): Filter to apply to the results. Defaults to None.
         include (list[str], optional): List of fields to include in the results. Defaults to None.
 
@@ -580,6 +589,12 @@ class FaissHNSWDB(FaissDB):
         - TODO: Support `where`
         """
         assert len(query_embedding) == self.__dimension
+        if include:
+            assert isinstance(include, list)
+            for i in include:
+                assert i in ["documents", "metadatas", "distances"]
+            assert len(include) <= 3 and len(include) > 0
+
         try:
             index = (
                 self.__index
@@ -602,7 +617,7 @@ class FaissHNSWDB(FaissDB):
                 np.array(query_embedding, dtype=np.float32), axis=0
             )
             assert np_query_embedding.shape == (1, self.__dimension)
-            distances, indices = index.search(np_query_embedding, k=n_results)
+            distances, indices = index.search(np_query_embedding, k=return_n)
             distances = distances[0]
             indices = indices[0]
             # Post Processing
@@ -614,15 +629,15 @@ class FaissHNSWDB(FaissDB):
                 if "is_deleted" in value_dict:
                     if value_dict["is_deleted"] is True:
                         continue
-                _output_object = {
-                    "id": value_dict["id"],
-                    "distance": distance,
-                    "document": value_dict["document"],
-                }
+                _output_object = {"id": value_dict["id"]}
                 # Include selected fields
                 if include is not None:
                     for key in include:
-                        _output_object[key] = value_dict[key]
+                        if key == "distances":
+                            _output_object["distance"] = distance
+                        else:
+                            _output_object[key[:-1]] = value_dict[key[:-1]]
+
                 output.append(_output_object)
 
             return output
@@ -750,6 +765,9 @@ class FaissMemory(VectorMemory):
         **kwargs,
     ):
         super().__init__(vdb, encoder, chunker, **kwargs)
+        overwrite: bool = kwargs.get("overwrite", False)
+        if overwrite is True:
+            self.clear()
 
     def add(self, document_string: str, **kwargs):
         identifier = kwargs.get("identifier", str(uuid.uuid4()))
@@ -769,22 +787,40 @@ class FaissMemory(VectorMemory):
                 documents=document_chunks,
                 metadatas=metas,
                 ids=ids,
-                embeddings=self.encoder.encode(document_chunks),
+                embeddings=[self.encoder.encode(document_chunks)],
             )
         else:
             self.vdb.add(
                 documents=document_chunks,
+                metadatas=None,
                 ids=[f"{identifier}-{i}" for i in range(len(document_chunks))],
-                embeddings=self.encoder.encode(document_chunks),
+                embeddings=[self.encoder.encode(document_chunks)],
             )
 
     def query(self, query_string: str, **kwargs):
-        n_results: int = kwargs.get("n_results", 5)
-        query_embedding = self.encoder.encode(query_string)
-        return self.vdb.query(
-            query_embedding=query_embedding,
-            n_results=n_results,
+        return_n: int = kwargs.get("return_n", 5)
+        include: list[str] = kwargs.get(
+            "include", ["documents", "metadatas", "distances"]
         )
+        assert isinstance(include, list)
+        output: dict[str, Any] = {"query": query_string, "result": {"ids": []}}
+
+        for m in include:
+            # assert isinstance(m, str)
+            output["result"][m] = []
+
+        query_embedding = self.encoder.encode(query_string)
+        results = self.vdb.query(
+            query_embedding=query_embedding,
+            return_n=return_n,
+            include=include,
+        )
+        for r in results:
+            for k, v in r.items():
+                if k != "metadatas":
+                    k += "s"
+                output["result"][k].append(v)
+        return output
 
     def clear(self) -> None:
         assert isinstance(self.vdb, FaissDB)
