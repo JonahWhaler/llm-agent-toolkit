@@ -127,7 +127,7 @@ class OllamaCore:
             header = header.strip()
             columns = header.split(",")
             # Expect no columns is missing
-            diff = EXPECTED_COLUMNS - set(columns)
+            diff = EXPECTED_COLUMNS.difference(set(columns))
             if diff:
                 raise ValueError(f"Missing columns in {input_path}: {', '.join(diff)}")
             # Expect all columns are in exact order
