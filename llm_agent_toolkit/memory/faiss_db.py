@@ -787,14 +787,14 @@ class FaissMemory(VectorMemory):
                 documents=document_chunks,
                 metadatas=metas,
                 ids=ids,
-                embeddings=[self.encoder.encode(document_chunks)],
+                embeddings=[self.encoder.encode(chunk) for chunk in document_chunks],
             )
         else:
             self.vdb.add(
                 documents=document_chunks,
                 metadatas=None,
                 ids=[f"{identifier}-{i}" for i in range(len(document_chunks))],
-                embeddings=[self.encoder.encode(document_chunks)],
+                embeddings=[self.encoder.encode(chunk) for chunk in document_chunks],
             )
 
     def query(self, query_string: str, **kwargs):
