@@ -132,7 +132,7 @@ class T2T_OLM_Core(Core, OllamaCore, ToolSupport):
                         )
                     )
 
-                tool_calls = response["message"]["tool_calls"]
+                tool_calls = response["message"].get("tool_calls", None)
                 if tool_calls:
                     output = await self.call_tools_async(tool_calls)
                     msgs.extend(output)
@@ -254,7 +254,7 @@ class T2T_OLM_Core(Core, OllamaCore, ToolSupport):
                         )
                     )
 
-                tool_calls = response["message"]["tool_calls"]
+                tool_calls = response["message"].get("tool_calls", None)
                 if tool_calls:
                     output = self.call_tools(tool_calls)
                     msgs.extend(output)
