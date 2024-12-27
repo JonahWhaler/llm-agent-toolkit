@@ -123,9 +123,7 @@ class TranscriptionConfig(ModelConfig):
         return new_value
 
     @model_validator(mode="after")
-    def timestamp_granularities_must_be_valid(
-        cls, values
-    ):  # pylint: disable=no-self-argument
+    def timestamp_granularities_must_be_valid(cls, values):  # pylint: disable=no-self-argument
         if values.response_format == "text":
             return values
         if len(values.timestamp_granularities) == 0:
@@ -148,7 +146,10 @@ class CreatorRole(str, Enum):
     TOOL = "tool"
 
 
-class MessageBlock(TypedDict, total=False):
+class RequiredMessageField(TypedDict, total=True):
     role: str
     content: str
+
+
+class MessageBlock(RequiredMessageField, total=False):
     name: str  # function name when role is `function`
