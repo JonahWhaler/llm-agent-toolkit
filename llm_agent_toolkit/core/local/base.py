@@ -180,7 +180,8 @@ class OllamaCore:
             if "content" in msg and msg["content"]:
                 character_count += len(msg["content"])
             if "role" in msg and msg["role"] == CreatorRole.TOOL.value:
-                character_count += len(msg["name"])
+                if "name" in msg:
+                    character_count += len(msg["name"])
 
         if tools:
             for tool in tools:
