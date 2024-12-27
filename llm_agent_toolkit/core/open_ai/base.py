@@ -150,7 +150,8 @@ class OpenAICore:
                     tmp = json.dumps(msg["content"])
                     token_count += len(encoding.encode(tmp))
             if "role" in msg and msg["role"] == CreatorRole.FUNCTION.value:
-                token_count += len(encoding.encode(msg["name"]))
+                if "name" in msg:
+                    token_count += len(encoding.encode(msg["name"]))
 
         if tools:
             for tool in tools:
