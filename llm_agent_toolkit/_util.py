@@ -153,3 +153,9 @@ class RequiredMessageField(TypedDict, total=True):
 
 class MessageBlock(RequiredMessageField, total=False):
     name: str  # function name when role is `function`
+
+
+class ResponseMode(str, Enum):
+    SO = "structured_output"
+    JSON = "json_object"
+    DEFAULT = "default"

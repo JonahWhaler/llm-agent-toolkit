@@ -1,15 +1,23 @@
-import asyncio
+# import asyncio
 
 # import os
 import logging
 import json
-from typing import Any
+from typing import Type, TypeVar
 from pydantic import BaseModel
 
-# import openai
 from dotenv import load_dotenv
-from llm_agent_toolkit.core.local import Text_to_Text, Text_to_Text_SO, OllamaCore
-from llm_agent_toolkit import ChatCompletionConfig
+from llm_agent_toolkit.core.local import (
+    Text_to_Text_SO,
+    Image_to_Text_SO,
+    OllamaCore,
+)
+from llm_agent_toolkit.core.open_ai import (
+    OpenAICore,
+    OAI_StructuredOutput_Core,
+)
+
+from llm_agent_toolkit import ChatCompletionConfig, ResponseMode
 
 logging.basicConfig(
     filename="./snippet/output/example-JSON.log",
@@ -19,16 +27,8 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-OllamaCore.load_csv("./files/ollama.csv")
-
-CONNECTION_STRING = "http://localhost:11434"
-STANDARD_CHAT_COMPLETION_CONFIG = {
-    "return_n": 1,
-    "max_iteration": 5,
-    "max_tokens": 4096,
-    "max_output_tokens": 2048,
-    "temperature": 0.7,
-}
+T = TypeVar("T", bound=BaseModel)
+OUTPUT_DIRECTORY = "./snippet/output"
 
 
 class QnA(BaseModel):
@@ -36,170 +36,314 @@ class QnA(BaseModel):
     answer: str
 
 
-def run_ollama(initial_prompt: str):
-    cfg = ChatCompletionConfig(name="qwen2.5:7b")
+def run_ollama(
+    llm: Text_to_Text_SO,
+    initial_prompt: str,
+    response_mode: ResponseMode | None,
+    response_format: Type[T] | None,
+) -> None:
     try:
-        llm = Text_to_Text_SO(
-            connection_string=CONNECTION_STRING,
-            system_prompt="You are a faithful assistant",
-            config=cfg,
-        )
-        response = llm.run(query=initial_prompt, context=None, format=QnA)[0]
-        with open("./answers.md", "a", encoding="utf-8") as writer:
-            writer.write("======= One-Shot =======\n")
-            writer.write(response["content"])
+        if response_mode and response_format:
+            response = llm.run(
+                query=initial_prompt,
+                context=None,
+                mode=response_mode,
+                format=response_format,
+            )[0]
+        elif response_mode:
+            response = llm.run(
+                query=initial_prompt,
+                context=None,
+                mode=response_mode,
+            )[0]
+        else:
+            response = llm.run(query=initial_prompt, context=None)[0]
 
+        with open(
+            f"{OUTPUT_DIRECTORY}/standard-output.md", "a", encoding="utf-8"
+        ) as writer:
+            writer.write("\n\n======= OLM One-Shot =======\n")
+            if response_mode:
+                writer.write(f"{response_mode.value}\n")
+            else:
+                writer.write("Default\n")
+            writer.write(f"Prompt: {initial_prompt}\n")
+            writer.write(f'Response: {response["content"]}\n')
     except Exception as e:
         logger.error("Exception: %s", e)
 
 
-class Body(BaseModel):
-    completed: bool
-    task: str
-    result: str
-    next_task: str
-
-
-def execute_chain(initial_prompt: str):
-    cfg = ChatCompletionConfig(
-        name="qwen2.5:7b", max_iteration=10, max_tokens=32_000, max_output_tokens=4096
-    )
-    thinker = Text_to_Text_SO(
-        connection_string=CONNECTION_STRING,
-        system_prompt=f"You are a faithful assistant. You break the given tasks into sub-tasks and tackle them one at a time.\
-            You will be called iteratively up to {cfg.max_iteration} iterations, your generation of this iteration will be used as the input of the next iteration.\
-                Set completed as True if you have completed the task/prompt of the user. \
-                    Finally, take your time to process the request, don't have to hurry to answer at the first shot.\
-                        Good Luck!",
-        config=cfg,
-    )
-    iteration = 0
-    prompt = f"Iteration 0: {initial_prompt}"
-    progress: list[dict] = []
-    while iteration < cfg.max_iteration:
-        logger.info("Iteration [%d]...", iteration)
-        response = thinker.run(query=prompt, context=progress, format=Body)[0]
-        jbody = json.loads(response["content"])
-
-        with open("./progress.md", "a", encoding="utf-8") as writer:
-            writer.write(f'======= {iteration} =======\n{response["content"]}\n')
-
-        if "error" in jbody:
-            logger.info("Error in JSON Body.")
-            break
-
-        if len(progress) == 0:
-            progress.append({"role": "user", "content": initial_prompt})
-
-        progress.append({"role": "user", "content": prompt})
-        progress.append({"role": "assistant", "content": jbody["result"]})
-
-        if jbody["completed"]:
-            break
-
-        prompt = f'Iteration {iteration}: {jbody["next_task"]}'
-
-        logger.info("Progress: %s", prompt)
-        iteration += 1
-
-    llm = Text_to_Text(
-        connection_string=CONNECTION_STRING,
-        system_prompt="You are a faithful assistant",
-        config=cfg,
-    )
-    response = llm.run(query=initial_prompt, context=progress[1:])[0]
-    with open("./answers.md", "a", encoding="utf-8") as writer:
-        writer.write("======= Multi-Shot =======\n")
-        writer.write(response["content"])
-
-
-async def run_ollama_async():
-    cfg = ChatCompletionConfig(name="qwen2.5:7b")
+def run_ollama_ii(
+    llm: Image_to_Text_SO,
+    initial_prompt: str,
+    filepath: str | None,
+    response_mode: ResponseMode | None,
+    response_format: Type[T] | None,
+) -> None:
     try:
-        llm = Text_to_Text_SO(
-            connection_string=CONNECTION_STRING,
-            system_prompt="You are a faithful assistant",
-            config=cfg,
-        )
-        responses = await llm.run_async(
-            query="Why is the sky blue?", context=None, format=QnA
-        )
-        response = responses[0]
-        j = json.loads(response["content"])
-        print(j)
+        if response_mode and response_format:
+            response = llm.run(
+                query=initial_prompt,
+                context=None,
+                filepath=filepath,
+                mode=response_mode,
+                format=response_format,
+            )[0]
+        elif response_mode:
+            response = llm.run(
+                query=initial_prompt,
+                context=None,
+                filepath=filepath,
+                mode=response_mode,
+            )[0]
+        else:
+            response = llm.run(query=initial_prompt, context=None, filepath=filepath)[0]
+
+        with open(
+            f"{OUTPUT_DIRECTORY}/standard-output.md", "a", encoding="utf-8"
+        ) as writer:
+            writer.write("\n\n======= OLM II One-Shot =======\n")
+            if response_mode:
+                writer.write(f"{response_mode.value}\n")
+            else:
+                writer.write("Default\n")
+            writer.write(f"Prompt: {initial_prompt}\n")
+            writer.write(f'Response: {response["content"]}\n')
     except Exception as e:
         logger.error("Exception: %s", e)
 
 
-# SPROMPT = f"""
-# You are a helpful assistant.
+def run_openai(
+    llm: OAI_StructuredOutput_Core,
+    initial_prompt: str,
+    filepath: str | None,
+    response_mode: ResponseMode | None,
+    response_format: Type[T] | None,
+) -> None:
+    try:
+        if response_mode and response_format:
+            response = llm.run(
+                query=initial_prompt,
+                context=None,
+                filepath=filepath,
+                mode=response_mode,
+                format=response_format,
+            )[0]
+        elif response_mode:
+            response = llm.run(
+                query=initial_prompt,
+                context=None,
+                filepath=filepath,
+                mode=response_mode,
+            )[0]
+        else:
+            response = llm.run(query=initial_prompt, context=None, filepath=filepath)[0]
 
-# Response Schema:
-# {
-#     json.dumps(QnA.model_json_schema())
-# }
-
-# Note:
-# Alway response in JSON format without additional comments or explanation.
-# """
-
-# logger.info(SPROMPT)
-
-
-# def run_openai_json():
-#     logger.info(">> run-openai")
-#     messages = [
-#         {"role": "system", "content": SPROMPT},
-#         {
-#             "role": "user",
-#             "content": "Why is the sky blue?",
-#         },
-#     ]
-#     try:
-#         client = openai.OpenAI(api_key=os.environ["OPENAI_API_KEY"])
-#         response = client.chat.completions.create(
-#             model="gpt-4o-2024-08-06",
-#             messages=messages,
-#             tools=None,
-#             response_format={"type": "json_object"},
-#             stream=False,
-#         )
-#         logger.info(">> %s", response.choices)
-#         # j = json.loads(response.message.content)
-#         # logger.info("j = %s | %s", j, type(j).__name__)
-#     except Exception as e:
-#         logger.error("Exception: %s", e)
+        with open(
+            f"{OUTPUT_DIRECTORY}/standard-output.md", "a", encoding="utf-8"
+        ) as writer:
+            writer.write("\n\n======= OAI One-Shot =======\n")
+            if response_mode:
+                writer.write(f"{response_mode.value}\n")
+            else:
+                writer.write("Default\n")
+            writer.write(f"Prompt: {initial_prompt}\n")
+            writer.write(f'Response: {response["content"]}\n')
+    except Exception as e:
+        logger.error("Exception: %s", e)
 
 
-# def run_openai_so():
-#     logger.info(">> run-openai")
-#     messages: list[dict | MessageBlock] = [
-#         {"role": "system", "content": "You are a helpful assistant."},
-#         {
-#             "role": "user",
-#             "content": "I eat Laksa as breakfast.",
-#         },
-#     ]
-#     try:
-#         client = openai.OpenAI(api_key=os.environ["OPENAI_API_KEY"])
-#         response = client.beta.chat.completions.parse(
-#             model="gpt-4o-2024-08-06",
-#             messages=messages,
-#             response_format=QnA,
-#         )
-#         logger.info(">> %s", response)
-#         logger.info(response.choices[0].message.content)
-#         # j = json.loads(response.message.content)
-#         # logger.info("j = %s | %s", j, type(j).__name__)
-#     except Exception as e:
-#         logger.error("Exception: %s", e)
+SPROMPT = f"""
+You are a helpful assistant.
+
+Response Schema:
+{
+    json.dumps(QnA.model_json_schema())
+}
+
+Note:
+Alway response in JSON format without additional comments or explanation.
+"""
 
 
 if __name__ == "__main__":
     load_dotenv()
-    # asyncio.run(run_ollama_async())
-    prompt = "Write a blog post about physician-assisted suicide (euthanasia)."
-    run_ollama(initial_prompt=prompt)
-    execute_chain(initial_prompt=prompt)
-    # run_openai_json()
-    # run_openai_so()
+    SYS_PROMPT = "You are a faithful Assistant."
+    PROMPT = "Write a blog post about physician-assisted suicide (euthanasia)."
+    II_PROMPT = "Write a story based on the provided image."
+    FILEPATH = "./dev/classroom.jpg"
+
+    logger.info("Ollama")
+    # Run Ollama's models with `Structured Output`
+    OllamaCore.load_csv("./files/ollama.csv")
+    CONNECTION_STRING = "http://localhost:11434"
+
+    logger.info("Text Generation")
+    # Text Generation
+    cfg = ChatCompletionConfig(
+        name="llama3.2:3b", temperature=0.3, max_tokens=2048, max_output_tokens=1024
+    )
+    ## Structured Ouput
+    run_ollama(
+        llm=Text_to_Text_SO(
+            connection_string=CONNECTION_STRING,
+            system_prompt=SYS_PROMPT,
+            config=cfg,
+        ),
+        initial_prompt=PROMPT,
+        response_mode=ResponseMode.SO,
+        response_format=QnA,
+    )
+    ## JSON Mode
+    run_ollama(
+        llm=Text_to_Text_SO(
+            connection_string=CONNECTION_STRING,
+            system_prompt=SPROMPT,
+            config=cfg,
+        ),
+        initial_prompt=PROMPT,
+        response_mode=ResponseMode.JSON,
+        response_format=None,
+    )
+    ## Prompt Only
+    run_ollama(
+        llm=Text_to_Text_SO(
+            connection_string=CONNECTION_STRING,
+            system_prompt=SPROMPT,
+            config=cfg,
+        ),
+        initial_prompt=PROMPT,
+        response_mode=None,
+        response_format=None,
+    )
+
+    logger.info("Image Interpretation")
+    # Image Interpretation
+    # Make sure model supports image interpretation
+    iicfg = ChatCompletionConfig(
+        name="llava:7b",
+        temperature=0.3,
+        max_tokens=32_000,
+        max_output_tokens=2048,
+    )
+    ## Structured Ouput
+    run_ollama_ii(
+        llm=Image_to_Text_SO(
+            connection_string=CONNECTION_STRING,
+            system_prompt=SYS_PROMPT,
+            config=iicfg,
+        ),
+        initial_prompt=II_PROMPT,
+        filepath=FILEPATH,
+        response_mode=ResponseMode.SO,
+        response_format=QnA,
+    )
+    ## JSON Mode
+    run_ollama_ii(
+        llm=Image_to_Text_SO(
+            connection_string=CONNECTION_STRING,
+            system_prompt=SPROMPT,
+            config=iicfg,
+        ),
+        initial_prompt=II_PROMPT,
+        filepath=FILEPATH,
+        response_mode=ResponseMode.JSON,
+        response_format=None,
+    )
+    ## Prompt Only
+    run_ollama_ii(
+        llm=Image_to_Text_SO(
+            connection_string=CONNECTION_STRING,
+            system_prompt=SPROMPT,
+            config=iicfg,
+        ),
+        initial_prompt=II_PROMPT,
+        filepath=FILEPATH,
+        response_mode=None,
+        response_format=None,
+    )
+
+    logger.info("OpenAI")
+    # Run OpenAI's models with `Structured Output`
+    OpenAICore.load_csv(input_path="./files/openai.csv")
+
+    logger.info("Text Generation")
+    # Text Generation
+    cfg = ChatCompletionConfig(
+        name="gpt-4o", temperature=0.3, max_tokens=2048, max_output_tokens=1024
+    )
+    ## Structured Ouput
+    run_openai(
+        llm=OAI_StructuredOutput_Core(
+            system_prompt=SYS_PROMPT,
+            config=cfg,
+        ),
+        initial_prompt=PROMPT,
+        filepath=None,
+        response_mode=ResponseMode.SO,
+        response_format=QnA,
+    )
+    ## JSON Mode
+    run_openai(
+        llm=OAI_StructuredOutput_Core(
+            system_prompt=SPROMPT,
+            config=ChatCompletionConfig(
+                name="gpt-4o", temperature=0.3, max_tokens=2048, max_output_tokens=1024
+            ),
+        ),
+        initial_prompt=PROMPT,
+        filepath=None,
+        response_mode=ResponseMode.JSON,
+        response_format=None,
+    )
+    ## Prompt Only
+    run_openai(
+        llm=OAI_StructuredOutput_Core(
+            system_prompt=SPROMPT,
+            config=cfg,
+        ),
+        initial_prompt=PROMPT,
+        filepath=None,
+        response_mode=None,
+        response_format=None,
+    )
+
+    logger.info("Image Interpretation")
+    # Image Interpreter
+    iicfg = ChatCompletionConfig(
+        name="gpt-4o",
+        temperature=0.3,
+    )
+    ## Structured Outout
+    run_openai(
+        llm=OAI_StructuredOutput_Core(
+            system_prompt=SYS_PROMPT,
+            config=iicfg,
+        ),
+        initial_prompt=II_PROMPT,
+        filepath=FILEPATH,
+        response_mode=ResponseMode.SO,
+        response_format=QnA,
+    )
+    ## JSON Mode
+    run_openai(
+        llm=OAI_StructuredOutput_Core(
+            system_prompt=SPROMPT,
+            config=iicfg,
+        ),
+        initial_prompt=II_PROMPT,
+        filepath=FILEPATH,
+        response_mode=ResponseMode.JSON,
+        response_format=None,
+    )
+    ## Prompt Only
+    run_openai(
+        llm=OAI_StructuredOutput_Core(
+            system_prompt=SPROMPT,
+            config=iicfg,
+        ),
+        initial_prompt=II_PROMPT,
+        filepath=FILEPATH,
+        response_mode=None,
+        response_format=None,
+    )

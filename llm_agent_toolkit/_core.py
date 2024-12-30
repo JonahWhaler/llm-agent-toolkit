@@ -7,7 +7,7 @@ Assumptions:
 """
 
 from abc import abstractmethod, ABC
-
+from typing import Any
 from ._util import ChatCompletionConfig, MessageBlock
 from ._tool import Tool
 
@@ -125,15 +125,15 @@ class Core(ABC):
 
     @abstractmethod
     async def run_async(
-        self, query: str, context: list[MessageBlock | dict] | None, **kwargs
-    ) -> list[MessageBlock | dict]:
+        self, query: str, context: list[MessageBlock | dict[str, Any]] | None, **kwargs
+    ) -> list[MessageBlock | dict[str, Any]]:
         """Asynchronously run the LLM model with the given query and context."""
         raise NotImplementedError
 
     @abstractmethod
     def run(
-        self, query: str, context: list[MessageBlock | dict] | None, **kwargs
-    ) -> list[MessageBlock | dict]:
+        self, query: str, context: list[MessageBlock | dict[str, Any]] | None, **kwargs
+    ) -> list[MessageBlock | dict[str, Any]]:
         """Synchronously run the LLM model with the given query and context."""
         raise NotImplementedError
 
@@ -171,10 +171,10 @@ class ImageInterpreter(ABC):
     async def interpret_async(
         self,
         query: str,
-        context: list[MessageBlock | dict] | None,
+        context: list[MessageBlock | dict[str, Any]] | None,
         filepath: str,
         **kwargs,
-    ) -> list[MessageBlock | dict]:
+    ) -> list[MessageBlock | dict[str, Any]]:
         """Asynchronously run the LLM model to interpret the image in `filepath`.
 
         Use this method to explicitly express the intention to interpret an image.
@@ -185,10 +185,10 @@ class ImageInterpreter(ABC):
     def interpret(
         self,
         query: str,
-        context: list[MessageBlock | dict] | None,
+        context: list[MessageBlock | dict[str, Any]] | None,
         filepath: str,
         **kwargs,
-    ) -> list[MessageBlock | dict]:
+    ) -> list[MessageBlock | dict[str, Any]]:
         """Synchronously run the LLM model to interpret the image in `filepath`.
 
         Use this method to explicitly express the intention to interpret an image.

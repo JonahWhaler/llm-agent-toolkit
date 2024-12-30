@@ -6,7 +6,12 @@ from ._tool import (
     FunctionProperty,
     FunctionPropertyType,
 )
-from ._util import ChatCompletionConfig, TranscriptionConfig, ImageGenerationConfig
+from ._util import (
+    ChatCompletionConfig,
+    TranscriptionConfig,
+    ImageGenerationConfig,
+    ResponseMode,
+)
 from ._audio import AudioHelper
 from ._chunkers import Chunker, ChunkerMetrics, RandomInitializer, UniformInitializer
 from ._core import Core
@@ -44,6 +49,7 @@ __all__ = [
     "ChatCompletionConfig",
     "ImageGenerationConfig",
     "TranscriptionConfig",
+    "ResponseMode",
     "AudioHelper",
     "Chunker",
     "ChunkerMetrics",
