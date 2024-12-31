@@ -11,3 +11,4 @@ llama3.2:3b,131072,,TRUE,TRUE,TRUE,,,TRUE,,,
 llama3.2:1b,131072,2048,TRUE,TRUE,TRUE,,,TRUE,,,https://www.prompthub.us/resources/llm-model-card-directory
 llama3.2-vision:11b,131072,,TRUE,,TRUE,TRUE,,TRUE,,,
 mistral-nemo:latest,128000,4096,TRUE,TRUE,TRUE,,,TRUE,,,Context-length=1024000
+llama3.2-vision:latest,131072,,TRUE,,TRUE,TRUE,,TRUE,,,
