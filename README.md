@@ -14,6 +14,7 @@ For developers requiring full-range customization or access to the latest featur
 - [LLM Agent Toolkit: Modular Components for AI Workflows](#llm-agent-toolkit-modular-components-for-ai-workflows)
   - [Attention!!!](#attention)
 - [Table of Contents](#table-of-contents)
+- [Dependecies](#dependecies)
 - [Installation](#installation)
 - [Fundamental Components](#fundamental-components)
   - [Core:](#core)
@@ -24,6 +25,11 @@ For developers requiring full-range customization or access to the latest featur
   - [Chunkers:](#chunkers)
 - [Planned Feature](#planned-feature)
 - [License](#license)
+
+# Dependecies
+
+  * **Ollama:** v0.5.4
+  * **ffmpeg:** v4.4.2 (Ubuntu)
 
 # Installation
   `
