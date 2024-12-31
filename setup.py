@@ -22,8 +22,8 @@ setup(
     license="GPLv3",
     install_requires=[
         "python-dotenv==0.21.0",
-        "openai==1.51.2",
-        "ollama==0.4.1",
+        "openai==1.58.0",
+        "ollama==0.4.4",
         "tiktoken==0.8.0",
         "torch==2.5.1",
         "transformers==4.46.2",
