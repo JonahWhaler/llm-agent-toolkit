@@ -46,6 +46,12 @@ setup(
         "tool integration",
         "multi-modality interaction",
         "multi-step workflow",
+        "vision",
+        "tools",
+        "structured output",
+        "chunking",
+        "chromadb",
+        "faiss",
     ],
     classifiers=[
         "Development Status :: 1 - Planning",
