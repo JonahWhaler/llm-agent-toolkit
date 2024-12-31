@@ -110,7 +110,7 @@ class T2TSO_OLM_Core(Core, OllamaCore):
         MAX_OUTPUT_TOKENS = min(
             MAX_TOKENS, self.max_output_tokens, self.config.max_output_tokens
         )
-        prompt_token_count = self.calculate_token_count(msgs, None)
+        prompt_token_count = self.calculate_token_count(msgs, None, None)
         max_output_tokens = min(
             MAX_OUTPUT_TOKENS,
             self.context_length - prompt_token_count,
@@ -228,7 +228,7 @@ class T2TSO_OLM_Core(Core, OllamaCore):
         MAX_OUTPUT_TOKENS = min(
             MAX_TOKENS, self.max_output_tokens, self.config.max_output_tokens
         )
-        prompt_token_count = self.calculate_token_count(msgs, None)
+        prompt_token_count = self.calculate_token_count(msgs, None, None)
         max_output_tokens = min(
             MAX_OUTPUT_TOKENS,
             self.context_length - prompt_token_count,
