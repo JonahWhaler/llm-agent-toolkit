@@ -106,7 +106,7 @@ class PDFLoader(BaseLoader):
 
             # Extract text, links, and images using PyMuPDF
             with fitz.open(input_path) as doc:
-                for page_number, page in enumerate(doc, start=1):
+                for page_number, page in enumerate(doc, start=1):  # type: ignore
                     markdown_content.append(f"# Page {page_number}\n")
                     markdown_content.append(page.get_text())
 
@@ -134,7 +134,7 @@ class PDFLoader(BaseLoader):
 
             # Extract text, links, and images using PyMuPDF
             with fitz.open(input_path) as doc:
-                for page_number, page in enumerate(doc, start=1):
+                for page_number, page in enumerate(doc, start=1):  # type: ignore
                     markdown_content.append(f"# Page {page_number}\n")
                     markdown_content.append(page.get_text())
 
@@ -165,7 +165,10 @@ class PDFLoader(BaseLoader):
             responses: list[MessageBlock | dict] = self.__image_interpreter.interpret(
                 query=image_caption, context=None, filepath=tmp_path
             )
-            return responses[0]["content"]
+            response = responses[0]
+            if "content" in response:
+                return response["content"]
+            raise RuntimeError("content not found in MessageBlock.")
 
     async def extract_img_description_async(
         self, image_bytes: bytes, image_name: str
@@ -177,12 +180,15 @@ class PDFLoader(BaseLoader):
             f"filename={image_name}. This is an attachment found in a pdf file."
         )
         with self.temporary_file(image_bytes, image_name) as tmp_path:
-            responses: list[MessageBlock | dict] = (
-                await self.__image_interpreter.interpret_async(
-                    query=image_caption, context=None, filepath=tmp_path
-                )
+            responses: list[
+                MessageBlock | dict
+            ] = await self.__image_interpreter.interpret_async(
+                query=image_caption, context=None, filepath=tmp_path
             )
-            return responses[0]["content"]
+            response = responses[0]
+            if "content" in response:
+                return response["content"]
+            raise RuntimeError("content not found in MessageBlock.")
 
     @contextmanager
     def temporary_file(self, image_bytes: bytes, filename: str):

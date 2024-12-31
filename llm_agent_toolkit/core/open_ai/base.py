@@ -95,7 +95,7 @@ class OpenAICore:
             header = header.strip()
             columns = header.split(",")
             # Expect no columns is missing
-            diff = EXPECTED_COLUMNS - set(columns)
+            diff = EXPECTED_COLUMNS.difference(set(columns))
             if diff:
                 raise ValueError(f"Missing columns in {input_path}: {', '.join(diff)}")
             # Expect all columns are in exact order
@@ -150,7 +150,8 @@ class OpenAICore:
                     tmp = json.dumps(msg["content"])
                     token_count += len(encoding.encode(tmp))
             if "role" in msg and msg["role"] == CreatorRole.FUNCTION.value:
-                token_count += len(encoding.encode(msg["name"]))
+                if "name" in msg:
+                    token_count += len(encoding.encode(msg["name"]))
 
         if tools:
             for tool in tools:

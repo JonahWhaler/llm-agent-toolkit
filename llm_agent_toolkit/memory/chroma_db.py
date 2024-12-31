@@ -21,7 +21,7 @@ class ChromaMemory(VectorMemory):
 
     def __init__(
         self,
-        vdb: chromadb.ClientAPI,
+        vdb: chromadb.ClientAPI,  # type: ignore
         encoder: Encoder,
         chunker: Chunker,
         **kwargs,
@@ -30,15 +30,19 @@ class ChromaMemory(VectorMemory):
         self.__namespace = kwargs.get("namespace", "default")
         overwrite: bool = kwargs.get("overwrite", False)
 
-        assert isinstance(self.vdb, chromadb.ClientAPI)
+        assert isinstance(self.vdb, chromadb.ClientAPI)  # type: ignore
 
         if overwrite:
             try:
                 self.vdb.delete_collection(name=self.__namespace)
                 # delete_collection raises InvalidCollectionException
                 # if attempt to delete non-exists collection
-            except (chromadb.errors.InvalidCollectionException, ValueError):
-                pass  # self.__namespace is not found in the vector database
+            except Exception as e:
+                logger.info(
+                    "%s is not found in the vector database. Ignore %s.",
+                    self.__namespace,
+                    e,
+                )
             finally:
                 self.vdb.create_collection(
                     name=self.__namespace, metadata={"hnsw:space": "cosine"}
@@ -50,7 +54,7 @@ class ChromaMemory(VectorMemory):
             )
 
     def add(self, document_string: str, **kwargs):
-        assert isinstance(self.vdb, chromadb.ClientAPI)
+        assert isinstance(self.vdb, chromadb.ClientAPI)  # type: ignore
         collection = self.vdb.get_or_create_collection(name=self.__namespace)
         identifier = kwargs.get("identifier", str(uuid.uuid4()))
         metadata = kwargs.get("metadata", {})
@@ -73,7 +77,7 @@ class ChromaMemory(VectorMemory):
         )
 
     def query(self, query_string: str, **kwargs):
-        assert isinstance(self.vdb, chromadb.ClientAPI)
+        assert isinstance(self.vdb, chromadb.ClientAPI)  # type: ignore
         return_n = kwargs.get("return_n", 5)
         advance_filter = kwargs.get("advance_filter", None)
         output_types = kwargs.get(
@@ -90,15 +94,12 @@ class ChromaMemory(VectorMemory):
             query_embedding,
             **params,
         )
-        return {
-            "query": query_string,
-            "result": {
-                "ids": results["ids"][0],
-                "document": results["documents"][0],
-                "distance": results["distances"][0],
-                "metadata": results["metadatas"][0],
-            },
-        }
+        result: dict[str, list | None] = {"ids": results["ids"][0]}
+        for meta in output_types:
+            if meta in results and results[meta]:
+                result[meta] = results[meta][0]
+
+        return {"query": query_string, "result": result}
 
     def clear(self):
         self.vdb.delete_collection(name=self.__namespace)
@@ -134,14 +135,14 @@ def _query_(
     )
 
 
-def _delete_collection_(client: chromadb.ClientAPI, collection_name: str):
+def _delete_collection_(client: chromadb.ClientAPI, collection_name: str):  # type: ignore
     return client.delete_collection(name=collection_name)
 
 
 class AsyncChromaMemory(AsyncVectorMemory):
     def __init__(
         self,
-        vdb: chromadb.ClientAPI,
+        vdb: chromadb.ClientAPI,  # type: ignore
         encoder: Encoder,
         chunker: Chunker,
         max_workers: int = 4,
@@ -154,14 +155,18 @@ class AsyncChromaMemory(AsyncVectorMemory):
         self.init()
 
     def init(self) -> None:
-        assert isinstance(self.vdb, chromadb.ClientAPI)
+        assert isinstance(self.vdb, chromadb.ClientAPI)  # type: ignore
         if self.__overwrite:
             try:
                 self.vdb.delete_collection(name=self.__namespace)
                 # delete_collection raises InvalidCollectionException
                 # if attempt to delete non-exists collection
-            except (chromadb.errors.InvalidCollectionException, ValueError):
-                pass  # self.__namespace is not found in the vector database
+            except Exception as e:
+                logger.info(
+                    "%s is not found in the vector database. Ignore %s.",
+                    self.__namespace,
+                    e,
+                )
             finally:
                 self.vdb.create_collection(
                     name=self.__namespace, metadata={"hnsw:space": "cosine"}
@@ -173,7 +178,7 @@ class AsyncChromaMemory(AsyncVectorMemory):
             )
 
     async def add(self, document_string: str, **kwargs) -> None:
-        assert isinstance(self.vdb, chromadb.ClientAPI)
+        assert isinstance(self.vdb, chromadb.ClientAPI)  # type: ignore
         collection = self.vdb.get_or_create_collection(name=self.__namespace)
         identifier = kwargs.get("identifier", str(uuid.uuid4()))
         metadata = kwargs.get("metadata", {})
@@ -207,7 +212,7 @@ class AsyncChromaMemory(AsyncVectorMemory):
             raise
 
     async def query(self, query_string, **kwargs):
-        assert isinstance(self.vdb, chromadb.ClientAPI)
+        assert isinstance(self.vdb, chromadb.ClientAPI)  # type: ignore
         return_n = kwargs.get("return_n", 5)
         advance_filter = kwargs.get("advance_filter", None)
         output_types = kwargs.get(
@@ -227,19 +232,16 @@ class AsyncChromaMemory(AsyncVectorMemory):
             output_types,
         )
 
-        return {
-            "query": query_string,
-            "result": {
-                "ids": results["ids"][0],
-                "document": results["documents"][0],
-                "distance": results["distances"][0],
-                "metadata": results["metadatas"][0],
-            },
-        }
+        result: dict[str, list | None] = {"ids": results["ids"][0]}
+        for meta in output_types:
+            if meta in results and results[meta]:
+                result[meta] = results[meta][0]
+
+        return {"query": query_string, "result": result}
 
     async def clear(self):
-        assert isinstance(self.vdb, chromadb.AsyncClientAPI)
+        assert isinstance(self.vdb, chromadb.AsyncClientAPI)  # type: ignore
         loop = asyncio.get_running_loop()
         await loop.run_in_executor(
             self.__executor, _delete_collection_, self.vdb, self.__namespace
-        )
+        )  # type: ignore

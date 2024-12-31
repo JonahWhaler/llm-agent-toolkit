@@ -14,6 +14,7 @@ For developers requiring full-range customization or access to the latest featur
 - [LLM Agent Toolkit: Modular Components for AI Workflows](#llm-agent-toolkit-modular-components-for-ai-workflows)
   - [Attention!!!](#attention)
 - [Table of Contents](#table-of-contents)
+- [Dependecies](#dependecies)
 - [Installation](#installation)
 - [Fundamental Components](#fundamental-components)
   - [Core:](#core)
@@ -24,6 +25,11 @@ For developers requiring full-range customization or access to the latest featur
   - [Chunkers:](#chunkers)
 - [Planned Feature](#planned-feature)
 - [License](#license)
+
+# Dependecies
+
+  * **Ollama:** v0.5.4
+  * **ffmpeg:** v4.4.2 (Ubuntu)
 
 # Installation
   `
@@ -41,7 +47,8 @@ A stateless chat completion interface to interact with the LLM.
 * Supports Text-to-Text and Image-to-Text.
 * Enables iterative executions for multi-step workflows.
 * Facilitates tool invocation as part of the workflow.
-* Support models from OpenAI and Ollama
+* Support models from OpenAI and Ollama.
+* Support `Structured Output`.
 
 ## Encoder:
 A standardized wrapper for embedding models.

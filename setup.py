@@ -5,7 +5,7 @@ DESCRIPTION = "LLM Agent Toolkit provides minimal, modular interfaces for core c
 # python3 setup.py sdist bdist_wheel
 # twine upload --skip-existing dist/* --verbose
 
-VERSION = "0.0.20"
+VERSION = "0.0.22"
 
 with open("./README.md", "r", encoding="utf-8") as f:
     long_description = f.read()
@@ -22,8 +22,8 @@ setup(
     license="GPLv3",
     install_requires=[
         "python-dotenv==0.21.0",
-        "openai==1.51.2",
-        "ollama==0.4.1",
+        "openai==1.58.0",
+        "ollama==0.4.4",
         "tiktoken==0.8.0",
         "torch==2.5.1",
         "transformers==4.46.2",
@@ -46,6 +46,12 @@ setup(
         "tool integration",
         "multi-modality interaction",
         "multi-step workflow",
+        "vision",
+        "tools",
+        "structured output",
+        "chunking",
+        "chromadb",
+        "faiss",
     ],
     classifiers=[
         "Development Status :: 1 - Planning",

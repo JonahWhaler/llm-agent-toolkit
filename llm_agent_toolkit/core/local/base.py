@@ -127,7 +127,7 @@ class OllamaCore:
             header = header.strip()
             columns = header.split(",")
             # Expect no columns is missing
-            diff = EXPECTED_COLUMNS - set(columns)
+            diff = EXPECTED_COLUMNS.difference(set(columns))
             if diff:
                 raise ValueError(f"Missing columns in {input_path}: {', '.join(diff)}")
             # Expect all columns are in exact order
@@ -180,7 +180,8 @@ class OllamaCore:
             if "content" in msg and msg["content"]:
                 character_count += len(msg["content"])
             if "role" in msg and msg["role"] == CreatorRole.TOOL.value:
-                character_count += len(msg["name"])
+                if "name" in msg:
+                    character_count += len(msg["name"])
 
         if tools:
             for tool in tools:

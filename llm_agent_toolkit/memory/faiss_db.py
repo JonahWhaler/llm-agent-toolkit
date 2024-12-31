@@ -9,8 +9,6 @@ from typing import Any
 import faiss  # type: ignore
 import numpy as np
 
-from llm_agent_toolkit._chunkers import Chunker
-
 from ._storage import SQLite3_Storage
 from .._encoder import Encoder
 from .._memory import VectorMemory
@@ -20,8 +18,8 @@ logger = logging.getLogger(__name__)
 
 
 class LoadStrategy(Enum):
-    LAZY: str = "Lazy"
-    EAGER: str = "Eager"
+    LAZY = "Lazy"
+    EAGER = "Eager"
 
 
 class FaissDB(ABC):
@@ -190,7 +188,7 @@ class FaissIFL2DB(FaissDB):
                 )
                 # Add to Faiss
                 np_embedding = np.expand_dims(np.array(e, dtype=np.float32), axis=0)
-                index.add(np_embedding)
+                index.add(np_embedding)  # type: ignore
                 inserted = True
                 track.append(counter)
             except AssertionError as a_e:
@@ -267,7 +265,7 @@ class FaissIFL2DB(FaissDB):
             np_query_embedding = np.array(query_embedding, dtype=np.float32)
             np_query_embedding = np.expand_dims(np_query_embedding, axis=0)
             assert np_query_embedding.shape == (1, self.__dimension)
-            distances, indices = index.search(np_query_embedding, k=return_n)
+            distances, indices = index.search(np_query_embedding, k=return_n)  # type: ignore
             distances = distances[0]
             indices = indices[0]
             # Post Processing
@@ -357,6 +355,8 @@ class FaissIFL2DB(FaissDB):
         # Iterate over the original db
         for key in sqlite.keys():
             value_dict = sqlite.get(key=key)
+            if value_dict is None:
+                raise RuntimeError("value_dict is None")
             # Skip the deleted
             if "is_deleted" in value_dict and value_dict["is_deleted"] is True:
                 continue
@@ -366,7 +366,7 @@ class FaissIFL2DB(FaissDB):
             _embedding = np.array(encoder.encode(value_dict["document"]))
             _embedding = np.expand_dims(_embedding, axis=0)
             # pylint: disable = no-value-for-parameter
-            tmp_index.add(_embedding.astype(np.float32))
+            tmp_index.add(_embedding.astype(np.float32))  # type: ignore
             counter += 1
         os.replace(tmp_sqlite_path, self.db_path)
         if self.load_strategy == LoadStrategy.EAGER:
@@ -539,7 +539,7 @@ class FaissHNSWDB(FaissDB):
                     },
                 )
                 # Add to Faiss
-                index.add(np.expand_dims(np.array(e, dtype=np.float32), axis=0))
+                index.add(np.expand_dims(np.array(e, dtype=np.float32), axis=0))  # type: ignore
                 inserted = True
                 track.append(counter)
             except AssertionError as a_e:
@@ -617,7 +617,7 @@ class FaissHNSWDB(FaissDB):
                 np.array(query_embedding, dtype=np.float32), axis=0
             )
             assert np_query_embedding.shape == (1, self.__dimension)
-            distances, indices = index.search(np_query_embedding, k=return_n)
+            distances, indices = index.search(np_query_embedding, k=return_n)  # type: ignore
             distances = distances[0]
             indices = indices[0]
             # Post Processing
@@ -707,6 +707,8 @@ class FaissHNSWDB(FaissDB):
         # Iterate over the original db
         for key in sqlite.keys():
             value_dict = sqlite.get(key=key)
+            if value_dict is None:
+                raise RuntimeError("value_dict is None")
             # Skip the deleted
             if "is_deleted" in value_dict and value_dict["is_deleted"] is True:
                 continue
@@ -718,7 +720,7 @@ class FaissHNSWDB(FaissDB):
             )
             _embedding = np.expand_dims(_embedding, axis=0)
             # pylint: disable = no-value-for-parameter
-            tmp_index.add(_embedding.astype(np.float32))
+            tmp_index.add(_embedding.astype(np.float32))  # type: ignore
             counter += 1
         os.replace(tmp_sqlite_path, self.db_path)
         if self.load_strategy == LoadStrategy.EAGER:
@@ -787,14 +789,14 @@ class FaissMemory(VectorMemory):
                 documents=document_chunks,
                 metadatas=metas,
                 ids=ids,
-                embeddings=[self.encoder.encode(document_chunks)],
+                embeddings=[self.encoder.encode(chunk) for chunk in document_chunks],
             )
         else:
             self.vdb.add(
                 documents=document_chunks,
                 metadatas=None,
                 ids=[f"{identifier}-{i}" for i in range(len(document_chunks))],
-                embeddings=[self.encoder.encode(document_chunks)],
+                embeddings=[self.encoder.encode(chunk) for chunk in document_chunks],
             )
 
     def query(self, query_string: str, **kwargs):

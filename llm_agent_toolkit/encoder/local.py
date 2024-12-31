@@ -146,7 +146,7 @@ class TransformerEncoder(Encoder):
                 padding=False,
                 add_special_tokens=True,
             )
-            token_count = len(tokens["input_ids"][0])
+            token_count = len(tokens["input_ids"][0])  # type: ignore
             model = AutoModel.from_pretrained(self.model_name)
             return self.__to_embedding(model, tokens), token_count
         except Exception as e:
@@ -209,7 +209,7 @@ class TransformerEncoder(Encoder):
                 padding=False,
                 add_special_tokens=True,
             )
-            token_count = len(tokens["input_ids"][0])
+            token_count = len(tokens["input_ids"][0])  # type: ignore
             model = AutoModel.from_pretrained(self.model_name)
             return self.__to_embedding(model, tokens), token_count
         except Exception as e:
