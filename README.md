@@ -41,7 +41,8 @@ A stateless chat completion interface to interact with the LLM.
 * Supports Text-to-Text and Image-to-Text.
 * Enables iterative executions for multi-step workflows.
 * Facilitates tool invocation as part of the workflow.
-* Support models from OpenAI and Ollama
+* Support models from OpenAI and Ollama.
+* Support `Structured Output`.
 
 ## Encoder:
 A standardized wrapper for embedding models.
