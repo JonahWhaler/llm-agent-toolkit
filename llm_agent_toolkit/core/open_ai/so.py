@@ -120,24 +120,43 @@ class OAI_StructuredOutput_Core(Core, OpenAICore, ImageInterpreter):
 
         if context:
             msgs.extend(context)
-        msgs.append({"role": CreatorRole.USER.value, "content": query})
 
         filepath: str | None = kwargs.get("filepath", None)
         if filepath:
-            img_url = self.get_image_url(filepath)
+            # detail hardcode as "high"
+            resized, newpath = self.resize(filepath, "high")
+            if resized and newpath:
+                img_url = self.get_image_url(newpath)
+                os.remove(newpath)
+            else:
+                img_url = self.get_image_url(filepath)
+
             msgs.append(
                 {
                     "role": CreatorRole.USER.value,
-                    "content": [{"type": "image_url", "image_url": {"url": img_url}}],  # type: ignore
+                    "content": [
+                        {"type": "text", "text": query},
+                        {
+                            "type": "image_url",
+                            "image_url": {"url": img_url, "detail": "high"},
+                        },
+                    ],  # type: ignore
                 }
             )
+        else:
+            msgs.append(MessageBlock(role=CreatorRole.USER.value, content=query))
 
         # Determine the maximum number of tokens allowed for the response
         MAX_TOKENS = min(self.config.max_tokens, self.context_length)
         MAX_OUTPUT_TOKENS = min(
             MAX_TOKENS, self.max_output_tokens, self.config.max_output_tokens
         )
-        prompt_token_count = self.calculate_token_count(msgs, None)
+        prompt_token_count = self.calculate_token_count(
+            msgs,
+            None,
+            images=[filepath] if filepath else None,
+            image_detail="high" if filepath else None,
+        )
         max_output_tokens = min(
             MAX_OUTPUT_TOKENS,
             self.context_length - prompt_token_count,
@@ -247,24 +266,43 @@ class OAI_StructuredOutput_Core(Core, OpenAICore, ImageInterpreter):
 
         if context:
             msgs.extend(context)
-        msgs.append({"role": CreatorRole.USER.value, "content": query})
 
         filepath: str | None = kwargs.get("filepath", None)
         if filepath:
-            img_url = self.get_image_url(filepath)
+            # detail hardcode as "high"
+            resized, newpath = self.resize(filepath, "high")
+            if resized and newpath:
+                img_url = self.get_image_url(newpath)
+                os.remove(newpath)
+            else:
+                img_url = self.get_image_url(filepath)
+
             msgs.append(
                 {
                     "role": CreatorRole.USER.value,
-                    "content": [{"type": "image_url", "image_url": {"url": img_url}}],  # type: ignore
+                    "content": [
+                        {"type": "text", "text": query},
+                        {
+                            "type": "image_url",
+                            "image_url": {"url": img_url, "detail": "high"},
+                        },
+                    ],  # type: ignore
                 }
             )
+        else:
+            msgs.append(MessageBlock(role=CreatorRole.USER.value, content=query))
 
         # Determine the maximum number of tokens allowed for the response
         MAX_TOKENS = min(self.config.max_tokens, self.context_length)
         MAX_OUTPUT_TOKENS = min(
             MAX_TOKENS, self.max_output_tokens, self.config.max_output_tokens
         )
-        prompt_token_count = self.calculate_token_count(msgs, None)
+        prompt_token_count = self.calculate_token_count(
+            msgs,
+            None,
+            images=[filepath] if filepath else None,
+            image_detail="high" if filepath else None,
+        )
         max_output_tokens = min(
             MAX_OUTPUT_TOKENS,
             self.context_length - prompt_token_count,

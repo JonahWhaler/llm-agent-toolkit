@@ -5,7 +5,7 @@ Please do not take this as tests.
 
 import asyncio
 import logging
-
+from llm_agent_toolkit.core.local import OllamaCore
 
 logging.basicConfig(
     filename="./snippet/output/example-ollama.log",
@@ -323,4 +323,5 @@ def try_ollama_examples():
 
 
 if __name__ == "__main__":
+    OllamaCore.load_csv("./files/ollama.csv")
     try_ollama_examples()

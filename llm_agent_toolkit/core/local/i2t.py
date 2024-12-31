@@ -97,7 +97,9 @@ class I2T_OLM_Core(Core, OllamaCore, ImageInterpreter):  # , ToolSupport
         MAX_OUTPUT_TOKENS = min(
             MAX_TOKENS, self.max_output_tokens, self.config.max_output_tokens
         )
-        prompt_token_count = self.calculate_token_count(msgs, None)
+        prompt_token_count = self.calculate_token_count(
+            msgs, None, images=[filepath] if filepath else None
+        )
         max_output_tokens = min(
             MAX_OUTPUT_TOKENS,
             self.context_length - prompt_token_count,
@@ -122,6 +124,11 @@ class I2T_OLM_Core(Core, OllamaCore, ImageInterpreter):  # , ToolSupport
                     role=CreatorRole.ASSISTANT.value,
                     content=llm_generated_content,
                 )
+            )
+            logger.info(
+                ">>>> Actual Consumption: %d + %d",
+                response["prompt_eval_count"],
+                response["eval_count"],
             )
 
             return msgs[NUMBER_OF_PRIMERS:]  # Return only the generated messages
@@ -172,7 +179,9 @@ class I2T_OLM_Core(Core, OllamaCore, ImageInterpreter):  # , ToolSupport
         MAX_OUTPUT_TOKENS = min(
             MAX_TOKENS, self.max_output_tokens, self.config.max_output_tokens
         )
-        prompt_token_count = self.calculate_token_count(msgs, None)
+        prompt_token_count = self.calculate_token_count(
+            msgs, None, images=[filepath] if filepath else None
+        )
         max_output_tokens = min(
             MAX_OUTPUT_TOKENS,
             self.context_length - prompt_token_count,
@@ -197,6 +206,12 @@ class I2T_OLM_Core(Core, OllamaCore, ImageInterpreter):  # , ToolSupport
                     role=CreatorRole.ASSISTANT.value,
                     content=llm_generated_content,
                 )
+            )
+
+            logger.info(
+                ">>>> Actual Consumption: %d + %d",
+                response["prompt_eval_count"],
+                response["eval_count"],
             )
 
             return msgs[NUMBER_OF_PRIMERS:]  # Return only the generated messages

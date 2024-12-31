@@ -92,7 +92,9 @@ class T2T_OAI_Core(Core, OpenAICore, ToolSupport):
         MAX_OUTPUT_TOKENS = min(
             MAX_TOKENS, self.max_output_tokens, self.config.max_output_tokens
         )
-        prompt_token_count = self.calculate_token_count(msgs, tools_metadata)
+        prompt_token_count = self.calculate_token_count(
+            msgs, tools_metadata, None, None
+        )
         max_output_tokens = min(
             MAX_OUTPUT_TOKENS,
             self.context_length - prompt_token_count,
@@ -133,7 +135,9 @@ class T2T_OAI_Core(Core, OpenAICore, ToolSupport):
                     msgs.extend(output)
 
                 solved = tool_calls is None
-                prompt_token_count = self.calculate_token_count(msgs, tools_metadata)
+                prompt_token_count = self.calculate_token_count(
+                    msgs, tools_metadata, None, None
+                )
                 max_output_tokens = min(
                     MAX_OUTPUT_TOKENS,
                     self.context_length - prompt_token_count,
@@ -208,7 +212,9 @@ class T2T_OAI_Core(Core, OpenAICore, ToolSupport):
         MAX_OUTPUT_TOKENS = min(
             MAX_TOKENS, self.max_output_tokens, self.config.max_output_tokens
         )
-        prompt_token_count = self.calculate_token_count(msgs, tools_metadata)
+        prompt_token_count = self.calculate_token_count(
+            msgs, tools_metadata, None, None
+        )
         max_output_tokens = min(
             MAX_OUTPUT_TOKENS,
             self.context_length - prompt_token_count,
@@ -249,7 +255,9 @@ class T2T_OAI_Core(Core, OpenAICore, ToolSupport):
                     msgs.extend(output)
 
                 solved = tool_calls is None
-                prompt_token_count = self.calculate_token_count(msgs, tools_metadata)
+                prompt_token_count = self.calculate_token_count(
+                    msgs, tools_metadata, None, None
+                )
                 max_output_tokens = min(
                     MAX_OUTPUT_TOKENS,
                     self.context_length - prompt_token_count,
