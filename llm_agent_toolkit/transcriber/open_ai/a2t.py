@@ -1,11 +1,11 @@
 import os
 import io
 import logging
+from typing import Any
 import openai
 
-from ..._special_core import Transcriber
-from ..._util import TranscriptionConfig, MessageBlock, CreatorRole
-from ..._audio import AudioHelper
+from ..base import Transcriber, TranscriptionConfig, AudioHelper
+from ..._util import MessageBlock, CreatorRole
 
 logger = logging.getLogger(__name__)
 
@@ -16,9 +16,9 @@ class OpenAITranscriber(Transcriber):
     It facilitates synchronous and asynchronous communication with OpenAI's API to transcribe audio files.
 
     Methods:
-    - transcribe(query: str, context: list[MessageBlock | dict] | None, filepath: str, tmp_directory: str, **kwargs) -> list[MessageBlock | dict]:
+    - transcribe(query: str, context: list[MessageBlock | dict[str, Any]] | None, filepath: str, tmp_directory: str, **kwargs) -> list[MessageBlock | dict]:
         Synchronously create transcript from the given audio file.
-    - transcribe_async(query: str, context: list[MessageBlock | dict] | None, filepath: str, tmp_directory: str, **kwargs) -> list[MessageBlock | dict]:
+    - transcribe_async(query: str, context: list[MessageBlock | dict[str, Any]] | None, filepath: str, tmp_directory: str, **kwargs) -> list[MessageBlock | dict]:
         Asynchronously create transcript from the given audio file.
 
     Notes:
@@ -49,7 +49,7 @@ class OpenAITranscriber(Transcriber):
 
     async def transcribe_async(
         self, prompt: str, filepath: str, tmp_directory: str, **kwargs
-    ) -> list[MessageBlock | dict]:
+    ) -> list[MessageBlock | dict[str, Any]]:
         """Asynchronously run the LLM model to create a transcript from the audio in `filepath`.
         Use this method to explicitly express the intention to create transcript.
 
@@ -98,7 +98,7 @@ class OpenAITranscriber(Transcriber):
 
     def transcribe(
         self, prompt: str, filepath: str, tmp_directory: str, **kwargs
-    ) -> list[MessageBlock | dict]:
+    ) -> list[MessageBlock | dict[str, Any]]:
         """Synchronously run the LLM model to create a transcript from the audio in `filepath`.
         Use this method to explicitly express the intention to create transcript.
 

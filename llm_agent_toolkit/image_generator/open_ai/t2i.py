@@ -5,8 +5,7 @@ import time
 
 import openai
 
-from ..._special_core import ImageGenerator
-from ..._util import ImageGenerationConfig
+from ..base import ImageGenerator, ImageGenerationConfig
 
 logger = logging.getLogger(__name__)
 
