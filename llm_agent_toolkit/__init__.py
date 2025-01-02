@@ -8,17 +8,14 @@ from ._tool import (
 )
 from ._util import (
     ChatCompletionConfig,
-    TranscriptionConfig,
-    ImageGenerationConfig,
     ResponseMode,
 )
-from ._audio import AudioHelper
+
 from ._chunkers import Chunker, ChunkerMetrics, RandomInitializer, UniformInitializer
 from ._core import Core
 from ._memory import VectorMemory
 from ._encoder import Encoder
 from ._loader import BaseLoader
-from ._special_core import Transcriber, ImageGenerator
 from . import (
     core,
     tool,
@@ -26,7 +23,6 @@ from . import (
     encoder,
     memory,
     chunkers,
-    transcriber,
     image_generator,
 )
 
@@ -36,10 +32,6 @@ __all__ = [
     "loader",
     "encoder",
     "memory",
-    "transcriber",
-    "Transcriber",
-    "image_generator",
-    "ImageGenerator",
     "Tool",
     "FunctionInfo",
     "FunctionInfoDict",
@@ -47,10 +39,7 @@ __all__ = [
     "FunctionProperty",
     "FunctionPropertyType",
     "ChatCompletionConfig",
-    "ImageGenerationConfig",
-    "TranscriptionConfig",
     "ResponseMode",
-    "AudioHelper",
     "Chunker",
     "ChunkerMetrics",
     "RandomInitializer",
@@ -60,4 +49,13 @@ __all__ = [
     "Encoder",
     "VectorMemory",
     "BaseLoader",
+    "image_generator",
 ]
+
+# transcriber
+try:
+    from . import transcriber
+
+    __all__.extend(["transcriber"])
+except:
+    pass

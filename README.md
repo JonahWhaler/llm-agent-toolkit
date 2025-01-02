@@ -29,12 +29,23 @@ For developers requiring full-range customization or access to the latest featur
 # Dependecies
 
   * **Ollama:** v0.5.4
-  * **ffmpeg:** v4.4.2 (Ubuntu)
 
 # Installation
-  `
+  ```bash
+  # Text Generation + Image Generation
   pip install llm-agent-toolkit
-  `
+
+  # transform text to embedding through transformers's API
+  pip install llm-agent-toolkit["transformer"] 
+  
+  # transform audio to text, only works on Ubuntu
+  sudo apt install ffmpeg
+  pip install llm-agent-toolkit["transcriber"]
+
+  # entire package
+  sudo apt install ffmpeg
+  pip install llm-agent-toolkit["all"] # entire package
+  ```
 
 # Fundamental Components
 ## Core: 
@@ -49,6 +60,168 @@ A stateless chat completion interface to interact with the LLM.
 * Facilitates tool invocation as part of the workflow.
 * Support models from OpenAI and Ollama.
 * Support `Structured Output`.
+
+### Example - Ollama
+```python
+from typing import Any
+from llm_agent_toolkit import ChatCompletionConfig
+from llm_agent_toolkit.core.local import Text_to_Text
+
+CONNECTION_STRING = "http://localhost:11434"
+SYSTEM_PROMPT = "You are a faithful assistant."
+PROMPT = "Why is the sky blue?"
+
+config = ChatCompletionConfig(
+  name="qwen2.5:7b", temperature=0.7
+)
+llm = Text_to_Text(
+  connection_string=CONNECTION_STRING,
+  system_prompt=SYSTEM_PROMPT,
+  config=config,
+  tools=None
+)
+responses: list[dict[str, Any]] = llm.run(query=PROMPT, context=None)
+for response in responses:
+    print(response["content"])
+
+```
+
+### Example - OpenAI
+```python
+from typing import Any
+from llm_agent_toolkit import ChatCompletionConfig
+from llm_agent_toolkit.core.open_ai import Text_to_Text
+
+SYSTEM_PROMPT = "You are a faithful assistant."
+PROMPT = "Why is the sky blue?"
+
+config = ChatCompletionConfig(
+  name="gpt-4o-mini", temperature=0.7
+)
+llm = Text_to_Text(
+  system_prompt=SYSTEM_PROMPT,
+  config=config,
+  tools=None
+)
+responses: list[dict[str, Any]] = llm.run(query=PROMPT, context=None)
+for response in responses:
+    print(response["content"])
+```
+
+### Example - Tools
+```python
+from typing import Any
+from llm_agent_toolkit import ChatCompletionConfig
+from llm_agent_toolkit.core.local import Text_to_Text
+# This example is also compatible with llm_agent_toolkit.core.open_ai.Text_to_Text
+from llm_agent_toolkit.tool import LazyTool
+
+def adder(a: int, b: int) -> int:
+    """Add a with b.
+
+    Args:
+        a (int): The first number.
+        b (int): The second number.
+
+    Returns:
+        int: Results
+    """
+    return a + b
+
+
+async def divider(a: int, b: int) -> float:
+    """Divide a by b.
+
+    Args:
+        a (int): The first number.
+        b (int): The second number.
+
+    Returns:
+        float: Results
+
+    Raises:
+        ValueError: When b is 0
+    """
+    if b == 0:
+        raise ValueError("Division by zero.")
+    return a / b
+
+
+CONNECTION_STRING = "http://localhost:11434"
+SYSTEM_PROMPT = "You are a faithful assistant."
+PROMPT = "10 + 5 / 5 = ?"
+
+add_tool = LazyTool(adder, is_coroutine_function=False)
+div_tool = LazyTool(divider, is_coroutine_function=True)
+
+llm = Text_to_Text(
+    connection_string=CONNECTION_STRING,
+    system_prompt=SYSTEM_PROMPT,
+    config=config,
+    tools=[add_tool, div_tool],
+)
+
+responses: list[dict[str, Any]] = llm.run(query=PROMPT, context=None)
+for response in responses:
+    print(response["content"])
+```
+
+### Example - Structured Output
+```python
+from pydantic import BaseModel
+
+from llm_agent_toolkit import ChatCompletionConfig, ResponseMode
+from llm_agent_toolkit.core.local import Text_to_Text_SO
+# Other Core that support Structured Output
+### * llm_agent_toolkit.core.local.Image_to_Text_SO
+### * llm_agent_toolkit.core.open_ai.OAI_StructuredOutput_Core
+
+# These `Core` does not support `Tool` and multi iteration execution.
+# If desired, caller can call `llm.run` iteratively with progressively updated `context`.
+# File example-chain.py shows steps to achieve chained execution.
+
+# Define the Schema through pydantic BaseModel
+class QnA(BaseModel):
+    question: str
+    answer: str
+
+
+CONNECTION_STRING = "http://localhost:11434"
+SYS_PROMPT = "You are a faithful Assistant."
+PROMPT = "Write a blog post about physician-assisted suicide (euthanasia)."
+CONFIG = ChatCompletionConfig(
+    name="llama3.2:3b", temperature=0.3, max_tokens=2048, max_output_tokens=1024
+)
+# Structured Output via Pydantic BaseModel
+llm = Text_to_Text_SO(
+    connection_string=CONNECTION_STRING, system_prompt=SYS_PROMPT, config=CONFIG,
+)
+response_1 = llm.run(
+    query=PROMPT, context=None, mode=ResponseMode.SO, format=QnA,
+)[0]
+
+# Structured Output via JSON Mode
+### It's essential to mention the expected JSON structure in the prompt 
+### and highlight it to return in JSON format.
+SPROMPT = f"""
+You are a helpful assistant.
+
+Response Schema:
+{
+    json.dumps(QnA.model_json_schema())
+}
+
+Note:
+Always response in JSON format without additional comments or explanation.
+"""
+
+llm = Text_to_Text_SO(
+    connection_string=CONNECTION_STRING, system_prompt=SPROMPT, config=CONFIG,
+)
+response_2 = llm.run(
+    query=PROMPT, context=None, mode=ResponseMode.JSON
+)
+```
 
 ## Encoder:
 A standardized wrapper for embedding models.

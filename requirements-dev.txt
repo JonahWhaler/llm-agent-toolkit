@@ -1,4 +1,4 @@
-# This file outlines the dependencies needed to execute the core components.
+# This file outlines all dependencies needed to execute the entire package.
 wheel==0.45.1
 twine==5.1.1
 python-dotenv==0.21.0
@@ -6,10 +6,19 @@ python-dotenv==0.21.0
 openai==1.58.0
 ollama==0.4.4
 tiktoken==0.8.0
+torch==2.5.1
+transformers==4.46.2
 # Vector DB
 chromadb==0.5.11
 faiss-cpu==1.9.0.post1
+# Agent-Specific
+# duckduckgo_search==6.3.3
+# beautifulsoup4==4.12.2
 aiohttp==3.10.11
+# Audio
+pydub==0.25.1
+pydub-stubs==0.25.1.4
+ffmpeg-python==0.2.0
 # PDF
 pdfplumber==0.11.4
 PyMuPDF==1.24.11
