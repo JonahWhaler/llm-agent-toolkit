@@ -1,6 +1,6 @@
 from enum import Enum
 from typing import TypedDict
-from pydantic import BaseModel, field_validator, ValidationError, model_validator
+from pydantic import BaseModel, field_validator, ValidationError
 
 
 class ModelConfig(BaseModel):

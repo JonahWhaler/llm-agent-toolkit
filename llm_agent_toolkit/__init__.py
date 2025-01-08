@@ -9,11 +9,13 @@ from ._tool import (
 from ._util import (
     ChatCompletionConfig,
     ResponseMode,
+    CreatorRole,
+    MessageBlock,
 )
 
 from ._chunkers import Chunker, ChunkerMetrics, RandomInitializer, UniformInitializer
-from ._core import Core
-from ._memory import VectorMemory
+from ._core import Core, ToolSupport, ImageInterpreter
+from ._memory import VectorMemory, ShortTermMemory, AsyncVectorMemory
 from ._encoder import Encoder
 from ._loader import BaseLoader
 from . import (
@@ -40,14 +42,20 @@ __all__ = [
     "FunctionPropertyType",
     "ChatCompletionConfig",
     "ResponseMode",
+    "CreatorRole",
+    "MessageBlock",
     "Chunker",
     "ChunkerMetrics",
     "RandomInitializer",
     "UniformInitializer",
     "chunkers",
     "Core",
+    "ToolSupport",
+    "ImageInterpreter",
     "Encoder",
+    "ShortTermMemory",
     "VectorMemory",
+    "AsyncVectorMemory",
     "BaseLoader",
     "image_generator",
 ]
