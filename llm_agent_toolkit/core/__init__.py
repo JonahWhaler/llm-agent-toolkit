@@ -1,3 +1,3 @@
-from . import open_ai, local
+from . import open_ai, local, deep_seek
 
-__all__ = ["open_ai", "local"]
+__all__ = ["open_ai", "local", "deep_seek"]
