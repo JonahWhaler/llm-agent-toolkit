@@ -18,6 +18,11 @@ For developers requiring full-range customization or access to the latest featur
 - [Installation](#installation)
 - [Fundamental Components](#fundamental-components)
   - [Core:](#core)
+    - [Example - Ollama](#example---ollama)
+    - [Example - OpenAI](#example---openai)
+    - [Example - DeepSeek](#example---deepseek)
+    - [Example - Tools](#example---tools)
+    - [Example - Structured Output](#example---structured-output)
   - [Encoder:](#encoder)
   - [Memory:](#memory)
   - [Tool:](#tool)
@@ -108,12 +113,35 @@ for response in responses:
     print(response["content"])
 ```
 
+### Example - DeepSeek
+```python
+from typing import Any
+from llm_agent_toolkit import ChatCompletionConfig
+from llm_agent_toolkit.core.deep_seek import Text_to_Text
+
+SYSTEM_PROMPT = "You are a faithful assistant."
+PROMPT = "Why is the sky blue?"
+
+config = ChatCompletionConfig(
+  name="deepseek-chat", temperature=1.0
+)
+llm = Text_to_Text(
+  system_prompt=SYSTEM_PROMPT,
+  config=config,
+  tools=None
+)
+responses: list[dict[str, Any]] = llm.run(query=PROMPT, context=None)
+for response in responses:
+    print(response["content"])
+```
+
 ### Example - Tools
 ```python
 from typing import Any
 from llm_agent_toolkit import ChatCompletionConfig
 from llm_agent_toolkit.core.local import Text_to_Text
 # This example is also compatible with llm_agent_toolkit.core.open_ai.Text_to_Text
+# This example is also compatible with llm_agent_toolkit.core.deep_seek.Text_to_Text
 from llm_agent_toolkit.tool import LazyTool
 
 def adder(a: int, b: int) -> int:
@@ -175,7 +203,7 @@ from llm_agent_toolkit.core.local import Text_to_Text_SO
 # Other Core that support Structured Output
 ### * llm_agent_toolkit.core.local.Image_to_Text_SO
 ### * llm_agent_toolkit.core.open_ai.OAI_StructuredOutput_Core
-
+### * llm_agent_toolkit.core.deep_seek.Text_to_Text_SO # JSON only
 # These `Core` does not support `Tool` and multi iteration execution.
 # If desired, caller can call `llm.run` iteratively with progressively updated `context`.
 # File example-chain.py shows steps to achieve chained execution.
