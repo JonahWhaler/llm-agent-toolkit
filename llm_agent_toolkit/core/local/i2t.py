@@ -104,6 +104,9 @@ class I2T_OLM_Core(Core, OllamaCore, ImageInterpreter):  # , ToolSupport
             MAX_OUTPUT_TOKENS,
             self.context_length - prompt_token_count,
         )
+        if max_output_tokens <= 0:
+            logger.warning("Prompt token count: %d", prompt_token_count)
+            raise ValueError("max_output_tokens <= 0")
 
         try:
             client = ollama.AsyncClient(host=self.CONN_STRING)
@@ -186,6 +189,9 @@ class I2T_OLM_Core(Core, OllamaCore, ImageInterpreter):  # , ToolSupport
             MAX_OUTPUT_TOKENS,
             self.context_length - prompt_token_count,
         )
+        if max_output_tokens <= 0:
+            logger.warning("Prompt token count: %d", prompt_token_count)
+            raise ValueError("max_output_tokens <= 0")
 
         try:
             client = ollama.Client(host=self.CONN_STRING)

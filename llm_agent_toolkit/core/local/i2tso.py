@@ -194,13 +194,13 @@ class I2TSO_OLM_Core(Core, OllamaCore, ImageInterpreter):
                         _ = json.loads(llm_generated_content)
                         content = llm_generated_content
                     except json.JSONDecodeError as decode_error:
-                        e = {"error": str(decode_error)}
+                        e = {"error": str(decode_error), "text": llm_generated_content}
                         content = json.dumps(e)
                 else:
                     content = llm_generated_content
 
                 return [{"role": CreatorRole.ASSISTANT.value, "content": content}]
-            return []
+            raise RuntimeError("Content not available.")
         except Exception as e:
             logger.error("Exception: %s", e)
             raise
@@ -331,13 +331,13 @@ class I2TSO_OLM_Core(Core, OllamaCore, ImageInterpreter):
                         _ = json.loads(llm_generated_content)
                         content = llm_generated_content
                     except json.JSONDecodeError as decode_error:
-                        e = {"error": str(decode_error)}
+                        e = {"error": str(decode_error), "text": llm_generated_content}
                         content = json.dumps(e)
                 else:
                     content = llm_generated_content
 
                 return [{"role": CreatorRole.ASSISTANT.value, "content": content}]
-            return []
+            raise RuntimeError("Content not available.")
         except Exception as e:
             logger.error("Exception: %s", e)
             raise
