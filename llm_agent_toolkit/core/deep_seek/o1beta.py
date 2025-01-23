@@ -102,7 +102,7 @@ class O1Beta_DS_Core(Core, DeepSeekCore):
                 ]
 
             failed_reason = choice.finish_reason
-            raise RuntimeError(str(failed_reason))
+            raise RuntimeError(failed_reason)
         except Exception as e:
             logger.error("Exception: %s", e)
             raise
@@ -183,7 +183,7 @@ class O1Beta_DS_Core(Core, DeepSeekCore):
                     {"role": CreatorRole.ASSISTANT.value, "content": response_string}
                 ]
             failed_reason = choice.finish_reason
-            raise RuntimeError(str(failed_reason))
+            raise RuntimeError(failed_reason)
         except RuntimeError as rte:
             logger.error("RuntimeError: %s", rte)
             raise

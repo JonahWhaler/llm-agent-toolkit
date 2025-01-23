@@ -121,13 +121,7 @@ class O1Beta_OAI_Core(Core, OpenAICore):
                 return [{"role": CreatorRole.ASSISTANT.value, "content": _content}]
 
             failed_reason = choice.finish_reason
-            logger.warning("Failed reason: %s", failed_reason)
-            return [
-                {
-                    "role": CreatorRole.ASSISTANT.value,
-                    "content": f"Failed: {failed_reason}",
-                }
-            ]
+            raise RuntimeError(failed_reason)
         except Exception as e:
             logger.error("Exception: %s", e)
             raise
@@ -202,13 +196,7 @@ class O1Beta_OAI_Core(Core, OpenAICore):
                 return [{"role": CreatorRole.ASSISTANT.value, "content": _content}]
 
             failed_reason = choice.finish_reason
-            logger.warning("Failed reason: %s", failed_reason)
-            return [
-                {
-                    "role": CreatorRole.ASSISTANT.value,
-                    "content": f"Failed: {failed_reason}",
-                }
-            ]
+            raise RuntimeError(failed_reason)
         except Exception as e:
             logger.error("Exception: %s", e)
             raise
