@@ -215,12 +215,12 @@ class OAI_StructuredOutput_Core(Core, OpenAICore, ImageInterpreter):
                         _ = json.loads(_content)
                         content = _content
                     except json.JSONDecodeError as decode_error:
-                        e = {"error": str(decode_error)}
+                        e = {"error": str(decode_error), "text": _content}
                         content = json.dumps(e)
                 else:
                     content = _content
                 return [{"role": CreatorRole.ASSISTANT.value, "content": content}]
-            return []
+            raise RuntimeError(f"Content not available. Reason: {choice.finish_reason}")
         except Exception as e:
             logger.error("Exception: %s", e)
             raise
@@ -359,12 +359,13 @@ class OAI_StructuredOutput_Core(Core, OpenAICore, ImageInterpreter):
                         _ = json.loads(_content)
                         content = _content
                     except json.JSONDecodeError as decode_error:
-                        e = {"error": str(decode_error)}
+                        e = {"error": str(decode_error), "text": _content}
                         content = json.dumps(e)
                 else:
                     content = _content
                 return [{"role": CreatorRole.ASSISTANT.value, "content": content}]
-            return []
+
+            raise RuntimeError(f"Content not available. Reason: {choice.finish_reason}")
         except Exception as e:
             logger.error("Exception: %s", e)
             raise

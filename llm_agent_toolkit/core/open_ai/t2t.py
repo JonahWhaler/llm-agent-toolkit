@@ -158,13 +158,7 @@ class T2T_OAI_Core(Core, OpenAICore, ToolSupport):
                     warning_message += f"Maximum output tokens <= 0. {prompt_token_count}/{self.context_length}\n"
                 else:
                     warning_message += "Unknown reason"
-                logger.warning(warning_message)
-                msgs.append(
-                    MessageBlock(
-                        role=CreatorRole.ASSISTANT.value,
-                        content=warning_message,
-                    )
-                )
+                raise RuntimeError(warning_message)
             return msgs[NUMBER_OF_PRIMERS:]  # Return only the generated messages
         except Exception as e:
             logger.error("Exception: %s", e)
@@ -277,13 +271,7 @@ class T2T_OAI_Core(Core, OpenAICore, ToolSupport):
                     warning_message += f"Maximum output tokens <= 0. {prompt_token_count}/{self.context_length}\n"
                 else:
                     warning_message += "Unknown reason"
-                logger.warning(warning_message)
-                msgs.append(
-                    MessageBlock(
-                        role=CreatorRole.ASSISTANT.value,
-                        content=warning_message,
-                    )
-                )
+                raise RuntimeError(warning_message)
             return msgs[NUMBER_OF_PRIMERS:]  # Return only the generated messages
         except Exception as e:
             logger.error("Exception: %s", e)
