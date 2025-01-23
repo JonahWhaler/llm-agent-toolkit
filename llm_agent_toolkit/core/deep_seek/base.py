@@ -16,7 +16,14 @@ class DeepSeekCore:
         pass
 
     @staticmethod
-    def build_profile() -> dict[str, bool | int | str]:
+    def build_profile(model_name: str = "deepseek-chat") -> dict[str, bool | int | str]:
+        if model_name == "deepseek-reasoner":
+            return {
+                "context_length": 64_000,
+                "max_output_tokens": 8_000,
+                "text_generation": True,
+                "tool": False,
+            }  # MAX COT TOKEN = 32K
         return {
             "context_length": 64_000,
             "max_output_tokens": 8_000,
@@ -34,14 +41,15 @@ class DeepSeekCore:
 
         Args:
             msgs (list[MessageBlock | dict[str, Any]]): A list of messages.
+            tools (list[ToolMetadata] | None): A list of tool description, default to None.
 
         Returns:
             int: The token count.
 
         Notes:
-        * Set `CONVERSION_FACTOR` as 2 because my usecase most like involve using utf-8 encoding.
+        * https://api-docs.deepseek.com/quick_start/token_usage
         """
-        CONVERSION_RATE = 2
+        CONVERSION_FACTOR = 0.6
         character_count: int = 0
         for msg in msgs:
             # Incase the dict does not comply with the MessageBlock format
@@ -57,7 +65,7 @@ class DeepSeekCore:
             for tool in tools:
                 character_count += len(json.dumps(tool))
 
-        return ceil(character_count // CONVERSION_RATE)
+        return ceil(character_count * CONVERSION_FACTOR)
 
 
 TOOL_PROMPT = """
