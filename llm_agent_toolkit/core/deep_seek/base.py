@@ -16,7 +16,14 @@ class DeepSeekCore:
         pass
 
     @staticmethod
-    def build_profile() -> dict[str, bool | int | str]:
+    def build_profile(model_name: str = "deepseek-chat") -> dict[str, bool | int | str]:
+        if model_name == "deepseek-reasoner":
+            return {
+                "context_length": 64_000,
+                "max_output_tokens": 8_000,
+                "text_generation": True,
+                "tool": False,
+            }  # MAX COT TOKEN = 32K
         return {
             "context_length": 64_000,
             "max_output_tokens": 8_000,
