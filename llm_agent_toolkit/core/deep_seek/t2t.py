@@ -73,6 +73,13 @@ class T2T_DS_Core(Core, DeepSeekCore, ToolSupport):
                 and accumulated_token_count < MAX_TOKENS
             ):
                 # logger.info("Iteration: [%d]", iteration)
+                if tools_metadata and iteration + 1 == self.config.max_iteration:
+                    # Force the llm to provide answer
+                    tools_metadata = None
+                    msgs.remove(
+                        {"role": CreatorRole.SYSTEM.value, "content": TOOL_PROMPT}
+                    )
+
                 response = await client.chat.completions.create(
                     model=self.model_name,
                     messages=msgs,  # type: ignore
@@ -186,6 +193,13 @@ class T2T_DS_Core(Core, DeepSeekCore, ToolSupport):
                 and accumulated_token_count < MAX_TOKENS
             ):
                 # logger.info("Iteration: [%d]", iteration)
+                if tools_metadata and iteration + 1 == self.config.max_iteration:
+                    # Force the llm to provide answer
+                    tools_metadata = None
+                    msgs.remove(
+                        {"role": CreatorRole.SYSTEM.value, "content": TOOL_PROMPT}
+                    )
+
                 response = client.chat.completions.create(
                     model=self.model_name,
                     messages=msgs,  # type: ignore

@@ -112,6 +112,12 @@ class T2T_OLM_Core(Core, OllamaCore, ToolSupport):
                 and accumulated_token_count < MAX_TOKENS
             ):
                 # logger.info("\n\nIteration: %d", iteration)
+                if tools_metadata and iteration + 1 == self.config.max_iteration:
+                    # Force the llm to provide answer
+                    tools_metadata = None
+                    msgs.remove(
+                        {"role": CreatorRole.SYSTEM.value, "content": TOOL_PROMPT}
+                    )
                 response = await client.chat(
                     model=self.model_name,
                     messages=msgs,
@@ -230,6 +236,12 @@ class T2T_OLM_Core(Core, OllamaCore, ToolSupport):
                 and accumulated_token_count < MAX_TOKENS
             ):
                 # logger.info("\n\nIteration: %d", iteration)
+                if tools_metadata and iteration + 1 == self.config.max_iteration:
+                    # Force the llm to provide answer
+                    tools_metadata = None
+                    msgs.remove(
+                        {"role": CreatorRole.SYSTEM.value, "content": TOOL_PROMPT}
+                    )
                 response = client.chat(
                     model=self.model_name,
                     messages=msgs,
