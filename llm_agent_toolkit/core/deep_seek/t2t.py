@@ -122,13 +122,7 @@ class T2T_DS_Core(Core, DeepSeekCore, ToolSupport):
                     warning_message += f"Maximum output tokens <= 0. {prompt_token_count}/{self.context_length}\n"
                 else:
                     warning_message += "Unknown reason"
-                logger.warning(warning_message)
-                msgs.append(
-                    MessageBlock(
-                        role=CreatorRole.ASSISTANT.value,
-                        content=warning_message,
-                    )
-                )
+                raise RuntimeError(warning_message)
             else:
                 msgs[-1]["role"] = CreatorRole.ASSISTANT.value
 
@@ -243,13 +237,7 @@ class T2T_DS_Core(Core, DeepSeekCore, ToolSupport):
                     warning_message += f"Maximum output tokens <= 0. {prompt_token_count}/{self.context_length}\n"
                 else:
                     warning_message += "Unknown reason"
-                logger.warning(warning_message)
-                msgs.append(
-                    MessageBlock(
-                        role=CreatorRole.ASSISTANT.value,
-                        content=warning_message,
-                    )
-                )
+                raise RuntimeError(warning_message)
             else:
                 msgs[-1]["role"] = CreatorRole.ASSISTANT.value
 

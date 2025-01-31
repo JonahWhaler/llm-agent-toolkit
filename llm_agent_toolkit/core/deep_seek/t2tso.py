@@ -120,7 +120,7 @@ class T2TSO_DS_Core(Core, DeepSeekCore):
                 else:
                     content = _content
                 return [{"role": CreatorRole.ASSISTANT.value, "content": content}]
-            return []
+            raise RuntimeError(f"Content not available. Reason: {choice.finish_reason}")
         except Exception as e:
             logger.error("Exception: %s", e)
             raise
@@ -202,7 +202,7 @@ class T2TSO_DS_Core(Core, DeepSeekCore):
                 else:
                     content = _content
                 return [{"role": CreatorRole.ASSISTANT.value, "content": content}]
-            return []
+            raise RuntimeError(f"Content not available. Reason: {choice.finish_reason}")
         except Exception as e:
             logger.error("Exception: %s", e)
             raise
