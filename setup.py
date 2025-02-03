@@ -30,6 +30,8 @@ transcriber_dependencies = [
     "pydub==0.25.1",
     "pydub-stubs==0.25.1.4",
     "ffmpeg-python==0.2.0",
+    "setuptools-rust==1.10.2",
+    "openai-whisper==20240930",
 ]
 extras = {
     "transformers": transformers_dependencies,
