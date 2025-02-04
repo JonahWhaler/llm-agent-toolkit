@@ -367,8 +367,8 @@ class TranscriptionConfig(ModelConfig):
         new_value = value.strip()
         if not new_value:
             raise ValidationError("Expect response_format to be a non-empty string")
-        if new_value not in ["text", "verbose_json"]:
-            raise ValueError("response_format must be one of text, verbose_json")
+        if new_value not in ["text", "json"]:
+            raise ValueError("response_format must be one of text or json")
         return new_value
 
     @field_validator("name")
@@ -376,15 +376,13 @@ class TranscriptionConfig(ModelConfig):
         new_value = value.strip()
         if not new_value:
             raise ValidationError("Expect model_name to be a non-empty string")
-        if new_value not in ["whisper-1"]:
-            raise ValueError("model_name must be one of whisper-1")
+        # if new_value not in ["whisper-1"]:
+        #     raise ValueError("model_name must be one of whisper-1")
         return new_value
 
     @model_validator(mode="after")
-    def timestamp_granularities_must_be_valid(
-        cls, values
-    ):  # pylint: disable=no-self-argument
-        if values.response_format == "text":
+    def timestamp_granularities_must_be_valid(cls, values):  # pylint: disable=no-self-argument
+        if values.response_format in ["text", "json"]:
             return values
         if len(values.timestamp_granularities) == 0:
             raise ValueError(
