@@ -396,6 +396,14 @@ class TranscriptionConfig(ModelConfig):
         return values
 
 
+class AudioParameter(BaseModel):
+    max_size_mb: int = 20
+    audio_bitrate: str = "160k"
+    sample_rate: int = 48000
+    channels: int = 2
+    overlap_duration: int = 0
+
+
 class Transcriber(ABC):
     def __init__(self, config: TranscriptionConfig):
         self.__config = config
