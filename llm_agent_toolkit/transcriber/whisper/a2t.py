@@ -1,10 +1,10 @@
 import os
-import io
 import logging
+import json
 from typing import Any
 import whisper
 
-from ..base import Transcriber, TranscriptionConfig, AudioHelper
+from ..base import AudioParameter, Transcriber, TranscriptionConfig, AudioHelper
 from ..._util import MessageBlock, CreatorRole
 
 logger = logging.getLogger(__name__)
@@ -15,13 +15,22 @@ class LocalWhisperTranscriber(Transcriber):
     Transcriber.
     """
 
-    def __init__(self, config: TranscriptionConfig, directory: str):
+    def __init__(
+        self,
+        config: TranscriptionConfig,
+        directory: str,
+        audio_parameter: AudioParameter | None = None,
+    ):
         Transcriber.__init__(self, config)
+        self.__dir = directory
+        if audio_parameter is None:
+            self.__audio_parameter = AudioParameter()
+        else:
+            self.__audio_parameter = audio_parameter
         if not self.__available():
             raise ValueError(
                 "%s is not available in the model listing.", self.model_name
             )
-        self.__dir = directory
 
     def __available(self) -> bool:
         try:
@@ -58,36 +67,48 @@ class LocalWhisperTranscriber(Transcriber):
             raise ValueError("filepath and tmp_directory are required")
 
         ext = os.path.splitext(filepath)[-1]
+        params: dict = self.__audio_parameter.model_dump()
+        params["output_format"] = ext[1:]
         try:
-            output: list[MessageBlock] = []
-            chunks = AudioHelper.generate_chunks(
-                input_path=filepath, tmp_directory=tmp_directory, output_format=ext[1:]
-            )
             model = whisper.load_model(
                 name=self.model_name, download_root=self.directory, in_memory=True
             )
-            for idx, chunk_path in enumerate(chunks):
-                result = model.transcribe(
+            chunks = AudioHelper.generate_chunks(
+                input_path=filepath, tmp_directory=tmp_directory, **params
+            )
+            pages = []
+            file_object: dict[str, str | list] = {
+                "filename": os.path.basename(filepath)
+            }
+            for idx, chunk_path in enumerate(chunks, start=1):
+                result: dict = model.transcribe(
                     audio=chunk_path,
                     temperature=self.config.temperature,
                     word_timestamps=False,
                     condition_on_previous_text=False,
+                    initial_prompt=prompt,
                 )
-                transcript: str = getattr(result, "text", "")
-                transcript = transcript.strip()
-                # BEGIN DEBUG
-                filename_wo_ext = os.path.basename(chunk_path).split(".")[0]
-                export_path = f"{tmp_directory}/{filename_wo_ext}.md"
-                with open(export_path, "w", encoding="utf-8") as writer:
-                    writer.write(transcript)
-                # END DEBUG
-                output.append(
-                    {
-                        "role": CreatorRole.ASSISTANT.value,
-                        "content": f"[{idx+1}]:{transcript}",
-                    }
-                )
-            return [*output]
+                page: dict[str, str | int | list] = {"page_index": idx}
+
+                if self.config.response_format == "json":
+                    segments = result["segments"]
+                    minimal_segments = []
+                    for segment in segments:
+                        minimal_segments.append(
+                            {
+                                "start": round(segment["start"], 2),
+                                "end": round(segment["end"], 2),
+                                "text": segment["text"].strip(),
+                            }
+                        )
+                    page["segments"] = minimal_segments
+                else:  # if self.config.response_format == "text":
+                    transcript: str = result["text"]
+                    page["text"] = transcript.strip()
+                pages.append(page)
+            file_object["transcript"] = pages
+            output_string = json.dumps(file_object, ensure_ascii=False)
+            return [{"role": CreatorRole.ASSISTANT.value, "content": output_string}]
         except Exception as e:
             logger.error("Exception: %s", e)
             raise
