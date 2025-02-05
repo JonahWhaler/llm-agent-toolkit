@@ -367,8 +367,10 @@ class TranscriptionConfig(ModelConfig):
         new_value = value.strip()
         if not new_value:
             raise ValidationError("Expect response_format to be a non-empty string")
-        if new_value not in ["text", "verbose_json"]:
-            raise ValueError("response_format must be one of text, verbose_json")
+        if new_value not in ["text", "json", "verbose_json"]:
+            raise ValueError(
+                "response_format must be one of text or json or verbose_json"
+            )
         return new_value
 
     @field_validator("name")
@@ -376,15 +378,13 @@ class TranscriptionConfig(ModelConfig):
         new_value = value.strip()
         if not new_value:
             raise ValidationError("Expect model_name to be a non-empty string")
-        if new_value not in ["whisper-1"]:
-            raise ValueError("model_name must be one of whisper-1")
+        # if new_value not in ["whisper-1"]:
+        #     raise ValueError("model_name must be one of whisper-1")
         return new_value
 
     @model_validator(mode="after")
-    def timestamp_granularities_must_be_valid(
-        cls, values
-    ):  # pylint: disable=no-self-argument
-        if values.response_format == "text":
+    def timestamp_granularities_must_be_valid(cls, values):  # pylint: disable=no-self-argument
+        if values.response_format in ["text", "json", "verbose_json"]:
             return values
         if len(values.timestamp_granularities) == 0:
             raise ValueError(
@@ -396,6 +396,14 @@ class TranscriptionConfig(ModelConfig):
                     "timestamp_granularities must be segment or word or both."
                 )
         return values
+
+
+class AudioParameter(BaseModel):
+    max_size_mb: int = 20
+    audio_bitrate: str = "160k"
+    sample_rate: int = 48000
+    channels: int = 2
+    overlap_duration: int = 0
 
 
 class Transcriber(ABC):
