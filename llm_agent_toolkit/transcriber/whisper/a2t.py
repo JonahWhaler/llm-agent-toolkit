@@ -21,6 +21,9 @@ class LocalWhisperTranscriber(Transcriber):
         directory: str,
         audio_parameter: AudioParameter | None = None,
     ):
+        # Only accept text | json
+        if config.response_format == "verbose_json":
+            config.response_format = "json"
         Transcriber.__init__(self, config)
         self.__dir = directory
         if audio_parameter is None:
