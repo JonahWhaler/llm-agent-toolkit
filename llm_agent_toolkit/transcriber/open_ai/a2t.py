@@ -28,6 +28,10 @@ class OpenAITranscriber(Transcriber):
     """
 
     def __init__(self, config: TranscriptionConfig):
+        # response_format as `json` yield same outcome like `text`
+        if config.response_format == "json":
+            # force it to `verbose_json`
+            config.response_format = "verbose_json"
         Transcriber.__init__(self, config)
         if not self.__available():
             raise ValueError("%s is not available in OpenAI's model listing.")
