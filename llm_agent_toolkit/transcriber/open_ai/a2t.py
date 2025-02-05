@@ -1,6 +1,7 @@
 import os
 import io
 import logging
+import json
 from typing import Any
 import openai
 
@@ -73,7 +74,11 @@ class OpenAITranscriber(Transcriber):
                 input_path=filepath, tmp_directory=tmp_directory, output_format=ext[1:]
             )
             client = openai.AsyncOpenAI(api_key=os.environ["OPENAI_API_KEY"])
-            for idx, chunk_path in enumerate(chunks):
+            pages = []
+            file_object: dict[str, str | list] = {
+                "filename": os.path.basename(filepath)
+            }
+            for idx, chunk_path in enumerate(chunks, start=1):
                 with open(chunk_path, "rb") as f:
                     audio_data = f.read()
                     buffer = io.BytesIO(audio_data)
@@ -81,21 +86,28 @@ class OpenAITranscriber(Transcriber):
                     buffer.seek(0)
 
                 params["file"] = buffer
-                params["prompt"] = f"PROMPT={prompt}\nPage={idx+1}"
+                params["prompt"] = f"PROMPT={prompt}\nPage={idx}"
                 transcript = await client.audio.transcriptions.create(**params)
-                # BEGIN DEBUG
-                filename_wo_ext = os.path.basename(chunk_path).split(".")[0]
-                export_path = f"{tmp_directory}/{filename_wo_ext}.md"
-                with open(export_path, "w", encoding="utf-8") as writer:
-                    writer.write(transcript.strip())
-                # END DEBUG
-                output.append(
-                    MessageBlock(
-                        role=CreatorRole.ASSISTANT.value,
-                        content=f"[{idx+1}]\n{transcript.strip()}",
-                    )
-                )
-            return [*output]
+
+                page: dict[str, str | int | list] = {"page_index": idx}
+                if self.config.response_format == "verbose_json":
+                    segments = transcript.segments
+                    minimal_segments = []
+                    for segment in segments:
+                        minimal_segments.append(
+                            {
+                                "start": segment.start,
+                                "end": segment.end,
+                                "text": segment.text,
+                            }
+                        )
+                    page["segments"] = minimal_segments
+                else:  # text and json yield the same structure
+                    page["text"] = transcript.text
+                pages.append(page)
+            file_object["transcript"] = pages
+            output_string = json.dumps(file_object, ensure_ascii=False)
+            return [{"role": CreatorRole.ASSISTANT.value, "content": output_string}]
         except Exception as e:
             logger.error("Exception: %s", e)
             raise
@@ -122,7 +134,11 @@ class OpenAITranscriber(Transcriber):
                 input_path=filepath, tmp_directory=tmp_directory, output_format=ext[1:]
             )
             client = openai.OpenAI(api_key=os.environ["OPENAI_API_KEY"])
-            for idx, chunk_path in enumerate(chunks):
+            pages = []
+            file_object: dict[str, str | list] = {
+                "filename": os.path.basename(filepath)
+            }
+            for idx, chunk_path in enumerate(chunks, start=1):
                 with open(chunk_path, "rb") as f:
                     audio_data = f.read()
                     buffer = io.BytesIO(audio_data)
@@ -130,21 +146,27 @@ class OpenAITranscriber(Transcriber):
                     buffer.seek(0)
 
                 params["file"] = buffer
-                params["prompt"] = f"PROMPT={prompt}\nPage={idx+1}"
+                params["prompt"] = f"PROMPT={prompt}\nPage={idx}"
                 transcript = client.audio.transcriptions.create(**params)
-                # BEGIN DEBUG
-                filename_wo_ext = os.path.basename(chunk_path).split(".")[0]
-                export_path = f"{tmp_directory}/{filename_wo_ext}.md"
-                with open(export_path, "w", encoding="utf-8") as writer:
-                    writer.write(transcript.strip())
-                # END DEBUG
-                output.append(
-                    MessageBlock(
-                        role=CreatorRole.ASSISTANT.value,
-                        content=f"[{idx+1}]\n{transcript.strip()}",
-                    )
-                )
-            return [*output]
+                page: dict[str, str | int | list] = {"page_index": idx}
+                if self.config.response_format == "verbose_json":
+                    segments = transcript.segments
+                    minimal_segments = []
+                    for segment in segments:
+                        minimal_segments.append(
+                            {
+                                "start": segment.start,
+                                "end": segment.end,
+                                "text": segment.text,
+                            }
+                        )
+                    page["segments"] = minimal_segments
+                else:  # text and json yield the same structure
+                    page["text"] = transcript.text
+                pages.append(page)
+            file_object["transcript"] = pages
+            output_string = json.dumps(file_object, ensure_ascii=False)
+            return [{"role": CreatorRole.ASSISTANT.value, "content": output_string}]
         except Exception as e:
             logger.error("Exception: %s", e)
             raise
