@@ -7,11 +7,11 @@ import asyncio
 import logging
 from dotenv import load_dotenv
 
-from llm_agent_toolkit.transcriber.open_ai import OpenAITranscriber
+from llm_agent_toolkit.transcriber.whisper import LocalWhisperTranscriber
 from llm_agent_toolkit.transcriber import TranscriptionConfig, AudioParameter
 
 logging.basicConfig(
-    filename="./dev/log/openai-whisper.log",
+    filename="./dev/log/local-whisper.log",
     level=logging.INFO,
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     datefmt="%Y-%m-%d %H:%M:%S",
@@ -25,7 +25,7 @@ MODEL_DIRECTORY = "./dev/models"
 AUDIO_PATH = "./dev/audio/short.mp3"
 CHUNK_SIZE = 5  # MB
 PROMPT = "一座祭坛、支搭帐篷、挖一口井"
-MODEL_NAME = "whisper-1"
+MODEL_NAME = "tiny"
 
 
 def store(content: str, filepath: str) -> None:
@@ -44,11 +44,11 @@ def transcribe(
         name=model_name, temperature=0.2, response_format=response_format
     )
     ap = AudioParameter(max_size_mb=CHUNK_SIZE)
-    llm = OpenAITranscriber(config, audio_parameter=ap)
+    llm = LocalWhisperTranscriber(config, directory=MODEL_DIRECTORY, audio_parameter=ap)
     transcripts = llm.transcribe(
         prompt=prompt, filepath=audio_file_path, tmp_directory=output_directory
     )
-    export_path = f"{output_directory}/audio-openai-{response_format}.md"
+    export_path = f"{output_directory}/audio-local-{response_format}.md"
     markdown_content = [f"{transcript['content']}\n" for transcript in transcripts]
     store("\n".join(markdown_content), export_path)
 
@@ -64,19 +64,18 @@ async def atranscribe(
         name=model_name, temperature=0.2, response_format=response_format
     )
     ap = AudioParameter(max_size_mb=CHUNK_SIZE)
-    llm = OpenAITranscriber(config, audio_parameter=ap)
+    llm = LocalWhisperTranscriber(config, directory=MODEL_DIRECTORY, audio_parameter=ap)
     transcripts = await llm.transcribe_async(
         prompt=prompt, filepath=audio_file_path, tmp_directory=output_directory
     )
-    export_path = f"{output_directory}/audio-openai-{response_format}.md"
+    export_path = f"{output_directory}/audio-local-{response_format}.md"
     markdown_content = [f"{transcript['content']}\n" for transcript in transcripts]
     store("\n".join(markdown_content), export_path)
 
 
 def synchronous_tasks():
-    # transcribe(AUDIO_PATH, TMP_DIRECTORY, PROMPT, MODEL_NAME, "text")
-    # transcribe(AUDIO_PATH, TMP_DIRECTORY, PROMPT, MODEL_NAME, "json")
-    transcribe(AUDIO_PATH, TMP_DIRECTORY, PROMPT, MODEL_NAME, "verbose_json")
+    transcribe(AUDIO_PATH, TMP_DIRECTORY, PROMPT, MODEL_NAME, "text")
+    transcribe(AUDIO_PATH, TMP_DIRECTORY, PROMPT, MODEL_NAME, "json")
 
 
 async def asynchronous_tasks():
