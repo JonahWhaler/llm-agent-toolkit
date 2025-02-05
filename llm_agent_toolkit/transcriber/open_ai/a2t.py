@@ -137,7 +137,7 @@ class OpenAITranscriber(Transcriber):
                             }
                         )
                     page["segments"] = minimal_segments
-                else:  # text and json yield the same structure
+                else:  # text
                     page["text"] = transcript.text
                 pages.append(page)
             file_object["transcript"] = pages
