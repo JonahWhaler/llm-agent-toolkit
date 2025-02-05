@@ -150,7 +150,7 @@ class OpenAITranscriber(Transcriber):
                         )
                     page["segments"] = minimal_segments
                 else:  # text
-                    page["text"] = transcript.text
+                    page["text"] = transcript
                 pages.append(page)
             file_object["transcript"] = pages
             output_string = json.dumps(file_object, ensure_ascii=False)
@@ -215,7 +215,7 @@ class OpenAITranscriber(Transcriber):
                         )
                     page["segments"] = minimal_segments
                 else:  # text and json yield the same structure
-                    page["text"] = transcript.text
+                    page["text"] = transcript
                 pages.append(page)
             file_object["transcript"] = pages
             output_string = json.dumps(file_object, ensure_ascii=False)
