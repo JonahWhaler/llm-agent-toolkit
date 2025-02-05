@@ -5,7 +5,7 @@ import json
 from typing import Any
 import openai
 
-from ..base import Transcriber, TranscriptionConfig, AudioHelper
+from ..base import AudioParameter, Transcriber, TranscriptionConfig, AudioHelper
 from ..._util import MessageBlock, CreatorRole
 
 logger = logging.getLogger(__name__)
@@ -59,12 +59,21 @@ class OpenAITranscriber(Transcriber):
     ```
     """
 
-    def __init__(self, config: TranscriptionConfig):
+    def __init__(
+        self,
+        config: TranscriptionConfig,
+        audio_parameter: AudioParameter | None = None,
+    ):
         # response_format as `json` yield same outcome like `text`
         if config.response_format == "json":
             # force it to `verbose_json`
             config.response_format = "verbose_json"
         Transcriber.__init__(self, config)
+        # Parameter to guide the chunking process. None = Default.
+        if audio_parameter is None:
+            self.__audio_parameter = AudioParameter()
+        else:
+            self.__audio_parameter = audio_parameter
         if not self.__available():
             raise ValueError("%s is not available in OpenAI's model listing.")
 
@@ -104,9 +113,12 @@ class OpenAITranscriber(Transcriber):
         params["model"] = self.model_name
         for kw in ["name", "return_n", "max_iteration"]:
             del params[kw]
+
+        chunk_params: dict = self.__audio_parameter.model_dump()
+        chunk_params["output_format"] = ext[1:]
         try:
             chunks = AudioHelper.generate_chunks(
-                input_path=filepath, tmp_directory=tmp_directory, output_format=ext[1:]
+                input_path=filepath, tmp_directory=tmp_directory, **chunk_params
             )
             client = openai.AsyncOpenAI(api_key=os.environ["OPENAI_API_KEY"])
             pages = []
@@ -168,9 +180,11 @@ class OpenAITranscriber(Transcriber):
         params["model"] = self.model_name
         for kw in ["name", "return_n", "max_iteration"]:
             del params[kw]
+        chunk_params: dict = self.__audio_parameter.model_dump()
+        chunk_params["output_format"] = ext[1:]
         try:
             chunks = AudioHelper.generate_chunks(
-                input_path=filepath, tmp_directory=tmp_directory, output_format=ext[1:]
+                input_path=filepath, tmp_directory=tmp_directory, **chunk_params
             )
             client = openai.OpenAI(api_key=os.environ["OPENAI_API_KEY"])
             pages = []
