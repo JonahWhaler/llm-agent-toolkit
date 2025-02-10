@@ -5,7 +5,7 @@ DESCRIPTION = "LLM Agent Toolkit provides minimal, modular interfaces for core c
 # python3 setup.py sdist bdist_wheel
 # twine upload --skip-existing dist/* --verbose
 
-VERSION = "0.0.29.1"
+VERSION = "0.0.29.2"
 
 with open("./README.md", "r", encoding="utf-8") as f:
     long_description = f.read()

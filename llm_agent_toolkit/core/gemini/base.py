@@ -10,6 +10,8 @@ logger = logging.getLogger(__name__)
 
 
 class GeminiCore:
+    csv_path: str | None = None
+
     def __init__(self, model_name: str):
         self.__model_name = model_name
         if not GeminiCore.__available(model_name):
@@ -33,18 +35,42 @@ class GeminiCore:
 
     @staticmethod
     def build_profile(model_name: str) -> dict[str, bool | int | str]:
-        # TODO: Pick profile from csv file
-        profile: dict[str, bool | int | str] = {
-            "name": model_name,
-            "context_length": 128_000,
-            "max_output_tokens": 8192,
-            "text_generation": True,
-            "tool": False,
-            "text_input": True,
-            "text_output": True,
-            "image_input": True,
-            "image_output": False,
-        }
+        profile: dict[str, bool | int | str] = {"name": model_name}
+        if GeminiCore.csv_path:
+            with open(GeminiCore.csv_path, "r", encoding="utf-8") as csv:
+                header = csv.readline()
+                columns = header.strip().split(",")
+                while True:
+                    line = csv.readline()
+                    if not line:
+                        break
+                    values = line.strip().split(",")
+                    if values[0] == model_name:
+                        for column, value in zip(columns[1:], values[1:]):
+                            if column == "context_length":
+                                profile[column] = int(value)
+                            elif column == "max_output_tokens":
+                                profile[column] = 2048 if value == "" else int(value)
+                            elif column == "remarks":
+                                profile[column] = value
+                            elif value == "TRUE":
+                                profile[column] = True
+                            else:
+                                profile[column] = False
+                        break
+
+        # If GeminiCore.csv_path is not set or some fields are missing
+        # Assign default values
+        if "context_length" not in profile:
+            # Most supported context length
+            profile["context_length"] = 2048
+        if "tool" not in profile:
+            # Assume supported
+            profile["tool"] = True
+        if "text_generation" not in profile:
+            # Assume supported
+            profile["text_generation"] = True
+
         return profile
 
     @staticmethod

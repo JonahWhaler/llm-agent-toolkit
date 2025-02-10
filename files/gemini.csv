@@ -1,0 +1,5 @@
+name,context_length,max_output_tokens,text_generation,tool,text_input,image_input,audio_input,text_output,image_output,audio_output,structured_output,remarks
+gemini-2.0-flash,1048576,8192,TRUE,TRUE,TRUE,TRUE,TRUE,TRUE,,,TRUE,
+gemini-1.5-flash,1048576,8192,TRUE,TRUE,TRUE,TRUE,TRUE,TRUE,,,TRUE,
+gemini-1.5-flash-8b,1048576,8192,TRUE,TRUE,TRUE,TRUE,TRUE,TRUE,,,TRUE,
+gemini-1.5-pro,2097152,8192,TRUE,TRUE,TRUE,TRUE,TRUE,TRUE,,,TRUE,
