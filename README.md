@@ -8,7 +8,7 @@ PyPI: ![PyPI Downloads](https://static.pepy.tech/badge/llm-agent-toolkit)
 ## Attention!!!
 Using this toolkit simplifies integration by providing unified and modular interfaces across platforms. Many configurations are intentionally kept at their default settings to prioritize ease of use. However, most of these components are extensible through abstract classes, allowing developers to define their own desired configurations for greater flexibility. While this approach enhances consistency and reduces complexity, advanced customization may require extending the provided abstractions. 
 
-For developers requiring full-range customization or access to the latest features, it is recommended to consider using native libraries like `ollama` and `openai` directly.
+For developers requiring full-range customization or access to the latest features, it is recommended to consider using native libraries like `ollama`, `openai` and `google-genai` directly.
 
 # Table of Contents
 - [LLM Agent Toolkit: Modular Components for AI Workflows](#llm-agent-toolkit-modular-components-for-ai-workflows)
@@ -21,6 +21,7 @@ For developers requiring full-range customization or access to the latest featur
     - [Example - Ollama](#example---ollama)
     - [Example - OpenAI](#example---openai)
     - [Example - DeepSeek](#example---deepseek)
+    - [Example - Gemini](#example---gemini)
     - [Example - Tools](#example---tools)
     - [Example - Structured Output](#example---structured-output)
   - [Encoder:](#encoder)
@@ -39,6 +40,9 @@ For developers requiring full-range customization or access to the latest featur
   ```bash
   # Text Generation + Image Generation
   pip install llm-agent-toolkit
+
+  # Text Generation + Image Generation through Gemini
+  pip install llm-agent-toolkit[gemini]
 
   # transform text to embedding through transformers's API
   pip install llm-agent-toolkit["transformer"] 
@@ -63,7 +67,7 @@ A stateless chat completion interface to interact with the LLM.
 * Supports Text-to-Text and Image-to-Text.
 * Enables iterative executions for multi-step workflows.
 * Facilitates tool invocation as part of the workflow.
-* Support models from OpenAI and Ollama.
+* Support models from `OpenAI`, `Ollama`, `DeepSeek`, and `Gemini`.
 * Support `Structured Output`.
 
 ### Example - Ollama
@@ -118,6 +122,28 @@ for response in responses:
 from typing import Any
 from llm_agent_toolkit import ChatCompletionConfig
 from llm_agent_toolkit.core.deep_seek import Text_to_Text
+
+SYSTEM_PROMPT = "You are a faithful assistant."
+PROMPT = "Why is the sky blue?"
+
+config = ChatCompletionConfig(
+  name="deepseek-chat", temperature=1.0
+)
+llm = Text_to_Text(
+  system_prompt=SYSTEM_PROMPT,
+  config=config,
+  tools=None
+)
+responses: list[dict[str, Any]] = llm.run(query=PROMPT, context=None)
+for response in responses:
+    print(response["content"])
+```
+
+### Example - Gemini
+```python
+from typing import Any
+from llm_agent_toolkit import ChatCompletionConfig
+from llm_agent_toolkit.core.gemini import Text_to_Text
 
 SYSTEM_PROMPT = "You are a faithful assistant."
 PROMPT = "Why is the sky blue?"
@@ -204,6 +230,7 @@ from llm_agent_toolkit.core.local import Text_to_Text_SO
 ### * llm_agent_toolkit.core.local.Image_to_Text_SO
 ### * llm_agent_toolkit.core.open_ai.OAI_StructuredOutput_Core
 ### * llm_agent_toolkit.core.deep_seek.Text_to_Text_SO # JSON only
+### * llm_agent_toolkit.core.gemini.GMN_StructuredOutput_Core
 # These `Core` does not support `Tool` and multi iteration execution.
 # If desired, caller can call `llm.run` iteratively with progressively updated `context`.
 # File example-chain.py shows steps to achieve chained execution.
