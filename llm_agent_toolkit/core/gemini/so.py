@@ -125,7 +125,10 @@ class GMN_StructuredOutput_Core(Core, GeminiCore):  # ImageInterpreter
             MAX_TOKENS, self.max_output_tokens, self.config.max_output_tokens
         )
         prompt_token_count = self.calculate_token_count(
-            msgs, imgs=None if filepath is None else [filepath]
+            self.model_name,
+            self.system_prompt,
+            msgs,
+            imgs=None if filepath is None else [filepath],
         )
         max_output_tokens = min(
             MAX_OUTPUT_TOKENS,
@@ -217,7 +220,10 @@ class GMN_StructuredOutput_Core(Core, GeminiCore):  # ImageInterpreter
             MAX_TOKENS, self.max_output_tokens, self.config.max_output_tokens
         )
         prompt_token_count = self.calculate_token_count(
-            msgs, imgs=None if filepath is None else [filepath]
+            self.model_name,
+            self.system_prompt,
+            msgs,
+            imgs=None if filepath is None else [filepath],
         )
         max_output_tokens = min(
             MAX_OUTPUT_TOKENS,

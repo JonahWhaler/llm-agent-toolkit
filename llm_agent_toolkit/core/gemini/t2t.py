@@ -2,7 +2,6 @@ import os
 import logging
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
-from math import ceil
 
 from google import genai
 from google.genai import types
@@ -81,7 +80,9 @@ class T2T_GMN_Core(Core, GeminiCore):
         MAX_OUTPUT_TOKENS = min(
             MAX_TOKENS, self.max_output_tokens, self.config.max_output_tokens
         )
-        prompt_token_count = self.calculate_token_count(msgs, imgs=None)
+        prompt_token_count = self.calculate_token_count(
+            self.model_name, self.system_prompt, msgs, imgs=None
+        )
         max_output_tokens = min(
             MAX_OUTPUT_TOKENS,
             self.context_length - prompt_token_count,
@@ -170,7 +171,9 @@ class T2T_GMN_Core(Core, GeminiCore):
         MAX_OUTPUT_TOKENS = min(
             MAX_TOKENS, self.max_output_tokens, self.config.max_output_tokens
         )
-        prompt_token_count = self.calculate_token_count(msgs, imgs=None)
+        prompt_token_count = self.calculate_token_count(
+            self.model_name, self.system_prompt, msgs, imgs=None
+        )
         max_output_tokens = min(
             MAX_OUTPUT_TOKENS,
             self.context_length - prompt_token_count,
