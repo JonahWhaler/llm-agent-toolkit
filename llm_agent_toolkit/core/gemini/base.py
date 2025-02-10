@@ -33,6 +33,47 @@ class GeminiCore:
             logger.error("Exception: %s", str(e))
         return False
 
+    @classmethod
+    def load_csv(cls, input_path: str):
+        COLUMNS_STRING = "name,context_length,max_output_tokens,text_generation,tool,text_input,image_input,audio_input,text_output,image_output,audio_output,structured_output,remarks"
+        EXPECTED_COLUMNS = set(COLUMNS_STRING.split(","))
+        # Begin validation
+        with open(input_path, "r", encoding="utf-8") as csv:
+            header = csv.readline()
+            header = header.strip()
+            columns = header.split(",")
+            # Expect no columns is missing
+            diff = EXPECTED_COLUMNS.difference(set(columns))
+            if diff:
+                raise ValueError(f"Missing columns in {input_path}: {', '.join(diff)}")
+            # Expect all columns are in exact order
+            if header != COLUMNS_STRING:
+                raise ValueError(
+                    f"Invalid header in {input_path}: \n{header}\n{COLUMNS_STRING}"
+                )
+
+            for line in csv:
+                values = line.strip().split(",")
+                name: str = values[0]
+                for column, value in zip(columns, values):
+                    if column in ["name", "remarks"]:
+                        assert isinstance(
+                            value, str
+                        ), f"{name}.{column} must be a string."
+                    elif column in ["context_length", "max_output_tokens"] and value:
+                        try:
+                            _ = int(value)
+                        except ValueError:
+                            print(f"{name}.{column} must be an integer.")
+                            raise
+                    elif value:
+                        assert value.lower() in [
+                            "true",
+                            "false",
+                        ], f"{name}.{column} must be a boolean."
+        # End validation
+        GeminiCore.csv_path = input_path
+
     @staticmethod
     def build_profile(model_name: str) -> dict[str, bool | int | str]:
         profile: dict[str, bool | int | str] = {"name": model_name}
