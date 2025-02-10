@@ -44,6 +44,13 @@ class GeminiCore:
 
     @staticmethod
     def calculate_image_tokens(width: int, height: int) -> int:
+        """
+        Estimation calculation based on link below:
+        https://cloud.google.com/vertex-ai/generative-ai/docs/multimodal/image-understanding#image-requirements
+
+        Modification:
+        1. Add `token_per_tile` to the product of `token_per_tile` and `number_of_tile`
+        """
         token_per_tile = 258
         if width <= 384 and height <= 384:
             return token_per_tile
@@ -58,14 +65,16 @@ class GeminiCore:
         tiles_height = ceil(height / tile_size)
 
         number_of_tile = tiles_width * tiles_height
-        return token_per_tile * number_of_tile
+        return token_per_tile + token_per_tile * number_of_tile
 
     @staticmethod
     def calculate_token_count(
-        msgs: list[types.Content], imgs: list[str] | None = None
+        model_name: str,
+        system_prompt: str,
+        msgs: list[types.Content],
+        imgs: list[str] | None = None,
     ) -> int:
         """Calculate the token count for the given messages.
-        Efficient but not accurate. Child classes should implement a more accurate version.
 
         Args:
             msgs (list[MessageBlock | dict[str, Any]]): A list of messages.
@@ -73,19 +82,31 @@ class GeminiCore:
 
         Returns:
             int: The token count.
+
+        Notes:
+        * https://ai.google.dev/gemini-api/docs/tokens?lang=python
+        * Why not use count_tokens to estimate token count needed to process images?
+            * As Bytes: No effect
+            * As ImageFile: 259 per image, does not scale according to the image size.
         """
-        CONVERSION_FACTOR = 0.5  # Magic Number!!! Don't trust me!!!
-        character_count: int = 0
+        text_contents = [system_prompt]
         for msg in msgs:
             parts = msg.parts
             if parts is None:
                 continue
-
             for p in parts:
                 p_text = getattr(p, "text", None)
                 if p_text:
-                    character_count += len(p_text)
-        text_tokens = ceil(character_count * CONVERSION_FACTOR)
+                    text_contents.append(p_text)
+
+        client = genai.Client(api_key=os.environ["GEMINI_API_KEY"])
+        count_token_response = client.models.count_tokens(
+            model=model_name,
+            contents=text_contents,  # type: ignore
+        )
+        text_tokens = count_token_response.total_tokens
+        if text_tokens is None:
+            text_tokens = 0
 
         image_tokens = 0
         if imgs:
@@ -93,6 +114,12 @@ class GeminiCore:
                 with Image.open(img) as image:
                     width, height = image.size
                     image_tokens += GeminiCore.calculate_image_tokens(width, height)
-        logger.info("Text: %d toks\nImage: %d toks", text_tokens, image_tokens)
+
         estimated_tokens = text_tokens + image_tokens
+        logger.info(
+            "Usage Estimation: %d toks\nText: %d toks\nImage: %d toks",
+            estimated_tokens,
+            text_tokens,
+            image_tokens,
+        )
         return estimated_tokens
