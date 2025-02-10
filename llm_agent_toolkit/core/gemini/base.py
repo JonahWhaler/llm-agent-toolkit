@@ -33,12 +33,17 @@ class GeminiCore:
 
     @staticmethod
     def build_profile(model_name: str) -> dict[str, bool | int | str]:
+        # TODO: Pick profile from csv file
         profile: dict[str, bool | int | str] = {
             "name": model_name,
             "context_length": 128_000,
             "max_output_tokens": 8192,
             "text_generation": True,
             "tool": False,
+            "text_input": True,
+            "text_output": True,
+            "image_input": True,
+            "image_output": False,
         }
         return profile
 
