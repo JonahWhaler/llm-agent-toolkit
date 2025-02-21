@@ -41,6 +41,15 @@ class OpenAICore:
             raise ValueError("%s is not available in OpenAI's model listing.")
 
     def __available(self) -> bool:
+        """
+        This is not the real fix, I basically pass the responsibility back to the user
+        to pick the available models.
+
+        Always return True!!!
+
+        If `client.models.list()` continue to fail,
+        it will show warning without raising the Exception.
+        """
         try:
             client = openai.Client(api_key=os.environ["OPENAI_API_KEY"])
             for model in client.models.list():
@@ -49,7 +58,7 @@ class OpenAICore:
             return False
         except Exception as e:
             logger.error("Exception: %s", e)
-            raise
+        return True
 
     @staticmethod
     def build_profile(model_name: str) -> dict[str, bool | int | str]:
