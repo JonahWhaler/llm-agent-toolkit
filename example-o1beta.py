@@ -7,7 +7,7 @@ import logging
 from dotenv import load_dotenv
 
 logging.basicConfig(
-    filename="./snippet/output/example-o1beta.log",
+    filename="./dev/log/example-o1beta.log",
     level=logging.INFO,
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     datefmt="%Y-%m-%d %H:%M:%S",
@@ -34,7 +34,7 @@ def exec_o1beta(model_name: str, prompt: str):
         config=config,
     )
     results = llm.run(query=prompt, context=None)
-    with open("./snippet/output/o1beta.md", "a", encoding="utf-8") as md:
+    with open("./dev/document/o1beta.md", "a", encoding="utf-8") as md:
         md.write(f"\n\n==== {model_name} ====\n\n")
         md.write(f"Prompt: {prompt}\n\n")
         for result in results:
@@ -51,7 +51,7 @@ def exec_reasoner(model_name: str, prompt: str):
     llm = O1Beta_DS_Core(system_prompt="", config=config)
     results = llm.run(query=prompt, context=None)
     with open(
-        "./snippet/output/o1beta-deepseek-reasoner.md", "a", encoding="utf-8"
+        "./dev/document/o1beta-deepseek-reasoner.md", "a", encoding="utf-8"
     ) as md:
         md.write(f"\n\n==== {model_name} ====\n\n")
         md.write(f"Prompt: {prompt}\n\n")
