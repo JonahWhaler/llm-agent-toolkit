@@ -8,14 +8,14 @@ import logging
 from dotenv import load_dotenv
 
 logging.basicConfig(
-    filename="./snippet/output/example-openai.log",
+    filename="./dev/log/example-openai.log",
     level=logging.INFO,
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     datefmt="%Y-%m-%d %H:%M:%S",
 )
 logger = logging.getLogger(__name__)
 
-FILEPATH = "./dev/classroom.jpg"
+FILEPATH = "./dev/image/classroom.jpg"
 
 
 def adder(a: int, b: int) -> int:
