@@ -5,7 +5,7 @@ DESCRIPTION = "LLM Agent Toolkit provides minimal, modular interfaces for core c
 # python3 setup.py sdist bdist_wheel
 # twine upload --skip-existing dist/* --verbose
 
-VERSION = "0.0.30.b2"
+VERSION = "0.0.29.4"
 
 with open("./README.md", "r", encoding="utf-8") as f:
     long_description = f.read()
@@ -24,7 +24,7 @@ core_dependencies = [
 ]
 transformers_dependencies = [
     "torch==2.5.1",
-    "transformers==4.46.2",
+    "transformers==4.48.0",
 ]
 transcriber_dependencies = [
     "pydub==0.25.1",
