@@ -98,9 +98,13 @@ class GMN_StructuredOutput_Core(Core, GeminiCore, ImageInterpreter):
 
         if context:
             for ctx in context:
+                _role = ctx["role"]
+                if _role == "system":
+                    # This can happend when user force an system message into the context
+                    _role = "model"
                 msgs.append(
                     types.Content(
-                        role=ctx["role"],
+                        role=_role,
                         parts=[types.Part.from_text(text=ctx["content"])],
                     )
                 )
@@ -197,9 +201,13 @@ class GMN_StructuredOutput_Core(Core, GeminiCore, ImageInterpreter):
 
         if context:
             for ctx in context:
+                _role = ctx["role"]
+                if _role == "system":
+                    # This can happend when user force an system message into the context
+                    _role = "model"
                 msgs.append(
                     types.Content(
-                        role=ctx["role"],
+                        role=_role,
                         parts=[types.Part.from_text(text=ctx["content"])],
                     )
                 )
