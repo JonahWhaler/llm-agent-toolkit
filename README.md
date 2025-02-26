@@ -45,15 +45,15 @@ For developers requiring full-range customization or access to the latest featur
   pip install llm-agent-toolkit[gemini]
 
   # transform text to embedding through transformers's API
-  pip install llm-agent-toolkit["transformer"] 
+  pip install llm-agent-toolkit[transformer] 
   
   # transform audio to text, only works on Ubuntu
   sudo apt install ffmpeg
-  pip install llm-agent-toolkit["transcriber"]
+  pip install llm-agent-toolkit[transcriber]
 
   # entire package
   sudo apt install ffmpeg
-  pip install llm-agent-toolkit["all"] # entire package
+  pip install llm-agent-toolkit[all] # entire package
   ```
 
 # Fundamental Components
