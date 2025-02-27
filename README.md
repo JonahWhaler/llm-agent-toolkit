@@ -34,7 +34,7 @@ For developers requiring full-range customization or access to the latest featur
 
 # Dependecies
 
-  * **Ollama:** v0.5.4
+  * **Ollama:** v0.5.4  # Download Ollama from here: https://ollama.com/download
 
 # Installation
   ```bash
@@ -43,6 +43,9 @@ For developers requiring full-range customization or access to the latest featur
 
   # Text Generation + Image Generation through Gemini
   pip install llm-agent-toolkit[gemini]
+
+  # Ollama Support
+  pip install llm-agent-toolkit[ollama] # >= v0.0.30.3
 
   # transform text to embedding through transformers's API
   pip install llm-agent-toolkit[transformer] 
