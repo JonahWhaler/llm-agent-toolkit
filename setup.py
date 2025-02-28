@@ -5,7 +5,7 @@ DESCRIPTION = "LLM Agent Toolkit provides minimal, modular interfaces for core c
 # python3 setup.py sdist bdist_wheel
 # twine upload --skip-existing dist/* --verbose
 
-VERSION = "0.0.30.2"
+VERSION = "0.0.30.3"
 
 with open("./README.md", "r", encoding="utf-8") as f:
     long_description = f.read()
@@ -13,7 +13,6 @@ with open("./README.md", "r", encoding="utf-8") as f:
 core_dependencies = [
     "python-dotenv==0.21.0",
     "openai==1.58.0",
-    "ollama==0.4.4",
     "tiktoken==0.8.0",
     "chromadb==0.5.11",
     "faiss-cpu==1.9.0.post1",
@@ -34,15 +33,18 @@ transcriber_dependencies = [
     "openai-whisper==20240930",
 ]
 gemini_dependencies = ["google-genai==1.0.0"]
+ollama_dependencies = ["ollama==0.4.4"]
 
 extras = {
     "transformers": transformers_dependencies,
     "transcriber": transcriber_dependencies,
     "gemini": gemini_dependencies,
+    "ollama": ollama_dependencies,
     "all": [
         *transformers_dependencies,
         *transcriber_dependencies,
         *gemini_dependencies,
+        *ollama_dependencies,
     ],
 }
 
