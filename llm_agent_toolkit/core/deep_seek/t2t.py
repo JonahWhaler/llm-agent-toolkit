@@ -92,10 +92,6 @@ class T2T_DS_Core(Core, DeepSeekCore, ToolSupport):
                 choice = response.choices[0]
                 _content = getattr(choice.message, "content", "Not Available")
 
-                accumulated_token_count += (
-                    response.usage.total_tokens if response.usage else 0
-                )
-
                 if _content:
                     msgs.append(
                         MessageBlock(role=CreatorRole.ASSISTANT.value, content=_content)
@@ -212,10 +208,6 @@ class T2T_DS_Core(Core, DeepSeekCore, ToolSupport):
                 choice = response.choices[0]
 
                 _content = getattr(choice.message, "content", None)
-
-                accumulated_token_count += (
-                    response.usage.total_tokens if response.usage else 0
-                )
 
                 if _content:
                     msgs.append(
