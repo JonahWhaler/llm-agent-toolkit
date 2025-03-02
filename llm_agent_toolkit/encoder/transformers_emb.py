@@ -60,6 +60,7 @@ class TransformerEncoder(Encoder):
         model_name: str,
         dimension: int | None = None,
         ctx_length: int | None = None,
+        directory: str | None = None,
     ):
         """
         Initialize an encoder model.
@@ -68,6 +69,7 @@ class TransformerEncoder(Encoder):
             - model_name (str): Name of the embedding model
             - dimension (int | None): Output dimension of the generated embedding. This will be ignored if the selected model is covered.
             - ctx_length (int | None): Number of word/token the embedding model can handle. This will be ignored if the selected model is covered.
+            - directory (str | None): Downloaded models will be stored here.
 
         Raises:
             - (TypeError): If dimension or ctx_length is not type int.
@@ -90,6 +92,15 @@ class TransformerEncoder(Encoder):
             if not isinstance(ctx_length, int):
                 raise TypeError("Invalid argument. Expect ctx_length to be type int.")
         super().__init__(model_name, dimension, ctx_length)
+        # Downloaded models will be stored here.
+        self.__dir = directory
+
+    @property
+    def directory(self) -> str | None:
+        """
+        Downloaded models will be stored here.
+        """
+        return self.__dir
 
     def encode(self, text: str, **kwargs) -> list[float]:
         """Transform string to embedding.
@@ -107,7 +118,14 @@ class TransformerEncoder(Encoder):
         * add_special_tokens=True
         """
         try:
-            tokenizer = AutoTokenizer.from_pretrained(self.model_name, use_fast=True)
+            if self.directory:
+                tokenizer = AutoTokenizer.from_pretrained(
+                    self.model_name, cache_dir=self.directory, use_fast=True
+                )
+            else:
+                tokenizer = AutoTokenizer.from_pretrained(
+                    self.model_name, use_fast=True
+                )
             tokens = tokenizer(
                 text,
                 return_tensors="pt",
@@ -137,7 +155,14 @@ class TransformerEncoder(Encoder):
         * add_special_tokens=True
         """
         try:
-            tokenizer = AutoTokenizer.from_pretrained(self.model_name, use_fast=True)
+            if self.directory:
+                tokenizer = AutoTokenizer.from_pretrained(
+                    self.model_name, cache_dir=self.directory, use_fast=True
+                )
+            else:
+                tokenizer = AutoTokenizer.from_pretrained(
+                    self.model_name, use_fast=True
+                )
             tokens = tokenizer(
                 text,
                 return_tensors="pt",
@@ -169,7 +194,14 @@ class TransformerEncoder(Encoder):
         * Not asynchronous! Implemented for the sake of interface consistency.
         """
         try:
-            tokenizer = AutoTokenizer.from_pretrained(self.model_name, use_fast=True)
+            if self.directory:
+                tokenizer = AutoTokenizer.from_pretrained(
+                    self.model_name, cache_dir=self.directory, use_fast=True
+                )
+            else:
+                tokenizer = AutoTokenizer.from_pretrained(
+                    self.model_name, use_fast=True
+                )
             tokens = tokenizer(
                 text,
                 return_tensors="pt",
@@ -200,7 +232,14 @@ class TransformerEncoder(Encoder):
         * Not asynchronous! Implemented for the sake of interface consistency.
         """
         try:
-            tokenizer = AutoTokenizer.from_pretrained(self.model_name, use_fast=True)
+            if self.directory:
+                tokenizer = AutoTokenizer.from_pretrained(
+                    self.model_name, cache_dir=self.directory, use_fast=True
+                )
+            else:
+                tokenizer = AutoTokenizer.from_pretrained(
+                    self.model_name, use_fast=True
+                )
             tokens = tokenizer(
                 text,
                 return_tensors="pt",
