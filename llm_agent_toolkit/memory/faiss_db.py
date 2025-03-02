@@ -776,10 +776,11 @@ class FaissMemory(VectorMemory):
         metadata = kwargs.get("metadata", None)
         document_chunks = self.split_text(document_string)
 
+        number_of_document_chunks = len(document_chunks)
         if metadata is not None:
             metas = []
             ids = []
-            for i in range(len(document_chunks)):
+            for i in range(number_of_document_chunks):
                 meta = deepcopy(metadata)
                 meta["page"] = i
                 meta["parent"] = identifier
@@ -794,8 +795,10 @@ class FaissMemory(VectorMemory):
         else:
             self.vdb.add(
                 documents=document_chunks,
-                metadatas=None,
-                ids=[f"{identifier}-{i}" for i in range(len(document_chunks))],
+                metadatas=[
+                    {"parent": identifier} for _ in range(number_of_document_chunks)
+                ],
+                ids=[f"{identifier}-{i}" for i in range(number_of_document_chunks)],
                 embeddings=[self.encoder.encode(chunk) for chunk in document_chunks],
             )
 
