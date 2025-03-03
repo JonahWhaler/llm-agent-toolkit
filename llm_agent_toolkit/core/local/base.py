@@ -8,7 +8,7 @@ import ollama
 from PIL import Image
 
 # Internal Packages
-from ..._util import CreatorRole, MessageBlock
+from ..._util import CreatorRole, MessageBlock, TokenUsage
 from ..._tool import ToolMetadata
 
 logger = logging.getLogger(__name__)
@@ -260,6 +260,23 @@ class OllamaCore:
         total_tokens = 85 + 170 * (tiles_width * tiles_height)
         # logger.info(">>>> Image Tokens: %d", total_tokens)
         return total_tokens
+
+    @staticmethod
+    def update_usage(
+        response: dict[str, Any], token_usage: TokenUsage | None = None
+    ) -> TokenUsage:
+        """Transforms CompletionUsage to TokenUsage. This is a adapter function."""
+        if token_usage is None:
+            token_usage = TokenUsage(input_tokens=0, output_tokens=0)
+
+        input_tokens = response.get("prompt_eval_count", None)
+        output_tokens = response.get("eval_count", None)
+        if input_tokens is None and output_tokens is None:
+            raise RuntimeError("Both input_tokens and output_tokens are None.")
+
+        token_usage.input_tokens += input_tokens
+        token_usage.output_tokens += output_tokens
+        return token_usage
 
 
 TOOL_PROMPT = """

@@ -2,13 +2,19 @@ import os
 import logging
 import json
 from typing import Any, Optional, Type, TypeVar
-from math import ceil
+# from math import ceil
 
 import openai
 from pydantic import BaseModel
 
 from ..._core import Core
-from ..._util import CreatorRole, ChatCompletionConfig, MessageBlock, ResponseMode
+from ..._util import (
+    CreatorRole,
+    ChatCompletionConfig,
+    MessageBlock,
+    ResponseMode,
+    TokenUsage,
+)
 
 from .base import DeepSeekCore
 
@@ -45,7 +51,7 @@ class T2TSO_DS_Core(Core, DeepSeekCore):
 
     async def run_async(
         self, query: str, context: list[MessageBlock | dict] | None, **kwargs
-    ) -> list[MessageBlock | dict]:
+    ) -> tuple[list[MessageBlock | dict], TokenUsage]:
         response_mode: Optional[ResponseMode] = kwargs.get("mode", ResponseMode.DEFAULT)
         # response_format: Optional[Type[T]] = kwargs.get("format")  # type: ignore
         self.validate(response_mode, None)  # Raise an exception if invalid
@@ -69,8 +75,6 @@ class T2TSO_DS_Core(Core, DeepSeekCore):
             MAX_OUTPUT_TOKENS,
             self.context_length - prompt_token_count,
         )
-
-        accumulated_token_count = 0  # Accumulated token count across iterations
 
         try:
             client = openai.AsyncOpenAI(
@@ -105,9 +109,7 @@ class T2TSO_DS_Core(Core, DeepSeekCore):
             choice = response.choices[0]
             _content = getattr(choice.message, "content", "Not Available")
 
-            accumulated_token_count += (
-                response.usage.total_tokens if response.usage else 0
-            )
+            token_usage = self.update_usage(response.usage)
 
             if _content:
                 if response_mode is not ResponseMode.DEFAULT:
@@ -119,7 +121,9 @@ class T2TSO_DS_Core(Core, DeepSeekCore):
                         content = json.dumps(e)
                 else:
                     content = _content
-                return [{"role": CreatorRole.ASSISTANT.value, "content": content}]
+                return [
+                    {"role": CreatorRole.ASSISTANT.value, "content": content}
+                ], token_usage
             raise RuntimeError(f"Content not available. Reason: {choice.finish_reason}")
         except Exception as e:
             logger.error("Exception: %s", e)
@@ -127,7 +131,7 @@ class T2TSO_DS_Core(Core, DeepSeekCore):
 
     def run(
         self, query: str, context: list[MessageBlock | dict] | None, **kwargs
-    ) -> list[MessageBlock | dict]:
+    ) -> tuple[list[MessageBlock | dict], TokenUsage]:
         response_mode: Optional[ResponseMode] = kwargs.get("mode", ResponseMode.DEFAULT)
         # response_format: Optional[Type[T]] = kwargs.get("format")  # type: ignore
         self.validate(response_mode, None)  # Raise an exception if invalid
@@ -151,8 +155,6 @@ class T2TSO_DS_Core(Core, DeepSeekCore):
             MAX_OUTPUT_TOKENS,
             self.context_length - prompt_token_count,
         )
-
-        accumulated_token_count = 0  # Accumulated token count across iterations
 
         try:
             client = openai.Client(
@@ -187,9 +189,7 @@ class T2TSO_DS_Core(Core, DeepSeekCore):
             choice = response.choices[0]
             _content = getattr(choice.message, "content", "Not Available")
 
-            accumulated_token_count += (
-                response.usage.total_tokens if response.usage else 0
-            )
+            token_usage = self.update_usage(response.usage)
 
             if _content:
                 if response_mode is not ResponseMode.DEFAULT:
@@ -201,7 +201,9 @@ class T2TSO_DS_Core(Core, DeepSeekCore):
                         content = json.dumps(e)
                 else:
                     content = _content
-                return [{"role": CreatorRole.ASSISTANT.value, "content": content}]
+                return [
+                    {"role": CreatorRole.ASSISTANT.value, "content": content}
+                ], token_usage
             raise RuntimeError(f"Content not available. Reason: {choice.finish_reason}")
         except Exception as e:
             logger.error("Exception: %s", e)

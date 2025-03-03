@@ -4,11 +4,7 @@ import logging
 import openai
 
 from ..._core import Core, ToolSupport
-from ..._util import (
-    CreatorRole,
-    ChatCompletionConfig,
-    MessageBlock,
-)
+from ..._util import CreatorRole, ChatCompletionConfig, MessageBlock, TokenUsage
 from ..._tool import Tool, ToolMetadata
 from .base import DeepSeekCore, TOOL_PROMPT
 
@@ -29,7 +25,7 @@ class T2T_DS_Core(Core, DeepSeekCore, ToolSupport):
 
     async def run_async(
         self, query: str, context: list[MessageBlock | dict] | None, **kwargs
-    ) -> list[MessageBlock | dict]:
+    ) -> tuple[list[MessageBlock | dict], TokenUsage]:
         msgs: list[MessageBlock | dict] = [
             MessageBlock(role=CreatorRole.SYSTEM.value, content=self.system_prompt)
         ]
@@ -58,9 +54,8 @@ class T2T_DS_Core(Core, DeepSeekCore, ToolSupport):
             self.context_length - prompt_token_count,
         )
 
-        accumulated_token_count = 0  # Accumulated token count across iterations
         iteration, solved = 0, False
-
+        token_usage = TokenUsage(input_tokens=0, output_tokens=0)
         try:
             client = openai.AsyncOpenAI(
                 api_key=os.environ["DEEPSEEK_API_KEY"],
@@ -70,7 +65,7 @@ class T2T_DS_Core(Core, DeepSeekCore, ToolSupport):
                 not solved
                 and max_output_tokens > 0
                 and iteration < self.config.max_iteration
-                and accumulated_token_count < MAX_TOKENS
+                and token_usage.total_tokens < MAX_TOKENS
             ):
                 # logger.info("Iteration: [%d]", iteration)
                 if tools_metadata and iteration + 1 == self.config.max_iteration:
@@ -111,16 +106,15 @@ class T2T_DS_Core(Core, DeepSeekCore, ToolSupport):
                     self.context_length - prompt_token_count,
                 )
                 iteration += 1
-                if response.usage:
-                    accumulated_token_count += response.usage.total_tokens
+                token_usage = self.update_usage(response.usage, token_usage)
 
             # End while
             if not solved:
                 warning_message = "Warning: "
                 if iteration == self.config.max_iteration:
                     warning_message += f"Maximum iteration reached. {iteration}/{self.config.max_iteration}\n"
-                elif accumulated_token_count >= MAX_TOKENS:
-                    warning_message += f"Maximum token count reached. {accumulated_token_count}/{MAX_TOKENS}\n"
+                elif token_usage.total_tokens >= MAX_TOKENS:
+                    warning_message += f"Maximum token count reached. {token_usage.total_tokens}/{MAX_TOKENS}\n"
                 elif max_output_tokens <= 0:
                     warning_message += f"Maximum output tokens <= 0. {prompt_token_count}/{self.context_length}\n"
                 else:
@@ -138,14 +132,14 @@ class T2T_DS_Core(Core, DeepSeekCore, ToolSupport):
                     generated_msgs,
                 )
             )
-            return filtered_msgs
+            return filtered_msgs, token_usage
         except Exception as e:
             logger.error("Exception: %s", e)
             raise
 
     def run(
         self, query: str, context: list[MessageBlock | dict] | None, **kwargs
-    ) -> list[MessageBlock | dict]:
+    ) -> tuple[list[MessageBlock | dict], TokenUsage]:
         msgs: list[MessageBlock | dict] = [
             MessageBlock(role=CreatorRole.SYSTEM.value, content=self.system_prompt)
         ]
@@ -174,9 +168,8 @@ class T2T_DS_Core(Core, DeepSeekCore, ToolSupport):
             self.context_length - prompt_token_count,
         )
 
-        accumulated_token_count = 0  # Accumulated token count across iterations
         iteration, solved = 0, False
-
+        token_usage = TokenUsage(input_tokens=0, output_tokens=0)
         try:
             client = openai.OpenAI(
                 api_key=os.environ["DEEPSEEK_API_KEY"],
@@ -186,7 +179,7 @@ class T2T_DS_Core(Core, DeepSeekCore, ToolSupport):
                 not solved
                 and max_output_tokens > 0
                 and iteration < self.config.max_iteration
-                and accumulated_token_count < MAX_TOKENS
+                and token_usage.total_tokens < MAX_TOKENS
             ):
                 # logger.info("Iteration: [%d]", iteration)
                 if tools_metadata and iteration + 1 == self.config.max_iteration:
@@ -228,17 +221,15 @@ class T2T_DS_Core(Core, DeepSeekCore, ToolSupport):
                     self.context_length - prompt_token_count,
                 )
                 iteration += 1
-                if response.usage:
-                    accumulated_token_count += response.usage.total_tokens
-                    # logger.info("Accumulated token count: %d", accumulated_token_count)
+                token_usage = self.update_usage(response.usage, token_usage)
 
             # End while
             if not solved:
                 warning_message = "Warning: "
                 if iteration == self.config.max_iteration:
                     warning_message += f"Maximum iteration reached. {iteration}/{self.config.max_iteration}\n"
-                elif accumulated_token_count >= MAX_TOKENS:
-                    warning_message += f"Maximum token count reached. {accumulated_token_count}/{MAX_TOKENS}\n"
+                elif token_usage.total_tokens >= MAX_TOKENS:
+                    warning_message += f"Maximum token count reached. {token_usage.total_tokens}/{MAX_TOKENS}\n"
                 elif max_output_tokens <= 0:
                     warning_message += f"Maximum output tokens <= 0. {prompt_token_count}/{self.context_length}\n"
                 else:
@@ -258,7 +249,7 @@ class T2T_DS_Core(Core, DeepSeekCore, ToolSupport):
                 )
             )
 
-            return filtered_msgs
+            return filtered_msgs, token_usage
         except Exception as e:
             logger.error("Exception: %s", e)
             raise

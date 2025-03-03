@@ -10,7 +10,7 @@ import tiktoken
 from PIL import Image
 
 # Internal Packages
-from ..._util import CreatorRole, MessageBlock
+from ..._util import CreatorRole, MessageBlock, TokenUsage
 from ..._tool import ToolMetadata
 
 logger = logging.getLogger(__name__)
@@ -285,6 +285,25 @@ class OpenAICore:
         tiles_width = ceil(width / 512)
         tiles_height = ceil(height / 512)
         return (tiles_width, tiles_height)
+
+    @staticmethod
+    def update_usage(
+        completion_usage: openai.types.CompletionUsage | None,
+        token_usage: TokenUsage | None = None,
+    ) -> TokenUsage:
+        """Transforms CompletionUsage to TokenUsage. This is a adapter function."""
+        if completion_usage is None:
+            raise RuntimeError("Response Usage is None.")
+
+        if token_usage is None:
+            token_usage = TokenUsage(
+                input_tokens=completion_usage.prompt_tokens,
+                output_tokens=completion_usage.completion_tokens,
+            )
+        else:
+            token_usage.input_tokens += completion_usage.prompt_tokens
+            token_usage.output_tokens += completion_usage.completion_tokens
+        return token_usage
 
 
 TOOL_PROMPT = """

@@ -6,6 +6,8 @@ from PIL import Image
 from google import genai
 from google.genai import types
 
+from ..._util import TokenUsage
+
 logger = logging.getLogger(__name__)
 
 
@@ -196,3 +198,28 @@ class GeminiCore:
             image_token_count,
         )
         return estimated_tokens
+
+    @staticmethod
+    def update_usage(
+        usage: types.GenerateContentResponseUsageMetadata | None,
+        token_usage: TokenUsage | None = None,
+    ) -> TokenUsage:
+        """Transforms GenerateContentResponseUsageMetadata to TokenUsage. This is a adapter function."""
+        if usage is None:
+            raise RuntimeError("Response usage is None.")
+
+        if usage.prompt_token_count is None or usage.candidates_token_count is None:
+            raise RuntimeError(
+                "Either or both prompt_token_count and candidates_token_count are None"
+            )
+
+        if token_usage is None:
+            token_usage = TokenUsage(
+                input_tokens=usage.prompt_token_count,
+                output_tokens=usage.candidates_token_count,
+            )
+        else:
+            token_usage.input_tokens += usage.prompt_token_count
+            token_usage.output_tokens += usage.candidates_token_count
+
+        return token_usage
