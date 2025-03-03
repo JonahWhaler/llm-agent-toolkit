@@ -188,7 +188,8 @@ class OllamaCore:
             int: The token count. Number of characters divided by `CONVERSION_FACTOR` + token count for images
 
         Notes:
-        * Set `CONVERSION_FACTOR` as 2 because my usecase most like involve using utf-8 encoding.
+        * Remove whitespaces
+        * If contain non-ascii character, conversion_factor = 1.5, else conversion_factor = 4
         """
         character_count: int = 0
         has_non_ascii = False
