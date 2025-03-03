@@ -48,6 +48,7 @@ class DeepSeekCore:
 
         Notes:
         * https://api-docs.deepseek.com/quick_start/token_usage
+        * Remove whitespaces
         """
         CONVERSION_FACTOR = 0.6
         character_count: int = 0
@@ -56,7 +57,9 @@ class DeepSeekCore:
             if not isinstance(msg, dict):
                 continue
             if "content" in msg and msg["content"]:
-                character_count += len(msg["content"])
+                cleaned_content = msg["content"].replace("\n", "")
+                cleaned_content = cleaned_content.replace(" ", "")
+                character_count += len(cleaned_content)
             # if "role" in msg and msg["role"] == CreatorRole.TOOL.value:
             #     if "name" in msg:
             #         character_count += len(msg["name"])
@@ -65,7 +68,9 @@ class DeepSeekCore:
             for tool in tools:
                 character_count += len(json.dumps(tool))
 
-        return ceil(character_count * CONVERSION_FACTOR)
+        text_token_count = ceil(character_count * CONVERSION_FACTOR)
+        logger.info("Token Estimation:\nText: %d", text_token_count)
+        return text_token_count
 
 
 TOOL_PROMPT = """
