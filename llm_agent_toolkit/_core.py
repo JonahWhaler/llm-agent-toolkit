@@ -161,9 +161,9 @@ class ImageInterpreter(ABC):
     Abstract class for image-to-text LLM models.
 
     Abstract methods:
-    - interpret_async(query: str, context: list[ContextMessage | dict] | None, filepath: str, **kwargs) -> list[OpenAIMessage | dict]:
+    - interpret_async(query: str, context: list[ContextMessage | dict] | None, filepath: str, **kwargs) -> tuple[list[OpenAIMessage | dict], TokenUsage]:
         Asynchronously run the LLM model to interpret the image in `filepath`.
-    - interpret(query: str, context: list[ContextMessage | dict] | None, filepath: str, **kwargs) -> list[OpenAIMessage | dict]:
+    - interpret(query: str, context: list[ContextMessage | dict] | None, filepath: str, **kwargs) -> tuple[list[OpenAIMessage | dict], TokenUsage]:
         Synchronously run the LLM model to interpret the image in `filepath`.
     """
 
