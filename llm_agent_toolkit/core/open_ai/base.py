@@ -167,31 +167,38 @@ class OpenAICore:
         Returns:
             int: The token count.
         """
-        token_count: int = 0
+        text_token_count: int = 0
         encoding = tiktoken.encoding_for_model(self.__model_name)
         for msg in msgs:
             # Incase the dict does not comply with the MessageBlock format
             if "content" in msg and msg["content"]:
                 if not isinstance(msg["content"], list):
-                    token_count += len(encoding.encode(msg["content"]))
+                    text_token_count += len(encoding.encode(msg["content"]))
                 # Skip images
             if "role" in msg and msg["role"] == CreatorRole.FUNCTION.value:
                 if "name" in msg:
-                    token_count += len(encoding.encode(msg["name"]))
+                    text_token_count += len(encoding.encode(msg["name"]))
 
         if tools:
             for tool in tools:
-                token_count += len(encoding.encode(json.dumps(tool)))
+                text_token_count += len(encoding.encode(json.dumps(tool)))
 
+        image_token_count = 0
         if images:
             for image_path in images:
                 if image_detail == "low":
-                    token_count += 85
+                    image_token_count += 85
                 else:
                     with Image.open(image_path) as img:
                         width, height = img.size
-                        token_count += self.calculate_image_tokens(width, height)
-        return token_count
+                        image_token_count += self.calculate_image_tokens(width, height)
+
+        logger.info(
+            "Token Estimation:\nText: %d\nImage: %d",
+            text_token_count,
+            image_token_count,
+        )
+        return text_token_count + image_token_count
 
     @staticmethod
     def calculate_image_tokens(width: int, height: int) -> int:
