@@ -176,22 +176,23 @@ class GeminiCore:
             model=model_name,
             contents=text_contents,  # type: ignore
         )
-        text_tokens = count_token_response.total_tokens
-        if text_tokens is None:
-            text_tokens = 0
+        text_token_count = count_token_response.total_tokens
+        if text_token_count is None:
+            text_token_count = 0
 
-        image_tokens = 0
+        image_token_count = 0
         if imgs:
             for img in imgs:
                 with Image.open(img) as image:
                     width, height = image.size
-                    image_tokens += GeminiCore.calculate_image_tokens(width, height)
+                    image_token_count += GeminiCore.calculate_image_tokens(
+                        width, height
+                    )
 
-        estimated_tokens = text_tokens + image_tokens
+        estimated_tokens = text_token_count + image_token_count
         logger.info(
-            "Usage Estimation: %d toks\nText: %d toks\nImage: %d toks",
-            estimated_tokens,
-            text_tokens,
-            image_tokens,
+            "Token Estimation:\nText: %d\nImage: %d",
+            text_token_count,
+            image_token_count,
         )
         return estimated_tokens
