@@ -1,5 +1,6 @@
 import io
 import os
+import logging
 from pathlib import Path
 import math
 from abc import abstractmethod, ABC
@@ -20,6 +21,8 @@ from pydantic import (
 )
 
 from .._util import MessageBlock, ModelConfig
+
+logger = logging.getLogger(__name__)
 
 
 class ConvertAudioInput(BaseModel):
@@ -211,20 +214,20 @@ class AudioHelper:
 
                     slices.append(output_file)
                 except ffmpeg.Error as e:
-                    print(f"Error processing slice {i + 1}:")
                     if e.stderr is not None:
-                        print(e.stderr.decode())
+                        logger.error(
+                            f"Error processing slice {i + 1}:" + e.stderr.decode()
+                        )
                     else:
-                        print(str(e))
+                        logger.error(f"Error processing slice {i + 1}:" + str(e))
                     raise
 
             return slices
         except ffmpeg.Error as e:
-            print("Error during file processing:")
             if e.stderr is not None:
-                print(e.stderr.decode())
+                logger.error("Error during file processing:" + e.stderr.decode())
             else:
-                print(str(e))
+                logger.error("Error during file processing:" + str(e))
             raise
 
         return slices
@@ -335,19 +338,18 @@ class AudioHelper:
                     # Yield the output file path
                     yield output_file
                 except ffmpeg.Error as e:
-                    print(f"Error processing slice {i + 1}:")
+                    logger.error(f"Error processing slice {i + 1}:")
                     if e.stderr is not None:
-                        print(e.stderr.decode())
+                        logger.error(e.stderr.decode())
                     else:
-                        print(str(e))
+                        logger.error(str(e))
                     raise
 
         except ffmpeg.Error as e:
-            print("Error during file processing:")
             if e.stderr is not None:
-                print(e.stderr.decode())
+                logger.error("Error during file processing:" + e.stderr.decode())
             else:
-                print(str(e))
+                logger.error("Error during file processing:" + str(e))
             raise
 
 
