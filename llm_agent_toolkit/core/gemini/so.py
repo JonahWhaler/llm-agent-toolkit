@@ -1,6 +1,8 @@
 import os
 import logging
+import asyncio
 from typing import Any, Optional, Type, TypeVar
+from concurrent.futures import ThreadPoolExecutor
 
 # External Packages
 from google import genai
@@ -251,14 +253,10 @@ class GMN_StructuredOutput_Core(Core, GeminiCore, ImageInterpreter):
         token_usage = TokenUsage(input_tokens=0, output_tokens=0)
         config = self.custom_config(max_output_tokens, response_mode, response_format)
         try:
-            client = genai.Client(api_key=os.environ["GEMINI_API_KEY"])
-            response = client.models.generate_content(
-                model=self.model_name,
-                contents=msgs,  # type: ignore
-                config=config,
+            response = await self.acall(self.model_name, config, msgs)
+            token_usage = self.update_usage(
+                response.usage_metadata, token_usage=token_usage
             )
-
-            token_usage = self.update_usage(response.usage_metadata, token_usage)
 
             response_text = getattr(response, "text", None)
             if response_text is None:
@@ -277,6 +275,22 @@ class GMN_StructuredOutput_Core(Core, GeminiCore, ImageInterpreter):
         except Exception as e:
             logger.error("Exception: %s", e, exc_info=True, stack_info=True)
             raise
+
+    @staticmethod
+    async def acall(
+        model_name: str, config: types.GenerateContentConfig, msgs: list[types.Content]
+    ):
+        """Use this to make the `generate_content` method asynchronous."""
+        client = genai.Client(api_key=os.environ["GEMINI_API_KEY"])
+        with ThreadPoolExecutor() as executor:
+            future = executor.submit(
+                client.models.generate_content,
+                model=model_name,
+                contents=msgs,  # type: ignore
+                config=config,
+            )
+            response = await asyncio.wrap_future(future)  # Makes the future awaitable
+            return response
 
     def interpret(
         self,
