@@ -128,13 +128,12 @@ class I2T_OLM_Core(Core, OllamaCore, ImageInterpreter):  # , ToolSupport
                 )
             )
             token_usage = self.update_usage(response)  # type: ignore
-            logger.info("Usage: %s", token_usage)
 
             return msgs[
                 NUMBER_OF_PRIMERS:
             ], token_usage  # Return only the generated messages
         except Exception as e:
-            logger.error("Exception: %s", e)
+            logger.error("Exception: %s", e, exc_info=True, stack_info=True)
             raise
 
     def run(
@@ -214,13 +213,12 @@ class I2T_OLM_Core(Core, OllamaCore, ImageInterpreter):  # , ToolSupport
             )
 
             token_usage = self.update_usage(response)  # type: ignore
-            logger.info("Usage: %s", token_usage)
 
             return msgs[
                 NUMBER_OF_PRIMERS:
             ], token_usage  # Return only the generated messages
         except Exception as e:
-            logger.error("Exception: %s", e)
+            logger.error("Exception: %s", e, exc_info=True, stack_info=True)
             raise
 
     def interpret(

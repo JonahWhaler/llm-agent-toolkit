@@ -95,10 +95,8 @@ class FaissIFL2DB(FaissDB):
         if os.path.exists(f"{self.__db_path}/{namespace}.index") and os.path.exists(
             f"{self.__db_path}/{namespace}.db"
         ):
-            logger.info("Loading...")
             index = faiss.read_index(f"{self.__db_path}/{namespace}.index")
         else:
-            logger.info("Creating...")
             index = faiss.IndexFlatL2(self.__dimension)
             faiss.write_index(index, f"{self.__db_path}/{namespace}.index")
 
@@ -170,7 +168,9 @@ class FaissIFL2DB(FaissDB):
                 )
             )
         except Exception as loading_error:
-            logger.error(msg=f"Loading Error: {loading_error}")
+            logger.error(
+                msg=f"Loading Error: {loading_error}", exc_info=True, stack_info=True
+            )
             raise
         track = []
         for i, d, m, e in zip(ids, documents, metadatas, embeddings):
@@ -193,11 +193,11 @@ class FaissIFL2DB(FaissDB):
                 track.append(counter)
             except AssertionError as a_e:
                 # Inconsistent counter
-                logger.error(msg=str(a_e))
+                logger.error(msg=str(a_e), exc_info=True, stack_info=True)
                 raise
             except Exception as e:
                 # Backtracking...
-                logger.error(msg=str(e))
+                logger.error(msg=str(e), exc_info=True, stack_info=True)
                 for counter in track:
                     v = sqlite.get(key=str(counter))
                     if v is not None:
@@ -258,7 +258,9 @@ class FaissIFL2DB(FaissDB):
                 )
             )
         except Exception as loading_error:
-            logger.error(msg=f"Loading Error: {loading_error}")
+            logger.error(
+                msg=f"Loading Error: {loading_error}", exc_info=True, stack_info=True
+            )
             raise
 
         try:
@@ -292,7 +294,7 @@ class FaissIFL2DB(FaissDB):
 
             return output
         except Exception as e:
-            logger.error(msg=str(e))
+            logger.error(msg=str(e), exc_info=True, stack_info=True)
             raise
 
     def remove(self, ids: list[str], **kwargs) -> list[str]:
@@ -320,7 +322,9 @@ class FaissIFL2DB(FaissDB):
                 )
             )
         except Exception as loading_error:
-            logger.error(msg=f"Loading Error: {loading_error}")
+            logger.error(
+                msg=f"Loading Error: {loading_error}", exc_info=True, stack_info=True
+            )
             raise
         removed_ids = []
         for key in ids:
@@ -342,7 +346,9 @@ class FaissIFL2DB(FaissDB):
                 )
             )
         except Exception as loading_error:
-            logger.error(msg=f"Loading Error: {loading_error}")
+            logger.error(
+                msg=f"Loading Error: {loading_error}", exc_info=True, stack_info=True
+            )
             raise
         # Build a tmp sqlite db
         tmp_sqlite_path = f"{self.__db_path}/tmp.db"
@@ -393,7 +399,9 @@ class FaissIFL2DB(FaissDB):
                 )
             )
         except Exception as loading_error:
-            logger.error(msg=f"Loading Error: {loading_error}")
+            logger.error(
+                msg=f"Loading Error: {loading_error}", exc_info=True, stack_info=True
+            )
             raise
         self.__sqlite = sqlite
         keys = self.__sqlite.keys()
@@ -445,10 +453,8 @@ class FaissHNSWDB(FaissDB):
         if os.path.exists(f"{self.__db_path}/{namespace}.index") and os.path.exists(
             f"{self.__db_path}/{namespace}.db"
         ):
-            logger.info("Loading...")
             index = faiss.read_index(f"{self.__db_path}/{namespace}.index")
         else:
-            logger.info("Creating...")
             index = faiss.IndexHNSWFlat(self.__dimension, FaissHNSWDB.M)
             index.hnsw.efConstruction = FaissHNSWDB.EF_CONSTRUCTION
             index.hnsw.efSearch = FaissHNSWDB.EF_SEARCH
@@ -522,7 +528,9 @@ class FaissHNSWDB(FaissDB):
                 )
             )
         except Exception as loading_error:
-            logger.error(msg=f"Loading Error: {loading_error}")
+            logger.error(
+                msg=f"Loading Error: {loading_error}", exc_info=True, stack_info=True
+            )
             raise
         track = []
         for i, d, m, e in zip(ids, documents, metadatas, embeddings):
@@ -544,11 +552,11 @@ class FaissHNSWDB(FaissDB):
                 track.append(counter)
             except AssertionError as a_e:
                 # Inconsistent counter
-                logger.error(msg=str(a_e))
+                logger.error(msg=str(a_e), exc_info=True, stack_info=True)
                 raise
             except Exception as e:
                 # Backtracking...
-                logger.error(msg=str(e))
+                logger.error(msg=str(e), exc_info=True, stack_info=True)
                 for counter in track:
                     v = sqlite.get(key=str(counter))
                     if v is not None:
@@ -609,7 +617,9 @@ class FaissHNSWDB(FaissDB):
                 )
             )
         except Exception as loading_error:
-            logger.error(msg=f"Loading Error: {loading_error}")
+            logger.error(
+                msg=f"Loading Error: {loading_error}", exc_info=True, stack_info=True
+            )
             raise
 
         try:
@@ -642,7 +652,7 @@ class FaissHNSWDB(FaissDB):
 
             return output
         except Exception as e:
-            logger.error(msg=str(e))
+            logger.error(msg=str(e), exc_info=True, stack_info=True)
             raise
 
     def remove(self, ids: list[str], **kwargs) -> list[str]:
@@ -670,7 +680,9 @@ class FaissHNSWDB(FaissDB):
                 )
             )
         except Exception as loading_error:
-            logger.error(msg=f"Loading Error: {loading_error}")
+            logger.error(
+                msg=f"Loading Error: {loading_error}", exc_info=True, stack_info=True
+            )
             raise
         removed_ids = []
         for key in ids:
@@ -692,7 +704,9 @@ class FaissHNSWDB(FaissDB):
                 )
             )
         except Exception as loading_error:
-            logger.error(msg=f"Loading Error: {loading_error}")
+            logger.error(
+                msg=f"Loading Error: {loading_error}", exc_info=True, stack_info=True
+            )
             raise
         # Build a tmp sqlite db
         tmp_sqlite_path = f"{self.__db_path}/tmp.db"
@@ -747,7 +761,9 @@ class FaissHNSWDB(FaissDB):
                 )
             )
         except Exception as loading_error:
-            logger.error(msg=f"Loading Error: {loading_error}")
+            logger.error(
+                msg=f"Loading Error: {loading_error}", exc_info=True, stack_info=True
+            )
             raise
         self.__sqlite = sqlite
         keys = self.__sqlite.keys()

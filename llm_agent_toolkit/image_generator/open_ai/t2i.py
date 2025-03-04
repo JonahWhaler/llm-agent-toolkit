@@ -24,7 +24,12 @@ class OpenAIImageGenerator(ImageGenerator):
                     return True
             return False
         except Exception as e:
-            logger.error("Exception: %s", e)
+            logger.error(
+                "Exception: %s",
+                e,
+                exc_info=True,
+                stack_info=True,
+            )
             raise
 
     async def generate_async(
@@ -49,7 +54,12 @@ class OpenAIImageGenerator(ImageGenerator):
 
             return output
         except Exception as e:
-            logger.error("Exception: %s", e)
+            logger.error(
+                "Exception: %s",
+                e,
+                exc_info=True,
+                stack_info=True,
+            )
             raise
 
     def generate(
@@ -74,7 +84,12 @@ class OpenAIImageGenerator(ImageGenerator):
 
             return output
         except Exception as e:
-            logger.error("Exception: %s", e)
+            logger.error(
+                "Exception: %s",
+                e,
+                exc_info=True,
+                stack_info=True,
+            )
             raise
 
     @staticmethod

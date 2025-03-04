@@ -189,7 +189,6 @@ class I2TSO_OLM_Core(Core, OllamaCore, ImageInterpreter):
             llm_generated_content: str = response["message"]["content"]
 
             token_usage = self.update_usage(response=response)  # type: ignore
-            logger.info("Usage: %s", token_usage)
 
             if llm_generated_content:
                 if response_mode is not ResponseMode.DEFAULT:
@@ -208,7 +207,7 @@ class I2TSO_OLM_Core(Core, OllamaCore, ImageInterpreter):
                 ], token_usage
             raise RuntimeError("Content not available.")
         except Exception as e:
-            logger.error("Exception: %s", e)
+            logger.error("Exception: %s", e, exc_info=True, stack_info=True)
             raise
 
     def run(
@@ -325,7 +324,6 @@ class I2TSO_OLM_Core(Core, OllamaCore, ImageInterpreter):
             llm_generated_content: str = response["message"]["content"]
 
             token_usage = self.update_usage(response=response)  # type: ignore
-            logger.info("Usage: %s", token_usage)
 
             if llm_generated_content:
                 if response_mode is not ResponseMode.DEFAULT:
@@ -344,7 +342,7 @@ class I2TSO_OLM_Core(Core, OllamaCore, ImageInterpreter):
                 ], token_usage
             raise RuntimeError("Content not available.")
         except Exception as e:
-            logger.error("Exception: %s", e)
+            logger.error("Exception: %s", e, exc_info=True, stack_info=True)
             raise
 
     def interpret(

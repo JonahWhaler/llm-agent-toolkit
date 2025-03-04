@@ -32,7 +32,7 @@ class GeminiCore:
                     return True
             return False
         except Exception as e:
-            logger.error("Exception: %s", str(e))
+            logger.error("Exception: %s", str(e), exc_info=True, stack_info=True)
         return False
 
     @classmethod
@@ -66,7 +66,7 @@ class GeminiCore:
                         try:
                             _ = int(value)
                         except ValueError:
-                            print(f"{name}.{column} must be an integer.")
+                            logger.warning(f"{name}.{column} must be an integer.")
                             raise
                     elif value:
                         assert value.lower() in [
@@ -192,7 +192,7 @@ class GeminiCore:
                     )
 
         estimated_tokens = text_token_count + image_token_count
-        logger.info(
+        logger.debug(
             "Token Estimation:\nText: %d\nImage: %d",
             text_token_count,
             image_token_count,
@@ -221,5 +221,5 @@ class GeminiCore:
         else:
             token_usage.input_tokens += usage.prompt_token_count
             token_usage.output_tokens += usage.candidates_token_count
-
+        logger.debug("Token Usage: %s", token_usage)
         return token_usage

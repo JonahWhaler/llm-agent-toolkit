@@ -136,7 +136,11 @@ class TransformerEncoder(Encoder):
             model = AutoModel.from_pretrained(self.model_name)
             return self.__to_embedding(model, tokens)
         except Exception as e:
-            logger.error(msg=f"{self.model_name}.encode failed. Error: {str(e)}")
+            logger.error(
+                msg=f"{self.model_name}.encode failed. Error: {str(e)}",
+                exc_info=True,
+                stack_info=True,
+            )
             raise
 
     def encode_v2(self, text: str, **kwargs) -> tuple[list[float], int]:
@@ -174,7 +178,11 @@ class TransformerEncoder(Encoder):
             model = AutoModel.from_pretrained(self.model_name)
             return self.__to_embedding(model, tokens), token_count
         except Exception as e:
-            logger.error(msg=f"{self.model_name}.encode failed. Error: {str(e)}")
+            logger.error(
+                msg=f"{self.model_name}.encode failed. Error: {str(e)}",
+                exc_info=True,
+                stack_info=True,
+            )
             raise
 
     async def encode_async(self, text: str, **kwargs) -> list[float]:
@@ -212,7 +220,11 @@ class TransformerEncoder(Encoder):
             model = AutoModel.from_pretrained(self.model_name)
             return self.__to_embedding(model, tokens)
         except Exception as e:
-            logger.error(msg=f"{self.model_name}.encode failed. Error: {str(e)}")
+            logger.error(
+                msg=f"{self.model_name}.encode failed. Error: {str(e)}",
+                exc_info=True,
+                stack_info=True,
+            )
             raise
 
     async def encode_v2_async(self, text: str, **kwargs) -> tuple[list[float], int]:
@@ -251,7 +263,11 @@ class TransformerEncoder(Encoder):
             model = AutoModel.from_pretrained(self.model_name)
             return self.__to_embedding(model, tokens), token_count
         except Exception as e:
-            logger.error(msg=f"{self.model_name}.encode failed. Error: {str(e)}")
+            logger.error(
+                msg=f"{self.model_name}.encode failed. Error: {str(e)}",
+                exc_info=True,
+                stack_info=True,
+            )
             raise
 
     @staticmethod

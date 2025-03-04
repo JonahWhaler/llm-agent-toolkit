@@ -42,6 +42,8 @@ class ChromaMemory(VectorMemory):
                     "%s is not found in the vector database. Ignore %s.",
                     self.__namespace,
                     e,
+                    exc_info=True,
+                    stack_info=True,
                 )
             finally:
                 self.vdb.create_collection(
@@ -208,7 +210,12 @@ class AsyncChromaMemory(AsyncVectorMemory):
                 metas,
             )
         except Exception as e:
-            logger.error("Failed to add document: %s", e)
+            logger.error(
+                "Failed to add document: %s",
+                e,
+                exc_info=True,
+                stack_info=True,
+            )
             raise
 
     async def query(self, query_string, **kwargs):

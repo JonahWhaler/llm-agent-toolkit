@@ -90,6 +90,7 @@ class DeepSeekCore:
         else:
             token_usage.input_tokens += completion_usage.prompt_tokens
             token_usage.output_tokens += completion_usage.completion_tokens
+        logger.debug("Token Usage: %s", token_usage)
         return token_usage
 
 

@@ -35,7 +35,11 @@ class OpenAIEncoder(Encoder):
             )
             return response.data[0].embedding
         except Exception as e:
-            logger.error(msg=f"{self.model_name}.encode failed. Error: {str(e)}")
+            logger.error(
+                msg=f"{self.model_name}.encode failed. Error: {str(e)}",
+                exc_info=True,
+                stack_info=True,
+            )
             raise
 
     def encode_v2(self, text: str, **kwargs) -> tuple[list[float], int]:
@@ -48,7 +52,11 @@ class OpenAIEncoder(Encoder):
             )
             return (response.data[0].embedding, response.usage.total_tokens)
         except Exception as e:
-            logger.error(msg=f"{self.model_name}.encode failed. Error: {str(e)}")
+            logger.error(
+                msg=f"{self.model_name}.encode failed. Error: {str(e)}",
+                exc_info=True,
+                stack_info=True,
+            )
             raise
 
     async def encode_async(self, text: str, **kwargs) -> list[float]:
@@ -61,7 +69,11 @@ class OpenAIEncoder(Encoder):
             )
             return response.data[0].embedding
         except Exception as e:
-            logger.error(msg=f"{self.model_name}.encode failed. Error: {str(e)}")
+            logger.error(
+                msg=f"{self.model_name}.encode failed. Error: {str(e)}",
+                exc_info=True,
+                stack_info=True,
+            )
             raise
 
     async def encode_v2_async(self, text: str, **kwargs) -> tuple[list[float], int]:
@@ -74,5 +86,9 @@ class OpenAIEncoder(Encoder):
             )
             return (response.data[0].embedding, response.usage.total_tokens)
         except Exception as e:
-            logger.error(msg=f"{self.model_name}.encode failed. Error: {str(e)}")
+            logger.error(
+                msg=f"{self.model_name}.encode failed. Error: {str(e)}",
+                exc_info=True,
+                stack_info=True,
+            )
             raise

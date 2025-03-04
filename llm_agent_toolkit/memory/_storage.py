@@ -136,7 +136,11 @@ class SQLite3_Storage(Storage):
             )
             conn.commit()
         except sqlite3.Error as e:
-            logger.error(e)
+            logger.error(
+                e,
+                exc_info=True,
+                stack_info=True,
+            )
             raise e
         finally:
             conn.close()

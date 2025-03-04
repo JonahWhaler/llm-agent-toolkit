@@ -107,7 +107,6 @@ class T2T_GMN_Core(Core, GeminiCore):
             token_usage = self.update_usage(
                 response.usage_metadata, token_usage=token_usage
             )
-            logger.info("Usage: %s", token_usage)
 
             response_text = getattr(response, "text", None)
             if response_text is None:
@@ -118,7 +117,7 @@ class T2T_GMN_Core(Core, GeminiCore):
             )
             return output, token_usage
         except Exception as e:
-            logger.error("Exception: %s", e)
+            logger.error("Exception: %s", e, exc_info=True, stack_info=True)
             raise
 
     @staticmethod
@@ -196,7 +195,6 @@ class T2T_GMN_Core(Core, GeminiCore):
         try:
             usage, response_text = await self.acall(self.model_name, config, msgs)
             token_usage = self.update_usage(usage, token_usage=token_usage)
-            logger.info("Usage: %s", token_usage)
 
             if response_text is None:
                 raise RuntimeError("response.text is None")
@@ -206,5 +204,5 @@ class T2T_GMN_Core(Core, GeminiCore):
             )
             return output, token_usage
         except Exception as e:
-            logger.error("Exception: %s", e)
+            logger.error("Exception: %s", e, exc_info=True, stack_info=True)
             raise

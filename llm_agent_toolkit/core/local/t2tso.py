@@ -169,7 +169,6 @@ class T2TSO_OLM_Core(Core, OllamaCore):
             llm_generated_content: str = response["message"]["content"]
 
             token_usage = self.update_usage(response)  # type: ignore
-            logger.info("Usage: %s", token_usage)
 
             if llm_generated_content:
                 if response_mode is not ResponseMode.DEFAULT:
@@ -188,7 +187,7 @@ class T2TSO_OLM_Core(Core, OllamaCore):
                 ], token_usage
             raise RuntimeError("Content not available.")
         except Exception as e:
-            logger.error("Exception: %s", e)
+            logger.error("Exception: %s", e, exc_info=True, stack_info=True)
             raise
 
     def run(
@@ -287,7 +286,6 @@ class T2TSO_OLM_Core(Core, OllamaCore):
             llm_generated_content: str = response["message"]["content"]
 
             token_usage = self.update_usage(response)  # type: ignore
-            logger.info("Usage: %s", token_usage)
 
             if llm_generated_content:
                 if response_mode is not ResponseMode.DEFAULT:
@@ -306,5 +304,5 @@ class T2TSO_OLM_Core(Core, OllamaCore):
                 ], token_usage
             raise RuntimeError("Content not available.")
         except Exception as e:
-            logger.error("Exception: %s", e)
+            logger.error("Exception: %s", e, exc_info=True, stack_info=True)
             raise
