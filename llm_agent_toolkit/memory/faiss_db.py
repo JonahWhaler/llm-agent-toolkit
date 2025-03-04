@@ -95,10 +95,8 @@ class FaissIFL2DB(FaissDB):
         if os.path.exists(f"{self.__db_path}/{namespace}.index") and os.path.exists(
             f"{self.__db_path}/{namespace}.db"
         ):
-            logger.info("Loading...")
             index = faiss.read_index(f"{self.__db_path}/{namespace}.index")
         else:
-            logger.info("Creating...")
             index = faiss.IndexFlatL2(self.__dimension)
             faiss.write_index(index, f"{self.__db_path}/{namespace}.index")
 
@@ -455,10 +453,8 @@ class FaissHNSWDB(FaissDB):
         if os.path.exists(f"{self.__db_path}/{namespace}.index") and os.path.exists(
             f"{self.__db_path}/{namespace}.db"
         ):
-            logger.info("Loading...")
             index = faiss.read_index(f"{self.__db_path}/{namespace}.index")
         else:
-            logger.info("Creating...")
             index = faiss.IndexHNSWFlat(self.__dimension, FaissHNSWDB.M)
             index.hnsw.efConstruction = FaissHNSWDB.EF_CONSTRUCTION
             index.hnsw.efSearch = FaissHNSWDB.EF_SEARCH
