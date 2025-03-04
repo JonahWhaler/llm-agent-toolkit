@@ -3,7 +3,8 @@ import logging
 from math import ceil
 from typing import Any
 
-from ..._util import MessageBlock
+import openai
+from ..._util import MessageBlock, TokenUsage
 from ..._tool import ToolMetadata
 
 logger = logging.getLogger(__name__)
@@ -48,6 +49,7 @@ class DeepSeekCore:
 
         Notes:
         * https://api-docs.deepseek.com/quick_start/token_usage
+        * Remove whitespaces
         """
         CONVERSION_FACTOR = 0.6
         character_count: int = 0
@@ -56,7 +58,9 @@ class DeepSeekCore:
             if not isinstance(msg, dict):
                 continue
             if "content" in msg and msg["content"]:
-                character_count += len(msg["content"])
+                cleaned_content = msg["content"].replace("\n", "")
+                cleaned_content = cleaned_content.replace(" ", "")
+                character_count += len(cleaned_content)
             # if "role" in msg and msg["role"] == CreatorRole.TOOL.value:
             #     if "name" in msg:
             #         character_count += len(msg["name"])
@@ -65,7 +69,28 @@ class DeepSeekCore:
             for tool in tools:
                 character_count += len(json.dumps(tool))
 
-        return ceil(character_count * CONVERSION_FACTOR)
+        text_token_count = ceil(character_count * CONVERSION_FACTOR)
+        logger.info("Token Estimation:\nText: %d", text_token_count)
+        return text_token_count
+
+    @staticmethod
+    def update_usage(
+        completion_usage: openai.types.CompletionUsage | None,
+        token_usage: TokenUsage | None = None,
+    ) -> TokenUsage:
+        """Transforms CompletionUsage to TokenUsage. This is a adapter function."""
+        if completion_usage is None:
+            raise RuntimeError("Response Usage is None.")
+
+        if token_usage is None:
+            token_usage = TokenUsage(
+                input_tokens=completion_usage.prompt_tokens,
+                output_tokens=completion_usage.completion_tokens,
+            )
+        else:
+            token_usage.input_tokens += completion_usage.prompt_tokens
+            token_usage.output_tokens += completion_usage.completion_tokens
+        return token_usage
 
 
 TOOL_PROMPT = """

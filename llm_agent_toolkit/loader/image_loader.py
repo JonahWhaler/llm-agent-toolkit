@@ -126,7 +126,7 @@ class ImageToTextLoader(BaseLoader):
         ImageToTextLoader.raise_if_invalid(input_path)
 
         try:
-            responses: list[MessageBlock | dict] = self.__image_interpreter.interpret(
+            responses, usage = self.__image_interpreter.interpret(
                 query=self.__prompt, context=None, filepath=input_path
             )
             return self.post_processing(responses)
@@ -155,10 +155,8 @@ class ImageToTextLoader(BaseLoader):
         ImageToTextLoader.raise_if_invalid(input_path)
 
         try:
-            responses: list[MessageBlock | dict] = (
-                await self.__image_interpreter.interpret_async(
-                    query=self.__prompt, context=None, filepath=input_path
-                )
+            responses, usage = await self.__image_interpreter.interpret_async(
+                query=self.__prompt, context=None, filepath=input_path
             )
             return self.post_processing(responses)
         except Exception as e:

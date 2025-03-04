@@ -11,7 +11,7 @@ import pdfplumber
 
 from .._loader import BaseLoader
 from .._core import ImageInterpreter
-from .._util import MessageBlock
+# from .._util import MessageBlock
 
 logger = logging.getLogger(__name__)
 
@@ -162,7 +162,7 @@ class PDFLoader(BaseLoader):
             f"filename={image_name}. This is an attachment found in a pdf file."
         )
         with self.temporary_file(image_bytes, image_name) as tmp_path:
-            responses: list[MessageBlock | dict] = self.__image_interpreter.interpret(
+            responses, usage = self.__image_interpreter.interpret(
                 query=image_caption, context=None, filepath=tmp_path
             )
             response = responses[0]
@@ -180,9 +180,7 @@ class PDFLoader(BaseLoader):
             f"filename={image_name}. This is an attachment found in a pdf file."
         )
         with self.temporary_file(image_bytes, image_name) as tmp_path:
-            responses: list[
-                MessageBlock | dict
-            ] = await self.__image_interpreter.interpret_async(
+            responses, usage = await self.__image_interpreter.interpret_async(
                 query=image_caption, context=None, filepath=tmp_path
             )
             response = responses[0]

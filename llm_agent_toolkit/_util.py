@@ -80,3 +80,12 @@ class ResponseMode(str, Enum):
     SO = "structured_output"
     JSON = "json_object"
     DEFAULT = "default"
+
+
+class TokenUsage(BaseModel):
+    input_tokens: int = 0
+    output_tokens: int = 0
+
+    @property
+    def total_tokens(self) -> int:
+        return self.input_tokens + self.output_tokens

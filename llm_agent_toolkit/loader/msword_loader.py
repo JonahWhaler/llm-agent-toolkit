@@ -11,7 +11,7 @@ from docx.table import Table
 
 from .._loader import BaseLoader
 from .._core import ImageInterpreter
-from .._util import MessageBlock
+# from .._util import MessageBlock
 
 
 logger = logging.getLogger(__name__)
@@ -312,12 +312,10 @@ class MsWordLoader(BaseLoader):
                     image_data = docx.read(file)
                     image_name = os.path.basename(file)  # image{index}.png
                     with self.temporary_file(image_data, image_name) as image_path:
-                        responses: list[MessageBlock | dict] = (
-                            self.__image_interpreter.interpret(
-                                query="Describe this image",
-                                context=None,
-                                filepath=image_path,
-                            )
+                        responses, usage = self.__image_interpreter.interpret(
+                            query="Describe this image",
+                            context=None,
+                            filepath=image_path,
                         )
                         image_description = responses[0]["content"]
 
@@ -352,12 +350,13 @@ class MsWordLoader(BaseLoader):
                     image_data = docx.read(file)
                     image_name = os.path.basename(file)  # image{index}.png
                     with self.temporary_file(image_data, image_name) as image_path:
-                        responses: list[MessageBlock | dict] = (
-                            await self.__image_interpreter.interpret_async(
-                                query="Describe this image",
-                                context=None,
-                                filepath=image_path,
-                            )
+                        (
+                            responses,
+                            usage,
+                        ) = await self.__image_interpreter.interpret_async(
+                            query="Describe this image",
+                            context=None,
+                            filepath=image_path,
                         )
                         image_description = responses[0]["content"]
 

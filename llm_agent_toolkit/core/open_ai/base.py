@@ -10,7 +10,7 @@ import tiktoken
 from PIL import Image
 
 # Internal Packages
-from ..._util import CreatorRole, MessageBlock
+from ..._util import CreatorRole, MessageBlock, TokenUsage
 from ..._tool import ToolMetadata
 
 logger = logging.getLogger(__name__)
@@ -167,31 +167,38 @@ class OpenAICore:
         Returns:
             int: The token count.
         """
-        token_count: int = 0
+        text_token_count: int = 0
         encoding = tiktoken.encoding_for_model(self.__model_name)
         for msg in msgs:
             # Incase the dict does not comply with the MessageBlock format
             if "content" in msg and msg["content"]:
                 if not isinstance(msg["content"], list):
-                    token_count += len(encoding.encode(msg["content"]))
+                    text_token_count += len(encoding.encode(msg["content"]))
                 # Skip images
             if "role" in msg and msg["role"] == CreatorRole.FUNCTION.value:
                 if "name" in msg:
-                    token_count += len(encoding.encode(msg["name"]))
+                    text_token_count += len(encoding.encode(msg["name"]))
 
         if tools:
             for tool in tools:
-                token_count += len(encoding.encode(json.dumps(tool)))
+                text_token_count += len(encoding.encode(json.dumps(tool)))
 
+        image_token_count = 0
         if images:
             for image_path in images:
                 if image_detail == "low":
-                    token_count += 85
+                    image_token_count += 85
                 else:
                     with Image.open(image_path) as img:
                         width, height = img.size
-                        token_count += self.calculate_image_tokens(width, height)
-        return token_count
+                        image_token_count += self.calculate_image_tokens(width, height)
+
+        logger.info(
+            "Token Estimation:\nText: %d\nImage: %d",
+            text_token_count,
+            image_token_count,
+        )
+        return text_token_count + image_token_count
 
     @staticmethod
     def calculate_image_tokens(width: int, height: int) -> int:
@@ -278,6 +285,25 @@ class OpenAICore:
         tiles_width = ceil(width / 512)
         tiles_height = ceil(height / 512)
         return (tiles_width, tiles_height)
+
+    @staticmethod
+    def update_usage(
+        completion_usage: openai.types.CompletionUsage | None,
+        token_usage: TokenUsage | None = None,
+    ) -> TokenUsage:
+        """Transforms CompletionUsage to TokenUsage. This is a adapter function."""
+        if completion_usage is None:
+            raise RuntimeError("Response Usage is None.")
+
+        if token_usage is None:
+            token_usage = TokenUsage(
+                input_tokens=completion_usage.prompt_tokens,
+                output_tokens=completion_usage.completion_tokens,
+            )
+        else:
+            token_usage.input_tokens += completion_usage.prompt_tokens
+            token_usage.output_tokens += completion_usage.completion_tokens
+        return token_usage
 
 
 TOOL_PROMPT = """

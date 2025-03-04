@@ -8,7 +8,7 @@ Assumptions:
 
 from abc import abstractmethod, ABC
 from typing import Any
-from ._util import ChatCompletionConfig, MessageBlock
+from ._util import ChatCompletionConfig, MessageBlock, TokenUsage
 from ._tool import Tool
 
 
@@ -126,14 +126,14 @@ class Core(ABC):
     @abstractmethod
     async def run_async(
         self, query: str, context: list[MessageBlock | dict[str, Any]] | None, **kwargs
-    ) -> list[MessageBlock | dict[str, Any]]:
+    ) -> tuple[list[MessageBlock | dict[str, Any]], TokenUsage]:
         """Asynchronously run the LLM model with the given query and context."""
         raise NotImplementedError
 
     @abstractmethod
     def run(
         self, query: str, context: list[MessageBlock | dict[str, Any]] | None, **kwargs
-    ) -> list[MessageBlock | dict[str, Any]]:
+    ) -> tuple[list[MessageBlock | dict[str, Any]], TokenUsage]:
         """Synchronously run the LLM model with the given query and context."""
         raise NotImplementedError
 
@@ -161,9 +161,9 @@ class ImageInterpreter(ABC):
     Abstract class for image-to-text LLM models.
 
     Abstract methods:
-    - interpret_async(query: str, context: list[ContextMessage | dict] | None, filepath: str, **kwargs) -> list[OpenAIMessage | dict]:
+    - interpret_async(query: str, context: list[ContextMessage | dict] | None, filepath: str, **kwargs) -> tuple[list[OpenAIMessage | dict], TokenUsage]:
         Asynchronously run the LLM model to interpret the image in `filepath`.
-    - interpret(query: str, context: list[ContextMessage | dict] | None, filepath: str, **kwargs) -> list[OpenAIMessage | dict]:
+    - interpret(query: str, context: list[ContextMessage | dict] | None, filepath: str, **kwargs) -> tuple[list[OpenAIMessage | dict], TokenUsage]:
         Synchronously run the LLM model to interpret the image in `filepath`.
     """
 
@@ -174,7 +174,7 @@ class ImageInterpreter(ABC):
         context: list[MessageBlock | dict[str, Any]] | None,
         filepath: str,
         **kwargs,
-    ) -> list[MessageBlock | dict[str, Any]]:
+    ) -> tuple[list[MessageBlock | dict[str, Any]], TokenUsage]:
         """Asynchronously run the LLM model to interpret the image in `filepath`.
 
         Use this method to explicitly express the intention to interpret an image.
@@ -188,7 +188,7 @@ class ImageInterpreter(ABC):
         context: list[MessageBlock | dict[str, Any]] | None,
         filepath: str,
         **kwargs,
-    ) -> list[MessageBlock | dict[str, Any]]:
+    ) -> tuple[list[MessageBlock | dict[str, Any]], TokenUsage]:
         """Synchronously run the LLM model to interpret the image in `filepath`.
 
         Use this method to explicitly express the intention to interpret an image.

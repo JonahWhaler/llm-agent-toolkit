@@ -8,7 +8,7 @@ import ollama
 from PIL import Image
 
 # Internal Packages
-from ..._util import CreatorRole, MessageBlock
+from ..._util import CreatorRole, MessageBlock, TokenUsage
 from ..._tool import ToolMetadata
 
 logger = logging.getLogger(__name__)
@@ -33,7 +33,8 @@ class OllamaCore:
     """
 
     csv_path: str | None = None
-    CONVERSION_FACTOR: float = 2
+    ASCII_CONVERSION_FACTOR: float = 4
+    NON_ASCII_CONVERSION_FACTOR: float = 1.5
 
     def __init__(self, connection_string: str, model_name: str):
         self.__connection_string = connection_string
@@ -187,14 +188,23 @@ class OllamaCore:
             int: The token count. Number of characters divided by `CONVERSION_FACTOR` + token count for images
 
         Notes:
-        * Set `CONVERSION_FACTOR` as 2 because my usecase most like involve using utf-8 encoding.
+        * Remove whitespaces
+        * If contain non-ascii character, conversion_factor = 1.5, else conversion_factor = 4
         """
         character_count: int = 0
+        has_non_ascii = False
         for msg in msgs:
             # Incase the dict does not comply with the MessageBlock format
             # "images" tag is not processed in this loop
             if "content" in msg and msg["content"]:
-                character_count += len(msg["content"])
+                cleaned_content = msg["content"].replace("\n", "")
+                cleaned_content = cleaned_content.replace(" ", "")
+                character_count += len(cleaned_content)
+                if has_non_ascii is False:
+                    try:
+                        cleaned_content.encode("ascii")
+                    except UnicodeEncodeError:
+                        has_non_ascii = True
             if "role" in msg and msg["role"] == CreatorRole.TOOL.value:
                 if "name" in msg:
                     character_count += len(msg["name"])
@@ -203,18 +213,25 @@ class OllamaCore:
             for tool in tools:
                 character_count += len(json.dumps(tool))
 
-        logger.info(
-            ">>>> Text Token Count: %d",
-            ceil(character_count // OllamaCore.CONVERSION_FACTOR),
-        )
-        token_count = 0
+        if has_non_ascii:
+            conversion_factor = OllamaCore.NON_ASCII_CONVERSION_FACTOR
+        else:
+            conversion_factor = OllamaCore.ASCII_CONVERSION_FACTOR
+
+        text_token_count = ceil(character_count / conversion_factor)
+        image_token_count = 0
         if images:
             for image_path in images:
                 with Image.open(image_path) as img:
                     width, height = img.size
-                    token_count += self.calculate_image_tokens(width, height)
-        logger.info(">>>> Image Token Count: %d", token_count)
-        return ceil(character_count // OllamaCore.CONVERSION_FACTOR) + token_count
+                    image_token_count += self.calculate_image_tokens(width, height)
+
+        logger.info(
+            "Token Estimation:\nText: %d\nImage: %d",
+            text_token_count,
+            image_token_count,
+        )
+        return text_token_count + image_token_count
 
     @staticmethod
     def calculate_image_tokens(width: int, height: int) -> int:
@@ -243,6 +260,23 @@ class OllamaCore:
         total_tokens = 85 + 170 * (tiles_width * tiles_height)
         # logger.info(">>>> Image Tokens: %d", total_tokens)
         return total_tokens
+
+    @staticmethod
+    def update_usage(
+        response: dict[str, Any], token_usage: TokenUsage | None = None
+    ) -> TokenUsage:
+        """Transforms CompletionUsage to TokenUsage. This is a adapter function."""
+        if token_usage is None:
+            token_usage = TokenUsage(input_tokens=0, output_tokens=0)
+
+        input_tokens = response.get("prompt_eval_count", None)
+        output_tokens = response.get("eval_count", None)
+        if input_tokens is None and output_tokens is None:
+            raise RuntimeError("Both input_tokens and output_tokens are None.")
+
+        token_usage.input_tokens += input_tokens
+        token_usage.output_tokens += output_tokens
+        return token_usage
 
 
 TOOL_PROMPT = """
