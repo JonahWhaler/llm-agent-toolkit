@@ -148,7 +148,7 @@ class I2T_OAI_Core(Core, OpenAICore, ImageInterpreter, ToolSupport):
                 and iteration < self.config.max_iteration
                 and token_usage.total_tokens < MAX_TOKENS
             ):
-                # logger.info("\n\nIteration: %d", iteration)
+                # logger.debug("\n\nIteration: %d", iteration)
                 if tools_metadata and iteration + 1 == self.config.max_iteration:
                     # Force the llm to provide answer
                     tools_metadata = None
@@ -190,7 +190,6 @@ class I2T_OAI_Core(Core, OpenAICore, ImageInterpreter, ToolSupport):
                 )
                 iteration += 1
                 token_usage = self.update_usage(response.usage, token_usage)
-                logger.info("Usage: %s", token_usage)
             # End while
 
             if not solved:
@@ -208,7 +207,7 @@ class I2T_OAI_Core(Core, OpenAICore, ImageInterpreter, ToolSupport):
                 NUMBER_OF_PRIMERS:
             ], token_usage  # Return only the generated messages
         except Exception as e:
-            logger.error("Exception: %s", e)
+            logger.error("Exception: %s", e, exc_info=True, stack_info=True)
             raise
 
     def run(
@@ -301,7 +300,7 @@ class I2T_OAI_Core(Core, OpenAICore, ImageInterpreter, ToolSupport):
                 and iteration < self.config.max_iteration
                 and token_usage.total_tokens < MAX_TOKENS
             ):
-                # logger.info("\n\nIteration: %d", iteration)
+                # logger.debug("\n\nIteration: %d", iteration)
                 if tools_metadata and iteration + 1 == self.config.max_iteration:
                     # Force the llm to provide answer
                     tools_metadata = None
@@ -343,7 +342,6 @@ class I2T_OAI_Core(Core, OpenAICore, ImageInterpreter, ToolSupport):
                 )
                 iteration += 1
                 token_usage = self.update_usage(response.usage, token_usage)
-                logger.info("Usage: %s", token_usage)
             # End while
 
             if not solved:
@@ -361,7 +359,7 @@ class I2T_OAI_Core(Core, OpenAICore, ImageInterpreter, ToolSupport):
                 NUMBER_OF_PRIMERS:
             ], token_usage  # Return only the generated messages
         except Exception as e:
-            logger.error("Exception: %s", e)
+            logger.error("Exception: %s", e, exc_info=True, stack_info=True)
             raise
 
     @staticmethod
@@ -375,10 +373,10 @@ class I2T_OAI_Core(Core, OpenAICore, ImageInterpreter, ToolSupport):
                 encoded_image = base64.b64encode(f.read()).decode("utf-8")
                 return f"data:image/{ext};base64,{encoded_image}"
         except FileNotFoundError as fnfe:
-            logger.error("FileNotFoundError: %s", fnfe, exc_info=True)
+            logger.error("FileNotFoundError: %s", fnfe, exc_info=True, stack_info=True)
             raise
         except Exception as e:
-            logger.error("Exception: %s", e, exc_info=True)
+            logger.error("Exception: %s", e, exc_info=True, stack_info=True)
             raise
 
     async def call_tools_async(self, selected_tools: list) -> list[MessageBlock | dict]:

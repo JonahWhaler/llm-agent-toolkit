@@ -110,7 +110,7 @@ class O1Beta_OAI_Core(Core, OpenAICore):
             _content = getattr(choice.message, "content", None)
 
             token_usage = self.update_usage(response.usage)
-            logger.info("Usage: %s", token_usage)
+
             if _content:
                 return [
                     {"role": CreatorRole.ASSISTANT.value, "content": _content}
@@ -119,7 +119,7 @@ class O1Beta_OAI_Core(Core, OpenAICore):
             failed_reason = choice.finish_reason
             raise RuntimeError(failed_reason)
         except Exception as e:
-            logger.error("Exception: %s", e)
+            logger.error("Exception: %s", e, exc_info=True, stack_info=True)
             raise
 
     def run(
@@ -182,7 +182,7 @@ class O1Beta_OAI_Core(Core, OpenAICore):
             _content = getattr(choice.message, "content", None)
 
             token_usage = self.update_usage(response.usage)
-            logger.info("Usage: %s", token_usage)
+
             if _content:
                 return [
                     {"role": CreatorRole.ASSISTANT.value, "content": _content}
@@ -191,5 +191,5 @@ class O1Beta_OAI_Core(Core, OpenAICore):
             failed_reason = choice.finish_reason
             raise RuntimeError(failed_reason)
         except Exception as e:
-            logger.error("Exception: %s", e)
+            logger.error("Exception: %s", e, exc_info=True, stack_info=True)
             raise

@@ -158,7 +158,6 @@ class GMN_StructuredOutput_Core(Core, GeminiCore, ImageInterpreter):
             )
 
             token_usage = self.update_usage(response.usage_metadata, token_usage)
-            logger.info("Usage: %s", token_usage)
 
             response_text = getattr(response, "text", None)
             if response_text is None:
@@ -168,14 +167,14 @@ class GMN_StructuredOutput_Core(Core, GeminiCore, ImageInterpreter):
                 custom_format = response.parsed
                 custom_dict = custom_format.model_dump()  # type: ignore
                 for k, v in custom_dict.items():
-                    logger.info("%s : %s", k, v)
+                    logger.debug("%s : %s", k, v)
 
             output.append(
                 {"role": CreatorRole.ASSISTANT.value, "content": response_text}
             )
             return output, token_usage
         except Exception as e:
-            logger.error("Exception: %s", e)
+            logger.error("Exception: %s", e, exc_info=True, stack_info=True)
             raise
 
     async def run_async(
@@ -260,7 +259,6 @@ class GMN_StructuredOutput_Core(Core, GeminiCore, ImageInterpreter):
             )
 
             token_usage = self.update_usage(response.usage_metadata, token_usage)
-            logger.info("Usage: %s", token_usage)
 
             response_text = getattr(response, "text", None)
             if response_text is None:
@@ -270,14 +268,14 @@ class GMN_StructuredOutput_Core(Core, GeminiCore, ImageInterpreter):
                 custom_format = response.parsed
                 custom_dict = custom_format.model_dump()  # type: ignore
                 for k, v in custom_dict.items():
-                    logger.info("%s : %s", k, v)
+                    logger.debug("%s : %s", k, v)
 
             output.append(
                 {"role": CreatorRole.ASSISTANT.value, "content": response_text}
             )
             return output, token_usage
         except Exception as e:
-            logger.error("Exception: %s", e)
+            logger.error("Exception: %s", e, exc_info=True, stack_info=True)
             raise
 
     def interpret(

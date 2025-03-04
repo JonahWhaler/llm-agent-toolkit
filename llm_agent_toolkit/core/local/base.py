@@ -53,14 +53,14 @@ class OllamaCore:
             _, m, *_ = lst
             for _m in m:
                 if _m.model == self.__model_name:
-                    logger.info("Found %s => %s", self.__model_name, _m)
+                    logger.debug("Found %s => %s", self.__model_name, _m)
                     return True
             return False
         except ollama.RequestError as ore:
-            logger.error("RequestError: %s", str(ore))
+            logger.error("RequestError: %s", str(ore), exc_info=True, stack_info=True)
             raise
         except Exception as e:
-            logger.error("Exception: %s", str(e))
+            logger.error("Exception: %s", str(e), exc_info=True, stack_info=True)
             raise
 
     def __try_pull_model(self):
@@ -74,13 +74,17 @@ class OllamaCore:
             client = ollama.Client(host=self.CONN_STRING)
             _ = client.pull(self.__model_name, stream=False)
         except ollama.RequestError as oreqe:
-            logger.error("RequestError: %s", str(oreqe))
+            logger.error("RequestError: %s", str(oreqe), exc_info=True, stack_info=True)
             raise
         except ollama.ResponseError as orespe:
-            logger.error("ResponseError: %s", str(orespe))
+            logger.error(
+                "ResponseError: %s", str(orespe), exc_info=True, stack_info=True
+            )
             raise
         except Exception as e:
-            logger.error("Exception: %s (%s)", str(e), type(e))
+            logger.error(
+                "Exception: %s (%s)", str(e), type(e), exc_info=True, stack_info=True
+            )
             raise
 
     @staticmethod
@@ -226,7 +230,7 @@ class OllamaCore:
                     width, height = img.size
                     image_token_count += self.calculate_image_tokens(width, height)
 
-        logger.info(
+        logger.debug(
             "Token Estimation:\nText: %d\nImage: %d",
             text_token_count,
             image_token_count,
@@ -258,7 +262,6 @@ class OllamaCore:
         tiles_width = ceil(width / 512)
         tiles_height = ceil(height / 512)
         total_tokens = 85 + 170 * (tiles_width * tiles_height)
-        # logger.info(">>>> Image Tokens: %d", total_tokens)
         return total_tokens
 
     @staticmethod
@@ -276,6 +279,7 @@ class OllamaCore:
 
         token_usage.input_tokens += input_tokens
         token_usage.output_tokens += output_tokens
+        logger.debug("Token Usage: %s", token_usage)
         return token_usage
 
 

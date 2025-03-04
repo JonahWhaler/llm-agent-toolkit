@@ -210,7 +210,7 @@ class OAI_StructuredOutput_Core(Core, OpenAICore, ImageInterpreter):
             _content = getattr(choice.message, "content", "Not Available")
 
             token_usage = self.update_usage(response.usage)
-            logger.info("Usage: %s", token_usage)
+            logger.debug("Usage: %s", token_usage)
 
             if _content:
                 if response_mode is not ResponseMode.DEFAULT:
@@ -228,7 +228,7 @@ class OAI_StructuredOutput_Core(Core, OpenAICore, ImageInterpreter):
                 ], token_usage
             raise RuntimeError(f"Content not available. Reason: {choice.finish_reason}")
         except Exception as e:
-            logger.error("Exception: %s", e)
+            logger.error("Exception: %s", e, exc_info=True, stack_info=True)
             raise
 
     async def run_async(
@@ -355,7 +355,7 @@ class OAI_StructuredOutput_Core(Core, OpenAICore, ImageInterpreter):
             _content = getattr(choice.message, "content", "Not Available")
 
             token_usage = self.update_usage(response.usage)
-            logger.info("Usage: %s", token_usage)
+            logger.debug("Usage: %s", token_usage)
 
             if _content:
                 if response_mode is not ResponseMode.DEFAULT:
@@ -373,7 +373,7 @@ class OAI_StructuredOutput_Core(Core, OpenAICore, ImageInterpreter):
 
             raise RuntimeError(f"Content not available. Reason: {choice.finish_reason}")
         except Exception as e:
-            logger.error("Exception: %s", e)
+            logger.error("Exception: %s", e, exc_info=True, stack_info=True)
             raise
 
     @staticmethod
@@ -387,10 +387,10 @@ class OAI_StructuredOutput_Core(Core, OpenAICore, ImageInterpreter):
                 encoded_image = base64.b64encode(f.read()).decode("utf-8")
                 return f"data:image/{ext};base64,{encoded_image}"
         except FileNotFoundError as fnfe:
-            logger.error("FileNotFoundError: %s", fnfe, exc_info=True)
+            logger.error("FileNotFoundError: %s", fnfe, exc_info=True, stack_info=True)
             raise
         except Exception as e:
-            logger.error("Exception: %s", e, exc_info=True)
+            logger.error("Exception: %s", e, exc_info=True, stack_info=True)
             raise
 
     def interpret(

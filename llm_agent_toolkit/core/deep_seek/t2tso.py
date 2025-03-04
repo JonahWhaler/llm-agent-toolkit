@@ -82,8 +82,9 @@ class T2TSO_DS_Core(Core, DeepSeekCore):
                 base_url=os.environ["DEEPSEEK_BASE_URL"],
             )
             if max_output_tokens <= 0:
-                logger.warning("Prompt token count: %d", prompt_token_count)
-                raise ValueError("max_output_tokens <= 0")
+                raise ValueError(
+                    f"max_output_tokens <= 0. Prompt token count: {prompt_token_count}"
+                )
 
             if response_mode is ResponseMode.JSON:
                 response = await client.chat.completions.create(
@@ -126,7 +127,7 @@ class T2TSO_DS_Core(Core, DeepSeekCore):
                 ], token_usage
             raise RuntimeError(f"Content not available. Reason: {choice.finish_reason}")
         except Exception as e:
-            logger.error("Exception: %s", e)
+            logger.error("Exception: %s", e, exc_info=True, stack_info=True)
             raise
 
     def run(
@@ -162,8 +163,9 @@ class T2TSO_DS_Core(Core, DeepSeekCore):
                 base_url=os.environ["DEEPSEEK_BASE_URL"],
             )
             if max_output_tokens <= 0:
-                logger.warning("Prompt token count: %d", prompt_token_count)
-                raise ValueError("max_output_tokens <= 0")
+                raise ValueError(
+                    f"max_output_tokens <= 0. Prompt token count: {prompt_token_count}"
+                )
 
             if response_mode is ResponseMode.JSON:
                 response = client.chat.completions.create(
@@ -206,5 +208,5 @@ class T2TSO_DS_Core(Core, DeepSeekCore):
                 ], token_usage
             raise RuntimeError(f"Content not available. Reason: {choice.finish_reason}")
         except Exception as e:
-            logger.error("Exception: %s", e)
+            logger.error("Exception: %s", e, exc_info=True, stack_info=True)
             raise

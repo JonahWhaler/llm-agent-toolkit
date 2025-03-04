@@ -67,7 +67,7 @@ class T2T_DS_Core(Core, DeepSeekCore, ToolSupport):
                 and iteration < self.config.max_iteration
                 and token_usage.total_tokens < MAX_TOKENS
             ):
-                # logger.info("Iteration: [%d]", iteration)
+                # logger.debug("Iteration: [%d]", iteration)
                 if tools_metadata and iteration + 1 == self.config.max_iteration:
                     # Force the llm to provide answer
                     tools_metadata = None
@@ -134,7 +134,7 @@ class T2T_DS_Core(Core, DeepSeekCore, ToolSupport):
             )
             return filtered_msgs, token_usage
         except Exception as e:
-            logger.error("Exception: %s", e)
+            logger.error("Exception: %s", e, exc_info=True, stack_info=True)
             raise
 
     def run(
@@ -181,7 +181,7 @@ class T2T_DS_Core(Core, DeepSeekCore, ToolSupport):
                 and iteration < self.config.max_iteration
                 and token_usage.total_tokens < MAX_TOKENS
             ):
-                # logger.info("Iteration: [%d]", iteration)
+                # logger.debug("Iteration: [%d]", iteration)
                 if tools_metadata and iteration + 1 == self.config.max_iteration:
                     # Force the llm to provide answer
                     tools_metadata = None
@@ -251,7 +251,7 @@ class T2T_DS_Core(Core, DeepSeekCore, ToolSupport):
 
             return filtered_msgs, token_usage
         except Exception as e:
-            logger.error("Exception: %s", e)
+            logger.error("Exception: %s", e, exc_info=True, stack_info=True)
             raise
 
     async def call_tools_async(self, selected_tools: list) -> list[MessageBlock | dict]:

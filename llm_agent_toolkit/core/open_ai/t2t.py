@@ -108,7 +108,7 @@ class T2T_OAI_Core(Core, OpenAICore, ToolSupport):
                 and iteration < self.config.max_iteration
                 and token_usage.total_tokens < MAX_TOKENS
             ):
-                # logger.info("\n\nIteration: %d", iteration)
+                # logger.debug("\n\nIteration: %d", iteration)
                 if tools_metadata and iteration + 1 == self.config.max_iteration:
                     # Force the llm to provide answer
                     tools_metadata = None
@@ -147,7 +147,6 @@ class T2T_OAI_Core(Core, OpenAICore, ToolSupport):
                 )
                 iteration += 1
                 token_usage = self.update_usage(response.usage, token_usage)  # type: ignore
-                logger.info("Usage: %s", token_usage)
 
             # End while
 
@@ -166,7 +165,7 @@ class T2T_OAI_Core(Core, OpenAICore, ToolSupport):
                 NUMBER_OF_PRIMERS:
             ], token_usage  # Return only the generated messages messages
         except Exception as e:
-            logger.error("Exception: %s", e)
+            logger.error("Exception: %s", e, exc_info=True, stack_info=True)
             raise
 
     def run(
@@ -230,7 +229,7 @@ class T2T_OAI_Core(Core, OpenAICore, ToolSupport):
                 and iteration < self.config.max_iteration
                 and token_usage.total_tokens < MAX_TOKENS
             ):
-                # logger.info("\n\nIteration: %d", iteration)
+                # logger.debug("\n\nIteration: %d", iteration)
                 if tools_metadata and iteration + 1 == self.config.max_iteration:
                     # Force the llm to provide answer
                     tools_metadata = None
@@ -269,7 +268,6 @@ class T2T_OAI_Core(Core, OpenAICore, ToolSupport):
                 )
                 iteration += 1
                 token_usage = self.update_usage(response.usage, token_usage)  # type: ignore
-                logger.info("Usage: %s", token_usage)
             # End while
 
             if not solved:
@@ -287,7 +285,7 @@ class T2T_OAI_Core(Core, OpenAICore, ToolSupport):
                 NUMBER_OF_PRIMERS:
             ], token_usage  # Return only the generated messages
         except Exception as e:
-            logger.error("Exception: %s", e)
+            logger.error("Exception: %s", e, exc_info=True, stack_info=True)
             raise
 
     async def call_tools_async(self, selected_tools: list) -> list[MessageBlock | dict]:

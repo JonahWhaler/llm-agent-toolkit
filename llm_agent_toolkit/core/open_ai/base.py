@@ -57,7 +57,7 @@ class OpenAICore:
                     return True
             return False
         except Exception as e:
-            logger.error("Exception: %s", e)
+            logger.error("Exception: %s", e, exc_info=True, stack_info=True)
         return True
 
     @staticmethod
@@ -193,7 +193,7 @@ class OpenAICore:
                         width, height = img.size
                         image_token_count += self.calculate_image_tokens(width, height)
 
-        logger.info(
+        logger.debug(
             "Token Estimation:\nText: %d\nImage: %d",
             text_token_count,
             image_token_count,
@@ -303,6 +303,8 @@ class OpenAICore:
         else:
             token_usage.input_tokens += completion_usage.prompt_tokens
             token_usage.output_tokens += completion_usage.completion_tokens
+
+        logger.debug("Token Usage: %s", token_usage)
         return token_usage
 
 

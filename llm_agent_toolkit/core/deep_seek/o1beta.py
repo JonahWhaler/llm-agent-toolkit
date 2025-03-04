@@ -64,8 +64,9 @@ class O1Beta_DS_Core(Core, DeepSeekCore):
         )
 
         if max_output_tokens <= 0:
-            logger.warning("Prompt token count: %d", prompt_token_count)
-            raise ValueError("max_output_tokens <= 0")
+            raise ValueError(
+                f"max_output_tokens <= 0. Prompt token count: {prompt_token_count}"
+            )
 
         try:
             client = openai.AsyncOpenAI(
@@ -83,7 +84,6 @@ class O1Beta_DS_Core(Core, DeepSeekCore):
             _reasoning_content = getattr(choice.message, "reasoning_content", None)
 
             token_usage = self.update_usage(response.usage)
-            logger.info("Usage: %s", response.usage)
             if _content:
                 response_string = _content
                 if _reasoning_content and include_rc:
@@ -97,7 +97,7 @@ class O1Beta_DS_Core(Core, DeepSeekCore):
             failed_reason = choice.finish_reason
             raise RuntimeError(failed_reason)
         except Exception as e:
-            logger.error("Exception: %s", e)
+            logger.error("Exception: %s", e, exc_info=True, stack_info=True)
             raise
 
     def run(
@@ -140,10 +140,9 @@ class O1Beta_DS_Core(Core, DeepSeekCore):
         )
 
         if max_output_tokens <= 0:
-            logger.warning("Prompt token count: %d", prompt_token_count)
-            raise ValueError("max_output_tokens <= 0")
-        logger.info("max output tokens: %d", max_output_tokens)
-        logger.info("prompt token count: %d", prompt_token_count)
+            raise ValueError(
+                f"max_output_tokens <= 0. Prompt token count: {prompt_token_count}"
+            )
 
         try:
             client = openai.OpenAI(
@@ -162,7 +161,6 @@ class O1Beta_DS_Core(Core, DeepSeekCore):
             _reasoning_content = getattr(choice.message, "reasoning_content", None)
 
             token_usage = self.update_usage(response.usage)
-            logger.info("Usage: %s", response.usage)
             if _content:
                 response_string = _content
                 if _reasoning_content and include_rc:
@@ -175,8 +173,8 @@ class O1Beta_DS_Core(Core, DeepSeekCore):
             failed_reason = choice.finish_reason
             raise RuntimeError(failed_reason)
         except RuntimeError as rte:
-            logger.error("RuntimeError: %s", rte)
+            logger.error("RuntimeError: %s", rte, exc_info=True, stack_info=True)
             raise
         except Exception as e:
-            logger.error("Exception: %s", e)
+            logger.error("Exception: %s", e, exc_info=True, stack_info=True)
             raise
