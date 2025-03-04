@@ -269,7 +269,7 @@ class T2T_OAI_Core(Core, OpenAICore, ToolSupport):
                 )
                 iteration += 1
                 token_usage = self.update_usage(response.usage, token_usage)  # type: ignore
-                logger.info("Usage: %d", token_usage)
+                logger.info("Usage: %s", token_usage)
             # End while
 
             if not solved:
