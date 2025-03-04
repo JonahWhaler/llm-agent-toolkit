@@ -556,11 +556,11 @@ class FaissHNSWDB(FaissDB):
                 track.append(counter)
             except AssertionError as a_e:
                 # Inconsistent counter
-                logger.error(msg=str(a_e))
+                logger.error(msg=str(a_e), exc_info=True, stack_info=True)
                 raise
             except Exception as e:
                 # Backtracking...
-                logger.error(msg=str(e))
+                logger.error(msg=str(e), exc_info=True, stack_info=True)
                 for counter in track:
                     v = sqlite.get(key=str(counter))
                     if v is not None:
