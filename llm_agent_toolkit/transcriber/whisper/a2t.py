@@ -90,7 +90,7 @@ class LocalWhisperTranscriber(Transcriber):
             )
             return True
         except Exception as e:
-            logger.error("Exception: %s", e)
+            logger.error("Exception: %s", e, exc_info=True, stack_info=True)
             raise
         return False
 
@@ -171,5 +171,5 @@ class LocalWhisperTranscriber(Transcriber):
             output_string = json.dumps(file_object, ensure_ascii=False)
             return [{"role": CreatorRole.ASSISTANT.value, "content": output_string}]
         except Exception as e:
-            logger.error("Exception: %s", e)
+            logger.error("Exception: %s", e, exc_info=True, stack_info=True)
             raise

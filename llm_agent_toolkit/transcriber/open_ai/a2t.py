@@ -85,7 +85,7 @@ class OpenAITranscriber(Transcriber):
                     return True
             return False
         except Exception as e:
-            logger.error("Exception: %s", e)
+            logger.error("Exception: %s", e, exc_info=True, stack_info=True)
             raise
 
     @property
@@ -156,7 +156,7 @@ class OpenAITranscriber(Transcriber):
             output_string = json.dumps(file_object, ensure_ascii=False)
             return [{"role": CreatorRole.ASSISTANT.value, "content": output_string}]
         except Exception as e:
-            logger.error("Exception: %s", e)
+            logger.error("Exception: %s", e, exc_info=True, stack_info=True)
             raise
 
     def transcribe(
@@ -221,5 +221,5 @@ class OpenAITranscriber(Transcriber):
             output_string = json.dumps(file_object, ensure_ascii=False)
             return [{"role": CreatorRole.ASSISTANT.value, "content": output_string}]
         except Exception as e:
-            logger.error("Exception: %s", e)
+            logger.error("Exception: %s", e, exc_info=True, stack_info=True)
             raise
