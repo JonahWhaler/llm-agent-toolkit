@@ -1,7 +1,7 @@
 ![Banner](https://raw.githubusercontent.com/JonahWhaler/llm-agent-toolkit/main/images/repo-banner.jpeg)
 
 # LLM Agent Toolkit: Modular Components for AI Workflows
-LLM Agent Toolkit provides minimal, modular interfaces for core components in LLM-based applications. Simplify workflows with stateless interaction, embedding encoders, memory management, tool integration, and data loaders, designed for compatibility and scalability. It prioritizes simplicity and modularity by proposing minimal wrappers designed to work across common tools, discouraging direct access to underlying technologies. Specific implementations and examples will be documented separately in a Cookbook (planned).
+LLM Agent Toolkit provides minimal, modular interfaces for core components in LLM-based applications. Simplify workflows with stateless interaction, embedding encoders, memory management, tool integration, and data loaders, designed for compatibility and scalability. It prioritizes simplicity and modularity by proposing minimal wrappers designed to work across common tools, discouraging direct access to underlying technologies. Specific implementations and examples will be documented separately in a Cookbook ([GitHub Repo](https://github.com/JonahWhaler/llm-agent-toolkit-cookbook)).
 
 PyPI: ![PyPI Downloads](https://static.pepy.tech/badge/llm-agent-toolkit)
 
@@ -29,7 +29,6 @@ For developers requiring full-range customization or access to the latest featur
   - [Tool:](#tool)
   - [Loader:](#loader)
   - [Chunkers:](#chunkers)
-- [Planned Feature](#planned-feature)
 - [License](#license)
 
 # Dependecies
@@ -92,7 +91,7 @@ llm = Text_to_Text(
   config=config,
   tools=None
 )
-responses: list[dict[str, Any]] = llm.run(query=PROMPT, context=None)
+responses, token_usage = llm.run(query=PROMPT, context=None)
 for response in responses:
     print(response["content"])
 
@@ -115,7 +114,7 @@ llm = Text_to_Text(
   config=config,
   tools=None
 )
-responses: list[dict[str, Any]] = llm.run(query=PROMPT, context=None)
+responses, token_usage = llm.run(query=PROMPT, context=None)
 for response in responses:
     print(response["content"])
 ```
@@ -137,7 +136,7 @@ llm = Text_to_Text(
   config=config,
   tools=None
 )
-responses: list[dict[str, Any]] = llm.run(query=PROMPT, context=None)
+responses, token_usage = llm.run(query=PROMPT, context=None)
 for response in responses:
     print(response["content"])
 ```
@@ -159,7 +158,7 @@ llm = Text_to_Text(
   config=config,
   tools=None
 )
-responses: list[dict[str, Any]] = llm.run(query=PROMPT, context=None)
+responses, token_usage = llm.run(query=PROMPT, context=None)
 for response in responses:
     print(response["content"])
 ```
@@ -218,7 +217,7 @@ llm = Text_to_Text(
     tools=[add_tool, div_tool],
 )
 
-responses: list[dict[str, Any]] = llm.run(query=PROMPT, context=None)
+responses, token_usage = llm.run(query=PROMPT, context=None)
 for response in responses:
     print(response["content"])
 ```
@@ -254,7 +253,7 @@ CONFIG = ChatCompletionConfig(
 llm = Text_to_Text_SO(
     connection_string=CONNECTION_STRING, system_prompt=SYS_PROMPT, config=CONFIG,
 )
-response_1 = llm.run(
+response_1, token_usage = llm.run(
     query=PROMPT, context=None, mode=ResponseMode.SO, format=QnA,
 )[0]
 
@@ -276,7 +275,7 @@ Always response in JSON format without additional comments or explanation.
 llm = Text_to_Text_SO(
     connection_string=CONNECTION_STRING, system_prompt=SPROMPT, config=CONFIG,
 )
-response_2 = llm.run(
+response_2, token_usage = llm.run(
     query=PROMPT, context=None, mode=ResponseMode.JSON
 )
 ```
@@ -334,9 +333,6 @@ Utility to split long text into chunks.
 * **Semantic**:
   * *SemanticChunker*: Split text into semantically coherent chunks.
   * *SimulatedAnnealingSemanticChunker*: Enhanced with Simulated Annealing optimization technique.
-
-# Planned Feature
-- A Cookbook with detailed implementation examples.
 
 # License
 This project is licensed under the GNU General Public License v3.0 License. See the [LICENSE](LICENSE) file for details.
