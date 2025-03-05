@@ -148,11 +148,15 @@ class ToolSupport(ABC):
         return self.__tools
 
     @abstractmethod
-    def call_tools(self, selected_tools: list) -> list[MessageBlock | dict]:
+    def call_tools(
+        self, selected_tools: list
+    ) -> tuple[list[MessageBlock | dict], TokenUsage]:
         raise NotImplementedError
 
     @abstractmethod
-    async def call_tools_async(self, selected_tools: list) -> list[MessageBlock | dict]:
+    async def call_tools_async(
+        self, selected_tools: list
+    ) -> tuple[list[MessageBlock | dict], TokenUsage]:
         raise NotImplementedError
 
 
