@@ -405,6 +405,9 @@ class Tool(ABC):
     def token_usage(self, value: TokenUsage) -> None:
         self.__tk_usage = value
 
+    def reset_token_usage(self) -> None:
+        self.__tk_usage = TokenUsage(input_tokens=0, output_tokens=0)
+
 
 if __name__ == "__main__":
     pass
