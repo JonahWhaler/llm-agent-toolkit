@@ -4,6 +4,8 @@ from enum import Enum
 from typing import Any, Optional, TypedDict, Union
 import json
 
+from ._util import TokenUsage
+
 
 class FunctionPropertyType(Enum):
     STRING = "string"
@@ -193,6 +195,7 @@ class Tool(ABC):
         self.__func_info = func_info
         self.__is_coroutine_function = is_coroutine_function
         self.__post_init()
+        self.__tk_usage = TokenUsage(input_tokens=0, output_tokens=0)
 
     @abstractmethod
     def run(self, params: str) -> str:
@@ -393,6 +396,17 @@ class Tool(ABC):
                     f"Invalid type for {name}, expected one of [string, number, boolean, object], got {_property.type}",
                 )
         return True, None
+
+    @property
+    def token_usage(self) -> TokenUsage:
+        return self.__tk_usage
+
+    @token_usage.setter
+    def token_usage(self, value: TokenUsage) -> None:
+        self.__tk_usage = value
+
+    def reset_token_usage(self) -> None:
+        self.__tk_usage = TokenUsage(input_tokens=0, output_tokens=0)
 
 
 if __name__ == "__main__":

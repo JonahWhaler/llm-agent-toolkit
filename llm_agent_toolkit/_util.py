@@ -89,3 +89,9 @@ class TokenUsage(BaseModel):
     @property
     def total_tokens(self) -> int:
         return self.input_tokens + self.output_tokens
+
+    def __add__(self, other: "TokenUsage") -> "TokenUsage":
+        return TokenUsage(
+            input_tokens=self.input_tokens + other.input_tokens,
+            output_tokens=self.output_tokens + other.output_tokens,
+        )
