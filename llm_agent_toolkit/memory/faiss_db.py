@@ -4,7 +4,7 @@ from copy import deepcopy
 import logging
 from enum import Enum
 from abc import ABC, abstractmethod
-from typing import Any
+from typing import Any, Optional
 
 import faiss  # type: ignore
 import numpy as np
@@ -44,7 +44,7 @@ class FaissDB(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def remove(self, ids: list[str], **kwargs) -> list[str]:
+    def remove(self, ids: Optional[list[str]], **kwargs) -> list[str]:
         raise NotImplementedError
 
     @abstractmethod
@@ -297,21 +297,21 @@ class FaissIFL2DB(FaissDB):
             logger.error(msg=str(e), exc_info=True, stack_info=True)
             raise
 
-    def remove(self, ids: list[str], **kwargs) -> list[str]:
+    def remove(self, ids: Optional[list[str]], **kwargs) -> list[str]:
         """
         Soft delete documents from the backend. Marks the selected records as "is_deleted".
 
+        Rules:
+        - Provide either `ids` or `where`.
+        - `ids`: Delete the specific document
+        - `where`: Delete all documents with matching metadata
+
         Args:
-        ids (list[str]): List of document ids to remove.
+            ids (Optional[list[str]]): List of document ids to delete.
+            where (Optional[dict]): Filter to apply to the results.
 
         Returns:
-        list[str]: List of document ids removed.
-
-        Raises:
-        - Exception: If failed to load the sqlite database.
-
-        Notes:
-        - Does not raise exception if the document is not found
+            list[str]: The list of ids that were marked as "is_deleted".
         """
         try:
             sqlite = (
@@ -326,15 +326,38 @@ class FaissIFL2DB(FaissDB):
                 msg=f"Loading Error: {loading_error}", exc_info=True, stack_info=True
             )
             raise
-        removed_ids = []
-        for key in ids:
-            value_dict = sqlite.get(key=key)
-            if value_dict is None:
-                continue
-            value_dict["is_deleted"] = True
-            sqlite.set(key=key, value=value_dict)
-            removed_ids.append(key)
-        return removed_ids
+
+        where: Optional[dict] = kwargs.get("where", None)
+        marked_ids = []
+        if ids:
+            for key in ids:
+                value_dict = sqlite.get(key)
+                if value_dict:
+                    value_dict["is_deleted"] = True
+                    sqlite.set(key, value_dict)
+                    marked_ids.append(key)
+        elif where:
+            for key in sqlite.keys():
+                data_dict = sqlite.get(key=key)
+                assert data_dict is not None
+                conds = []
+                metadatas = data_dict.get("metadata", None)
+                assert metadatas is not None
+
+                for field_name, field_value in where.items():
+                    conds.append(metadatas.get(field_name, None) == field_value)
+                if all(conds):
+                    data_dict["is_deleted"] = True
+                    sqlite.set(key=key, value=data_dict)
+                    marked_ids.append(key)
+            return marked_ids
+        else:
+            logger.warning("ids = %s, where = %s", ids, where)
+
+            raise ValueError("Either `ids` or `where` must be provided.")
+
+        logger.warning("Call self.reconstruct to completely purge the deleted.")
+        return marked_ids
 
     def reconstruct(self, encoder: Encoder) -> None:
         try:
@@ -405,11 +428,11 @@ class FaissIFL2DB(FaissDB):
             raise
         self.__sqlite = sqlite
         keys = self.__sqlite.keys()
-        deleted = self.remove(keys)
-        logger.info(
-            "Deleted: %s. Please call self.reconstruct to completely purge the deleted.",
-            deleted,
-        )
+        if len(keys) == 0:
+            return None
+
+        self.remove(ids=keys)
+        logger.warning("Call self.reconstruct to completely purge the deleted.")
 
 
 class FaissHNSWDB(FaissDB):
@@ -655,21 +678,21 @@ class FaissHNSWDB(FaissDB):
             logger.error(msg=str(e), exc_info=True, stack_info=True)
             raise
 
-    def remove(self, ids: list[str], **kwargs) -> list[str]:
+    def remove(self, ids: Optional[list[str]], **kwargs) -> list[str]:
         """
         Soft delete documents from the backend. Marks the selected records as "is_deleted".
 
+        Rules:
+        - Provide either `ids` or `where`.
+        - `ids`: Delete the specific document
+        - `where`: Delete all documents with matching metadata
+
         Args:
-        ids (list[str]): List of document ids to remove.
+            ids (Optional[list[str]]): List of document ids to delete.
+            where (Optional[dict]): Filter to apply to the results.
 
         Returns:
-        list[str]: List of document ids removed.
-
-        Raises:
-        - Exception: If failed to load the sqlite database.
-
-        Notes:
-        - Does not raise exception if the document is not found
+            list[str]: The list of ids that were marked as "is_deleted".
         """
         try:
             sqlite = (
@@ -684,15 +707,36 @@ class FaissHNSWDB(FaissDB):
                 msg=f"Loading Error: {loading_error}", exc_info=True, stack_info=True
             )
             raise
-        removed_ids = []
-        for key in ids:
-            value_dict = sqlite.get(key=key)
-            if value_dict is None:
-                continue
-            value_dict["is_deleted"] = True
-            sqlite.set(key=key, value=value_dict)
-            removed_ids.append(key)
-        return removed_ids
+
+        where: Optional[dict] = kwargs.get("where", None)
+        marked_ids = []
+        if ids:
+            for key in ids:
+                value_dict = sqlite.get(key)
+                if value_dict:
+                    value_dict["is_deleted"] = True
+                    sqlite.set(key, value_dict)
+                    marked_ids.append(key)
+        elif where:
+            for key in sqlite.keys():
+                data_dict = sqlite.get(key=key)
+                assert data_dict is not None
+                conds = []
+                metadatas = data_dict.get("metadata", None)
+                assert metadatas is not None
+
+                for field_name, field_value in where.items():
+                    conds.append(metadatas.get(field_name, None) == field_value)
+                if all(conds):
+                    data_dict["is_deleted"] = True
+                    sqlite.set(key=key, value=data_dict)
+                    marked_ids.append(key)
+            return marked_ids
+        else:
+            raise ValueError("Either `ids` or `where` must be provided.")
+
+        logger.warning("Call self.reconstruct to completely purge the deleted.")
+        return marked_ids
 
     def reconstruct(self, encoder: Encoder) -> None:
         try:
@@ -767,11 +811,11 @@ class FaissHNSWDB(FaissDB):
             raise
         self.__sqlite = sqlite
         keys = self.__sqlite.keys()
-        deleted = self.remove(keys)
-        logger.info(
-            "Deleted: %s. Please call self.reconstruct to completely purge the deleted.",
-            deleted,
-        )
+        if len(keys) == 0:
+            return None
+
+        self.remove(ids=keys)
+        logger.warning("Call self.reconstruct to completely purge the deleted.")
 
 
 class FaissMemory(VectorMemory):
