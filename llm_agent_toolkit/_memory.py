@@ -54,6 +54,26 @@ class VectorMemory(ABC):
     def clear(self):
         raise NotImplementedError
 
+    @abstractmethod
+    def delete(self, identifier: str):
+        """
+        Delete document from the backend.
+
+        With assumptions below, we naively force the user to delete the document at document-level.
+
+        Assumption:
+        1. The content of a file has to be chunked into multiple smaller block before added to the backend.
+        2. Following the 1st assumption, it is very unlikely the user has the unique identifier of each block.
+        3. All blocks derived from the same document will have the `parent` tag which point to the original document.
+
+        Args:
+            identifier (str): This is the unique identifier of the complete document.
+
+        Returns:
+            None
+        """
+        raise NotImplementedError
+
     def split_text(self, text: str) -> list[str]:
         chunks = self.__chunker.split(long_text=text)
         return chunks
@@ -88,3 +108,23 @@ class AsyncVectorMemory(ABC):
     def split_text(self, text: str) -> list[str]:
         chunks = self.__chunker.split(long_text=text)
         return chunks
+
+    @abstractmethod
+    async def delete(self, identifier: str):
+        """
+        Delete document from the backend.
+
+        With assumptions below, we naively force the user to delete the document at document-level.
+
+        Assumption:
+        1. The content of a file has to be chunked into multiple smaller block before added to the backend.
+        2. Following the 1st assumption, it is very unlikely the user has the unique identifier of each block.
+        3. All blocks derived from the same document will have the `parent` tag which point to the original document.
+
+        Args:
+            identifier (str): This is the unique identifier of the complete document.
+
+        Returns:
+            None
+        """
+        raise NotImplementedError
