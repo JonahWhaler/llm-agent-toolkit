@@ -74,6 +74,20 @@ class VectorMemory(ABC):
         """
         raise NotImplementedError
 
+    def update(self, identifier: str, document_string: str, **kwargs):
+        """
+        Update document in the backend.
+
+        With assumptions below, we naively force the user to update the document at document-level.
+
+        Assumption:
+        1. The content of a file has to be chunked into multiple smaller block before added to the backend.
+        2. Following the 1st assumption, it is very unlikely the user has the unique identifier of each block.
+        3. All blocks derived from the same document will have the `parent` tag which point to the original document.
+        """
+        self.delete(identifier)
+        self.add(document_string, identifier=identifier, **kwargs)
+
     def split_text(self, text: str) -> list[str]:
         chunks = self.__chunker.split(long_text=text)
         return chunks
@@ -128,3 +142,17 @@ class AsyncVectorMemory(ABC):
             None
         """
         raise NotImplementedError
+
+    async def update(self, identifier: str, document_string: str, **kwargs):
+        """
+        Update document in the backend.
+
+        With assumptions below, we naively force the user to update the document at document-level.
+
+        Assumption:
+        1. The content of a file has to be chunked into multiple smaller block before added to the backend.
+        2. Following the 1st assumption, it is very unlikely the user has the unique identifier of each block.
+        3. All blocks derived from the same document will have the `parent` tag which point to the original document.
+        """
+        await self.delete(identifier)
+        await self.add(document_string, identifier=identifier, **kwargs)
