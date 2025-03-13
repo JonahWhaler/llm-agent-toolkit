@@ -891,3 +891,8 @@ class FaissMemory(VectorMemory):
         assert isinstance(self.vdb, FaissDB)
         self.vdb.clear()
         self.vdb.reconstruct(encoder=self.encoder)
+
+    def delete(self, identifier: str) -> None:
+        assert isinstance(self.vdb, FaissDB)
+        self.vdb.remove(ids=None, where={"parent": identifier})
+        self.vdb.reconstruct(encoder=self.encoder)  # Very costly!!! But must call!!!

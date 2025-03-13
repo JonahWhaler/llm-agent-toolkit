@@ -106,6 +106,12 @@ class ChromaMemory(VectorMemory):
     def clear(self):
         self.vdb.delete_collection(name=self.__namespace)
 
+    def delete(self, identifier: str) -> None:
+        collection: chromadb.Collection = self.vdb.get_or_create_collection(
+            name=self.__namespace
+        )
+        collection.delete(where={"parent": identifier})
+
 
 def _add_(
     collection: chromadb.Collection,
@@ -139,6 +145,10 @@ def _query_(
 
 def _delete_collection_(client: chromadb.ClientAPI, collection_name: str):  # type: ignore
     return client.delete_collection(name=collection_name)
+
+
+def _delete_document_(collection: chromadb.Collection, identifier: str) -> None:
+    collection.delete(where={"parent": identifier})
 
 
 class AsyncChromaMemory(AsyncVectorMemory):
@@ -252,3 +262,12 @@ class AsyncChromaMemory(AsyncVectorMemory):
         await loop.run_in_executor(
             self.__executor, _delete_collection_, self.vdb, self.__namespace
         )  # type: ignore
+
+    async def delete(self, identifier: str) -> None:
+        collection: chromadb.Collection = self.vdb.get_or_create_collection(
+            name=self.__namespace
+        )
+        loop = asyncio.get_running_loop()
+        await loop.run_in_executor(
+            self.__executor, _delete_document_, collection, identifier
+        )
