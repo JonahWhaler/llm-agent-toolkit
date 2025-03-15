@@ -86,7 +86,13 @@ class VectorMemory(ABC):
         2. Following the 1st assumption, it is very unlikely the user has the unique identifier of each block.
         3. All blocks derived from the same document will have the `parent` tag which point to the original document.
         """
-        self.delete(identifier)
+        try:
+            self.delete(identifier)
+        except Exception as e:
+            logger = logging.getLogger(__name__)
+            error_msg = f"Failed to delete document: {str(e)}"
+            logger.error(error_msg, exc_info=True, stack_info=True)
+
         self.add(document_string, identifier=identifier, **kwargs)
 
     def split_text(self, text: str) -> list[str]:
