@@ -1,3 +1,4 @@
+import logging
 from typing import Deque
 from collections import deque
 from itertools import islice
@@ -154,5 +155,11 @@ class AsyncVectorMemory(ABC):
         2. Following the 1st assumption, it is very unlikely the user has the unique identifier of each block.
         3. All blocks derived from the same document will have the `parent` tag which point to the original document.
         """
-        await self.delete(identifier)
+        try:
+            await self.delete(identifier)
+        except Exception as e:
+            logger = logging.getLogger(__name__)
+            error_msg = f"Failed to delete document: {str(e)}"
+            logger.error(error_msg, exc_info=True, stack_info=True)
+
         await self.add(document_string, identifier=identifier, **kwargs)
