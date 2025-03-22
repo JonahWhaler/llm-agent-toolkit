@@ -204,25 +204,30 @@ class GeminiCore:
         usage: types.GenerateContentResponseUsageMetadata | None,
         token_usage: TokenUsage | None = None,
     ) -> TokenUsage:
-        """Transforms GenerateContentResponseUsageMetadata to TokenUsage. This is a adapter function."""
+        """Transforms GenerateContentResponseUsageMetadata to TokenUsage. This is a adapter function.
+
+        Notes:
+        * When finish_reason=<FinishReason.MALFORMED_FUNCTION_CALL: 'MALFORMED_FUNCTION_CALL'>, candidates_token_count is None
+        """
         if usage is None:
             raise RuntimeError("Response usage is None.")
 
-        if usage.prompt_token_count is None or usage.candidates_token_count is None:
-            raise RuntimeError(
-                "Either or both prompt_token_count and candidates_token_count are None"
-            )
+        ptc = usage.prompt_token_count
+        ctc = usage.candidates_token_count
+        if ptc is None:
+            ptc = 0
+
+        if ctc is None:
+            ctc = 0
 
         if token_usage is None:
-            token_usage = TokenUsage(
-                input_tokens=usage.prompt_token_count,
-                output_tokens=usage.candidates_token_count,
-            )
+            token_usage = TokenUsage(input_tokens=ptc, output_tokens=ctc)
         else:
-            token_usage.input_tokens += usage.prompt_token_count
-            token_usage.output_tokens += usage.candidates_token_count
+            token_usage.input_tokens += ptc
+            token_usage.output_tokens += ctc
         logger.debug("Token Usage: %s", token_usage)
         return token_usage
+
     @staticmethod
     def preprocessing(
         query: str,
