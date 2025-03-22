@@ -250,12 +250,28 @@ class GeminiCore:
                     )
                 )
 
-        output.append(
-            types.Content(
-                role="user",
-                parts=[types.Part.from_text(text=query)],
+        if filepath:
+            ext = os.path.splitext(filepath)[-1][1:]
+            ext = "jpeg" if ext == "jpg" else ext
+            mime_type = f"image/{ext}"  # Assume image file only.
+            with open(filepath, "rb") as f:
+                data_bytes = f.read()
+            output.append(
+                types.Content(
+                    role="user",
+                    parts=[
+                        types.Part.from_bytes(data=data_bytes, mime_type=mime_type),
+                        types.Part.from_text(text=query),
+                    ],
+                )
             )
-        )
+        else:
+            output.append(
+                types.Content(
+                    role="user",
+                    parts=[types.Part.from_text(text=query)],
+                )
+            )
         return output
 
     @staticmethod
