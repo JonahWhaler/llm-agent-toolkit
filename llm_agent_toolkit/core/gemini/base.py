@@ -389,3 +389,10 @@ class GeminiCore:
         except Exception as e:
             # logger.warning("Response text not found: %s", str(e))
             return None
+
+
+TOOL_PROMPT = """
+Utilize tools to solve the problems. 
+Results from tools will be kept in the context. 
+Calling the tools repeatedly is highly discouraged.
+"""
