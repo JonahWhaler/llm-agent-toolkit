@@ -223,3 +223,81 @@ class GeminiCore:
             token_usage.output_tokens += usage.candidates_token_count
         logger.debug("Token Usage: %s", token_usage)
         return token_usage
+            warning_message += "Unknown reason."
+    @staticmethod
+    def get_function_call(
+        response: types.GenerateContentResponse,
+    ) -> Optional[dict[str, Any]]:
+        try:
+            candidates: Optional[list[types.Candidate]] = response.candidates
+            if not candidates:
+                return None
+
+            content: Optional[types.Candidate] = getattr(candidates[0], "content", None)
+            if not content:
+                return None
+
+            parts: Optional[list[types.Part]] = getattr(content, "parts", None)
+            if not parts:
+                return None
+
+            function_call: Optional[types.FunctionCall] = getattr(
+                parts[0],
+                "function_call",
+                None,
+            )
+            if not function_call:
+                return None
+
+            return {
+                "id": function_call.id,
+                "name": function_call.name,
+                "arguments": function_call.args,
+            }
+        except Exception as e:
+            # logger.warning("Function call not found: %s", str(e))
+            return None
+
+    @staticmethod
+    def get_response_text(response: types.GenerateContentResponse) -> str | None:
+        try:
+            candidates: Optional[list[types.Candidate]] = response.candidates
+            if not candidates:
+                return None
+
+            content: Optional[types.Candidate] = getattr(candidates[0], "content", None)
+            if content is None:
+                return None
+
+            parts: Optional[list[types.Part]] = getattr(content, "parts", None)
+            if parts is None:
+                return None
+
+            response_text = getattr(parts[0], "text", None)
+            if response_text is None:
+                return response.text
+
+            return response_text
+        except Exception as e:
+            # logger.warning("Response text not found: %s", str(e))
+            return None
+
+    @staticmethod
+    def get_finish_reason(
+        response: types.GenerateContentResponse,
+    ) -> Optional[types.FinishReason]:
+        try:
+            candidates: Optional[list[types.Candidate]] = response.candidates
+            if not candidates:
+                return None
+
+            finish_reason: Optional[types.FinishReason] = getattr(
+                candidates[0], "finish_reason", None
+            )
+            if finish_reason is None:
+                return None
+
+            return finish_reason
+        except Exception as e:
+            # logger.warning("Response text not found: %s", str(e))
+            return None
