@@ -224,6 +224,56 @@ class GeminiCore:
         logger.debug("Token Usage: %s", token_usage)
         return token_usage
     @staticmethod
+    def preprocessing(
+        query: str,
+        context: Optional[list[MessageBlock | dict]],
+        filepath: Optional[str] = None,
+    ) -> list[types.Content]:
+        """Adapter function to transform MessageBlock to types.Content."""
+        output: list[types.Content] = []
+        if context is not None:
+            for ctx in context:
+                _role = ctx["role"]
+                if _role == "system":
+                    # This can happend when user force an system message into the context
+                    _role = "model"
+                output.append(
+                    types.Content(
+                        role=_role,
+                        parts=[types.Part.from_text(text=ctx["content"])],
+                    )
+                )
+
+        output.append(
+            types.Content(
+                role="user",
+                parts=[types.Part.from_text(text=query)],
+            )
+        )
+        return output
+
+    @staticmethod
+    def postprocessing(msgs: list[types.Content]) -> list[MessageBlock | dict]:
+        """Adapter function to transform types.Content to MessageBlock."""
+        output_list: list[MessageBlock | dict] = []
+        for msg in msgs:
+            role = getattr(msg, "role", None)
+            parts: list[types.Part] | None = getattr(msg, "parts", None)
+            assert role is not None
+            assert parts is not None
+            content = parts[0].text
+            if content:
+                output_list.append(
+                    MessageBlock(
+                        role=CreatorRole.ASSISTANT.value if role == "model" else role,
+                        content=content,
+                    )
+                )
+            # Parts without the text attribute will be skipped.
+
+        return output_list
+
+    @staticmethod
     def warning_message(
         iteration: int,
         max_iteration: int,
