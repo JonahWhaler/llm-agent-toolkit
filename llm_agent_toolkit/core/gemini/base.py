@@ -223,7 +223,40 @@ class GeminiCore:
             token_usage.output_tokens += usage.candidates_token_count
         logger.debug("Token Usage: %s", token_usage)
         return token_usage
+    @staticmethod
+    def warning_message(
+        iteration: int,
+        max_iteration: int,
+        token_usage: TokenUsage,
+        max_tokens: int,
+        available_tokens: int,
+    ) -> str:
+        """
+        Generate a warning message given various conditions.
+        This funtion assume a warning message is needed.
+
+        Args:
+            iteration (int): current iteration count.
+            max_iteration (int): maximum iteration allowed.
+            token_usage (TokenUsage): token usage record.
+            max_tokens (int): maximum token allowed.
+            available_tokens (int): available tokens.
+
+        Returns:
+            str: A warning message.
+        """
+        warning_message = "Warning: "
+        if iteration >= max_iteration:
+            warning_message += "Iteration limit reached."
+        elif token_usage.total_tokens >= max_tokens:
+            warning_message += f"Maximum token count reached. \
+                {token_usage.total_tokens} > {max_tokens}"
+        elif available_tokens <= 0:
+            warning_message += "No tokens available."
+        else:
             warning_message += "Unknown reason."
+        return warning_message
+
     @staticmethod
     def get_function_call(
         response: types.GenerateContentResponse,
