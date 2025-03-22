@@ -1,12 +1,13 @@
 import os
 import logging
 from math import ceil
-
+from typing import Any, Optional
 from PIL import Image
 from google import genai
 from google.genai import types
 
-from ..._util import TokenUsage
+from ..._util import CreatorRole, TokenUsage
+from ..._core import MessageBlock
 
 logger = logging.getLogger(__name__)
 
