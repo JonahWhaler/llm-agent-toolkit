@@ -1,12 +1,13 @@
 import os
 import logging
 from math import ceil
-
+from typing import Any, Optional
 from PIL import Image
 from google import genai
 from google.genai import types
 
-from ..._util import TokenUsage
+from ..._util import CreatorRole, TokenUsage
+from ..._core import MessageBlock
 
 logger = logging.getLogger(__name__)
 
@@ -204,22 +205,211 @@ class GeminiCore:
         usage: types.GenerateContentResponseUsageMetadata | None,
         token_usage: TokenUsage | None = None,
     ) -> TokenUsage:
-        """Transforms GenerateContentResponseUsageMetadata to TokenUsage. This is a adapter function."""
+        """Transforms GenerateContentResponseUsageMetadata to TokenUsage. This is a adapter function.
+
+        Notes:
+        * When finish_reason=<FinishReason.MALFORMED_FUNCTION_CALL: 'MALFORMED_FUNCTION_CALL'>, candidates_token_count is None
+        """
         if usage is None:
             raise RuntimeError("Response usage is None.")
 
-        if usage.prompt_token_count is None or usage.candidates_token_count is None:
-            raise RuntimeError(
-                "Either or both prompt_token_count and candidates_token_count are None"
-            )
+        ptc = usage.prompt_token_count
+        ctc = usage.candidates_token_count
+        if ptc is None:
+            ptc = 0
+
+        if ctc is None:
+            ctc = 0
 
         if token_usage is None:
-            token_usage = TokenUsage(
-                input_tokens=usage.prompt_token_count,
-                output_tokens=usage.candidates_token_count,
-            )
+            token_usage = TokenUsage(input_tokens=ptc, output_tokens=ctc)
         else:
-            token_usage.input_tokens += usage.prompt_token_count
-            token_usage.output_tokens += usage.candidates_token_count
+            token_usage.input_tokens += ptc
+            token_usage.output_tokens += ctc
         logger.debug("Token Usage: %s", token_usage)
         return token_usage
+
+    @staticmethod
+    def preprocessing(
+        query: str,
+        context: Optional[list[MessageBlock | dict]],
+        filepath: Optional[str] = None,
+    ) -> list[types.Content]:
+        """Adapter function to transform MessageBlock to types.Content."""
+        output: list[types.Content] = []
+        if context is not None:
+            for ctx in context:
+                _role = ctx["role"]
+                if _role == "system":
+                    # This can happend when user force an system message into the context
+                    _role = "model"
+                output.append(
+                    types.Content(
+                        role=_role,
+                        parts=[types.Part.from_text(text=ctx["content"])],
+                    )
+                )
+
+        if filepath:
+            ext = os.path.splitext(filepath)[-1][1:]
+            ext = "jpeg" if ext == "jpg" else ext
+            mime_type = f"image/{ext}"  # Assume image file only.
+            with open(filepath, "rb") as f:
+                data_bytes = f.read()
+            output.append(
+                types.Content(
+                    role="user",
+                    parts=[
+                        types.Part.from_bytes(data=data_bytes, mime_type=mime_type),
+                        types.Part.from_text(text=query),
+                    ],
+                )
+            )
+        else:
+            output.append(
+                types.Content(
+                    role="user",
+                    parts=[types.Part.from_text(text=query)],
+                )
+            )
+        return output
+
+    @staticmethod
+    def postprocessing(msgs: list[types.Content]) -> list[MessageBlock | dict]:
+        """Adapter function to transform types.Content to MessageBlock."""
+        output_list: list[MessageBlock | dict] = []
+        for msg in msgs:
+            role = getattr(msg, "role", None)
+            parts: list[types.Part] | None = getattr(msg, "parts", None)
+            assert role is not None
+            assert parts is not None
+            content = parts[0].text
+            if content:
+                output_list.append(
+                    MessageBlock(
+                        role=CreatorRole.ASSISTANT.value if role == "model" else role,
+                        content=content,
+                    )
+                )
+            # Parts without the text attribute will be skipped.
+
+        return output_list
+
+    @staticmethod
+    def warning_message(
+        iteration: int,
+        max_iteration: int,
+        token_usage: TokenUsage,
+        max_tokens: int,
+        available_tokens: int,
+    ) -> str:
+        """
+        Generate a warning message given various conditions.
+        This funtion assume a warning message is needed.
+
+        Args:
+            iteration (int): current iteration count.
+            max_iteration (int): maximum iteration allowed.
+            token_usage (TokenUsage): token usage record.
+            max_tokens (int): maximum token allowed.
+            available_tokens (int): available tokens.
+
+        Returns:
+            str: A warning message.
+        """
+        warning_message = "Warning: "
+        if iteration >= max_iteration:
+            warning_message += "Iteration limit reached."
+        elif token_usage.total_tokens >= max_tokens:
+            warning_message += f"Maximum token count reached. \
+                {token_usage.total_tokens} > {max_tokens}"
+        elif available_tokens <= 0:
+            warning_message += "No tokens available."
+        else:
+            warning_message += "Unknown reason."
+        return warning_message
+
+    @staticmethod
+    def get_function_call(
+        response: types.GenerateContentResponse,
+    ) -> Optional[dict[str, Any]]:
+        try:
+            candidates: Optional[list[types.Candidate]] = response.candidates
+            if not candidates:
+                return None
+
+            content: Optional[types.Candidate] = getattr(candidates[0], "content", None)
+            if not content:
+                return None
+
+            parts: Optional[list[types.Part]] = getattr(content, "parts", None)
+            if not parts:
+                return None
+
+            function_call: Optional[types.FunctionCall] = getattr(
+                parts[0],
+                "function_call",
+                None,
+            )
+            if not function_call:
+                return None
+
+            return {
+                "id": function_call.id,
+                "name": function_call.name,
+                "arguments": function_call.args,
+            }
+        except Exception as e:
+            # logger.warning("Function call not found: %s", str(e))
+            return None
+
+    @staticmethod
+    def get_response_text(response: types.GenerateContentResponse) -> str | None:
+        try:
+            candidates: Optional[list[types.Candidate]] = response.candidates
+            if not candidates:
+                return None
+
+            content: Optional[types.Candidate] = getattr(candidates[0], "content", None)
+            if content is None:
+                return None
+
+            parts: Optional[list[types.Part]] = getattr(content, "parts", None)
+            if parts is None:
+                return None
+
+            response_text = getattr(parts[0], "text", None)
+            if response_text is None:
+                return response.text
+
+            return response_text
+        except Exception as e:
+            # logger.warning("Response text not found: %s", str(e))
+            return None
+
+    @staticmethod
+    def get_finish_reason(
+        response: types.GenerateContentResponse,
+    ) -> Optional[types.FinishReason]:
+        try:
+            candidates: Optional[list[types.Candidate]] = response.candidates
+            if not candidates:
+                return None
+
+            finish_reason: Optional[types.FinishReason] = getattr(
+                candidates[0], "finish_reason", None
+            )
+            if finish_reason is None:
+                return None
+
+            return finish_reason
+        except Exception as e:
+            # logger.warning("Response text not found: %s", str(e))
+            return None
+
+
+TOOL_PROMPT = """
+Utilize tools to solve the problems. 
+Results from tools will be kept in the context. 
+Calling the tools repeatedly is highly discouraged.
+"""

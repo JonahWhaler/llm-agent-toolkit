@@ -65,6 +65,7 @@ class CreatorRole(str, Enum):
     ASSISTANT = "assistant"
     FUNCTION = "function"
     TOOL = "tool"
+    MODEL = "model"
 
 
 class RequiredMessageField(TypedDict, total=True):
