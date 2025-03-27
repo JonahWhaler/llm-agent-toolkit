@@ -39,7 +39,6 @@ class T2T_GMN_Core(Core, GeminiCore):
             system_instruction=self.system_prompt,
             temperature=self.config.temperature,
             max_output_tokens=max_output_tokens,
-            # frequency_penalty=0.5,
         )
         return config
 
@@ -61,27 +60,7 @@ class T2T_GMN_Core(Core, GeminiCore):
         Notes:
         * Single-Turn Execution.
         """
-        msgs: list[types.Content] = []
-        output: list[MessageBlock | dict] = []
-
-        if context:
-            for ctx in context:
-                _role = ctx["role"]
-                if _role == "system":
-                    # This can happend when user force an system message into the context
-                    _role = "model"
-                msgs.append(
-                    types.Content(
-                        role=_role,
-                        parts=[types.Part.from_text(text=ctx["content"])],
-                    )
-                )
-        msgs.append(
-            types.Content(
-                role="user",
-                parts=[types.Part.from_text(text=query)],
-            )
-        )
+        msgs: list[types.Content] = self.preprocessing(query, context)
         MAX_TOKENS = min(self.config.max_tokens, self.context_length)
         MAX_OUTPUT_TOKENS = min(
             MAX_TOKENS, self.max_output_tokens, self.config.max_output_tokens
@@ -95,7 +74,6 @@ class T2T_GMN_Core(Core, GeminiCore):
         )
 
         config = self.custom_config(max_output_tokens)
-        token_usage = TokenUsage(input_tokens=0, output_tokens=0)
         try:
             client = genai.Client(api_key=os.environ["GEMINI_API_KEY"])
             response = client.models.generate_content(
@@ -104,17 +82,18 @@ class T2T_GMN_Core(Core, GeminiCore):
                 config=config,
             )
 
-            token_usage = self.update_usage(
-                response.usage_metadata, token_usage=token_usage
-            )
+            token_usage = self.update_usage(response.usage_metadata, token_usage=None)
 
-            response_text = getattr(response, "text", None)
-            if response_text is None:
-                raise RuntimeError("response.text is None")
+            response_text = self.get_response_text(response)
+            if response_text:
+                msgs.append(
+                    types.Content(
+                        role=CreatorRole.MODEL.value,
+                        parts=[types.Part.from_text(text=response_text)],
+                    )
+                )
 
-            output.append(
-                {"role": CreatorRole.ASSISTANT.value, "content": response_text}
-            )
+            output = self.postprocessing(msgs[-1:])
             return output, token_usage
         except Exception as e:
             logger.error("Exception: %s", e, exc_info=True, stack_info=True)
@@ -134,10 +113,7 @@ class T2T_GMN_Core(Core, GeminiCore):
                 config=config,
             )
             response = await asyncio.wrap_future(future)  # Makes the future awaitable
-            usage = response.usage_metadata
-
-            response_text = getattr(response, "text", None)
-            return usage, response_text
+            return response
 
     async def run_async(
         self, query: str, context: list[MessageBlock | dict] | None, **kwargs
@@ -157,27 +133,7 @@ class T2T_GMN_Core(Core, GeminiCore):
         Notes:
         * Single-Turn Execution.
         """
-        msgs: list[types.Content] = []
-        output: list[MessageBlock | dict] = []
-
-        if context:
-            for ctx in context:
-                _role = ctx["role"]
-                if _role == "system":
-                    # This can happend when user force an system message into the context
-                    _role = "model"
-                msgs.append(
-                    types.Content(
-                        role=_role,
-                        parts=[types.Part.from_text(text=ctx["content"])],
-                    )
-                )
-        msgs.append(
-            types.Content(
-                role="user",
-                parts=[types.Part.from_text(text=query)],
-            )
-        )
+        msgs: list[types.Content] = self.preprocessing(query, context)
         MAX_TOKENS = min(self.config.max_tokens, self.context_length)
         MAX_OUTPUT_TOKENS = min(
             MAX_TOKENS, self.max_output_tokens, self.config.max_output_tokens
@@ -193,15 +149,19 @@ class T2T_GMN_Core(Core, GeminiCore):
         token_usage = TokenUsage(input_tokens=0, output_tokens=0)
         config = self.custom_config(max_output_tokens)
         try:
-            usage, response_text = await self.acall(self.model_name, config, msgs)
-            token_usage = self.update_usage(usage, token_usage=token_usage)
+            response = await self.acall(self.model_name, config, msgs)
+            token_usage = self.update_usage(response.usage_metadata, token_usage=None)
 
-            if response_text is None:
-                raise RuntimeError("response.text is None")
+            response_text = self.get_response_text(response)
+            if response_text:
+                msgs.append(
+                    types.Content(
+                        role=CreatorRole.MODEL.value,
+                        parts=[types.Part.from_text(text=response_text)],
+                    )
+                )
 
-            output.append(
-                {"role": CreatorRole.ASSISTANT.value, "content": response_text}
-            )
+            output = self.postprocessing(msgs[-1:])
             return output, token_usage
         except Exception as e:
             logger.error("Exception: %s", e, exc_info=True, stack_info=True)

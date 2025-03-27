@@ -27,6 +27,8 @@ logger = logging.getLogger(__name__)
 class GMN_StructuredOutput_Core(Core, GeminiCore, ImageInterpreter):
     """SO LLM"""
 
+    SUPPORTED_IMAGE_FORMATS = (".png", ".jpeg", ".jpg", ".webp")
+
     def __init__(
         self,
         system_prompt: str,
@@ -50,7 +52,6 @@ class GMN_StructuredOutput_Core(Core, GeminiCore, ImageInterpreter):
             system_instruction=self.system_prompt,
             temperature=self.config.temperature,
             max_output_tokens=max_output_tokens,
-            # frequency_penalty=0.5,
         )
         if response_mode == ResponseMode.SO:
             config.response_mime_type = "application/json"
@@ -102,37 +103,13 @@ class GMN_StructuredOutput_Core(Core, GeminiCore, ImageInterpreter):
         response_format: Optional[Type[T]] = kwargs.get("format")  # type: ignore
         self.validate(response_mode, response_format)  # Raise an exception if invalid
 
-        msgs: list[types.Content] = []
-        output: list[MessageBlock | dict] = []
-
-        if context:
-            for ctx in context:
-                _role = ctx["role"]
-                if _role == "system":
-                    # This can happend when user force an system message into the context
-                    _role = "model"
-                msgs.append(
-                    types.Content(
-                        role=_role,
-                        parts=[types.Part.from_text(text=ctx["content"])],
-                    )
-                )
-        parts = []
         filepath: str | None = kwargs.get("filepath", None)
         if filepath:
-            with open(filepath, "rb") as f:
-                data = f.read()
-            ext = os.path.splitext(filepath)[-1][1:]
-            ext = "jpeg" if ext == "jpg" else ext
-            parts.append(types.Part.from_bytes(data=data, mime_type=f"image/{ext}"))
+            ext = os.path.splitext(filepath)[-1]
+            if ext not in GMN_StructuredOutput_Core.SUPPORTED_IMAGE_FORMATS:
+                raise ValueError(f"Unsupported image type: {ext}")
 
-        parts.append(types.Part.from_text(text=query))
-        msgs.append(
-            types.Content(
-                role="user",
-                parts=parts,
-            )
-        )
+        msgs: list[types.Content] = self.preprocessing(query, context, filepath)
 
         MAX_TOKENS = min(self.config.max_tokens, self.context_length)
         MAX_OUTPUT_TOKENS = min(
@@ -149,7 +126,6 @@ class GMN_StructuredOutput_Core(Core, GeminiCore, ImageInterpreter):
             self.context_length - prompt_token_count,
         )
 
-        token_usage = TokenUsage(input_tokens=0, output_tokens=0)
         config = self.custom_config(max_output_tokens, response_mode, response_format)
         try:
             client = genai.Client(api_key=os.environ["GEMINI_API_KEY"])
@@ -159,21 +135,25 @@ class GMN_StructuredOutput_Core(Core, GeminiCore, ImageInterpreter):
                 config=config,
             )
 
-            token_usage = self.update_usage(response.usage_metadata, token_usage)
+            token_usage = self.update_usage(response.usage_metadata, token_usage=None)
 
-            response_text = getattr(response, "text", None)
-            if response_text is None:
-                raise RuntimeError("response.text is None")
+            response_text = self.get_response_text(response)
+            if response_text:
+                msgs.append(
+                    types.Content(
+                        role=CreatorRole.MODEL.value,
+                        parts=[types.Part.from_text(text=response_text)],
+                    )
+                )
 
             if response_mode == ResponseMode.SO:
                 custom_format = response.parsed
-                custom_dict = custom_format.model_dump()  # type: ignore
-                for k, v in custom_dict.items():
-                    logger.debug("%s : %s", k, v)
+                if custom_format:
+                    custom_dict = custom_format.model_dump()  # type: ignore
+                    for k, v in custom_dict.items():
+                        logger.debug("%s : %s", k, v)
 
-            output.append(
-                {"role": CreatorRole.ASSISTANT.value, "content": response_text}
-            )
+            output = self.postprocessing(msgs[-1:])
             return output, token_usage
         except Exception as e:
             logger.error("Exception: %s", e, exc_info=True, stack_info=True)
@@ -204,37 +184,14 @@ class GMN_StructuredOutput_Core(Core, GeminiCore, ImageInterpreter):
         response_format: Optional[Type[T]] = kwargs.get("format")  # type: ignore
         self.validate(response_mode, response_format)  # Raise an exception if invalid
 
-        msgs: list[types.Content] = []
-        output: list[MessageBlock | dict] = []
-
-        if context:
-            for ctx in context:
-                _role = ctx["role"]
-                if _role == "system":
-                    # This can happend when user force an system message into the context
-                    _role = "model"
-                msgs.append(
-                    types.Content(
-                        role=_role,
-                        parts=[types.Part.from_text(text=ctx["content"])],
-                    )
-                )
-        parts = []
         filepath: str | None = kwargs.get("filepath", None)
         if filepath:
-            with open(filepath, "rb") as f:
-                data = f.read()
-            ext = os.path.splitext(filepath)[-1][1:]
-            ext = "jpeg" if ext == "jpg" else ext
-            parts.append(types.Part.from_bytes(data=data, mime_type=f"image/{ext}"))
+            ext = os.path.splitext(filepath)[-1]
+            if ext not in GMN_StructuredOutput_Core.SUPPORTED_IMAGE_FORMATS:
+                raise ValueError(f"Unsupported image type: {ext}")
 
-        parts.append(types.Part.from_text(text=query))
-        msgs.append(
-            types.Content(
-                role="user",
-                parts=parts,
-            )
-        )
+        msgs: list[types.Content] = self.preprocessing(query, context, filepath)
+
         MAX_TOKENS = min(self.config.max_tokens, self.context_length)
         MAX_OUTPUT_TOKENS = min(
             MAX_TOKENS, self.max_output_tokens, self.config.max_output_tokens
@@ -250,27 +207,28 @@ class GMN_StructuredOutput_Core(Core, GeminiCore, ImageInterpreter):
             self.context_length - prompt_token_count,
         )
 
-        token_usage = TokenUsage(input_tokens=0, output_tokens=0)
         config = self.custom_config(max_output_tokens, response_mode, response_format)
         try:
             response = await self.acall(self.model_name, config, msgs)
-            token_usage = self.update_usage(
-                response.usage_metadata, token_usage=token_usage
-            )
+            token_usage = self.update_usage(response.usage_metadata, token_usage=None)
 
-            response_text = getattr(response, "text", None)
-            if response_text is None:
-                raise RuntimeError("response.text is None")
+            response_text = self.get_response_text(response)
+            if response_text:
+                msgs.append(
+                    types.Content(
+                        role=CreatorRole.MODEL.value,
+                        parts=[types.Part.from_text(text=response_text)],
+                    )
+                )
 
             if response_mode == ResponseMode.SO:
                 custom_format = response.parsed
-                custom_dict = custom_format.model_dump()  # type: ignore
-                for k, v in custom_dict.items():
-                    logger.debug("%s : %s", k, v)
+                if custom_format:
+                    custom_dict = custom_format.model_dump()  # type: ignore
+                    for k, v in custom_dict.items():
+                        logger.debug("%s : %s", k, v)
 
-            output.append(
-                {"role": CreatorRole.ASSISTANT.value, "content": response_text}
-            )
+            output = self.postprocessing(msgs[-1:])
             return output, token_usage
         except Exception as e:
             logger.error("Exception: %s", e, exc_info=True, stack_info=True)

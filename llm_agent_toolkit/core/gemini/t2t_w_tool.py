@@ -105,12 +105,7 @@ class T2T_GMN_Core_W_Tool(Core, GeminiCore, ToolSupport):
             temperature=self.config.temperature,
             max_output_tokens=max_output_tokens,
             tools=tools if use_tool else None,
-            # automatic_function_calling=types.AutomaticFunctionCallingConfig(
-            #     disable=True, maximum_remote_calls=0
-            # ),
-            # frequency_penalty=0.5,
         )
-
         return config
 
     def run(
