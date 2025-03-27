@@ -78,6 +78,15 @@ class OpenAITranscriber(Transcriber):
             raise ValueError("%s is not available in OpenAI's model listing.")
 
     def __available(self) -> bool:
+        """
+        This is not the real fix, I basically pass the responsibility back to the user
+        to pick the available models.
+
+        Always return True!!!
+
+        If `client.models.list()` continue to fail,
+        it will show warning without raising the Exception.
+        """
         try:
             client = openai.Client(api_key=os.environ["OPENAI_API_KEY"])
             for model in client.models.list():
@@ -85,8 +94,8 @@ class OpenAITranscriber(Transcriber):
                     return True
             return False
         except Exception as e:
-            logger.error("Exception: %s", e, exc_info=True, stack_info=True)
-            raise
+            logger.warning("Exception: %s", e)
+        return True
 
     @property
     def model_name(self) -> str:
