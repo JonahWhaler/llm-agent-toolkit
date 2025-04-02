@@ -1,39 +1,72 @@
 import os
 import logging
+from typing import Any
 import openai
 from ..._core import Core
 from ..._util import CreatorRole, ChatCompletionConfig, MessageBlock, TokenUsage
-from .base import DeepSeekCore
+from .base import OpenAICore
 
 logger = logging.getLogger(__name__)
 
 
-class O1Beta_DS_Core(Core, DeepSeekCore):
-    SUPPORTED_MODELS = "deepseek-reasoner"
+class Reasoning_Core(Core, OpenAICore):
+    """
+    `Reasoning_Core` is a concrete implementation of abstract base classes `Core`.
+    `Reasoning_Core` is also a child class of `OpenAICore`.
+
+    It facilitates synchronous and asynchronous communication with OpenAI's API.
+
+    This is specially implemented to support `o3-mini` and `o1-mini`.
+
+    Methods:
+    - run(query: str, context: list[MessageBlock | dict] | None, **kwargs) -> tuple[list[MessageBlock | dict], TokenUsage]:
+        Synchronously run the LLM model with the given query and context.
+    - run_async(query: str, context: list[MessageBlock | dict] | None, **kwargs) -> tuple[list[MessageBlock | dict], TokenUsage]:
+        Asynchronously run the LLM model with the given query and context.
+
+
+    **Notes:**
+    - The caller is responsible for memory management, output parsing and error handling.
+    - If model is not available under OpenAI's listing, raise ValueError.
+    - `context_length` is configurable.
+    - `max_output_tokens` is configurable.
+    - `temperature` has to be 1.0
+    """
+
+    SUPPORTED_MODELS = ("o1-mini", "o3-mini")
+    SUPPORTED_EFFORT = ("low", "medium", "high")
 
     def __init__(
         self,
         system_prompt: str,
         config: ChatCompletionConfig,
+        reasoning_effort: str = "low",
     ):
         if config.name not in self.SUPPORTED_MODELS:
             raise ValueError(
                 f"{config.name} is not supported. Supported models: {self.SUPPORTED_MODELS}"
             )
+        if config.temperature != 1.0:
+            raise ValueError("temperature has to be 1.0")
+
         Core.__init__(self, system_prompt, config)
-        DeepSeekCore.__init__(self)
+        OpenAICore.__init__(self, config.name)
         self.profile = self.build_profile(config.name)
+        if reasoning_effort not in self.SUPPORTED_EFFORT:
+            raise ValueError(
+                f"{reasoning_effort} is not supported. Supported effort: {self.SUPPORTED_EFFORT}"
+            )
+        self.reasoning_effort = reasoning_effort
 
     async def run_async(
         self, query: str, context: list[MessageBlock | dict] | None, **kwargs
-    ) -> tuple[list[MessageBlock | dict], TokenUsage]:
+    ) -> tuple[list[MessageBlock | dict[str, Any]], TokenUsage]:
         """
         Asynchronously run the LLM model with the given query and context.
 
         Args:
             query (str): The query to be processed by the LLM model.
             context (list[MessageBlock | dict] | None): The context to be used for the LLM model.
-            include_rc (bool): Whether to include `reasoning content` in the output, default is True.
             **kwargs: Additional keyword arguments.
 
         Returns:
@@ -43,10 +76,13 @@ class O1Beta_DS_Core(Core, DeepSeekCore):
         Notes:
         * No system prompt!
         * max_tokens -> max_completion_tokens
+        * temperature has to be 1.0
+        * frequency_penalty not supported
+        * reasoning_effort is only available to `o1`
         """
-        # MessageBlock(role=CreatorRole.USER.value, content=self.system_prompt)
-        include_rc: bool = kwargs.get("include_rc", True)
-        msgs: list[MessageBlock | dict] = []
+        msgs: list[MessageBlock | dict] = [
+            MessageBlock(role=CreatorRole.USER.value, content=self.system_prompt)
+        ]
 
         if context:
             msgs.extend(context)
@@ -57,41 +93,36 @@ class O1Beta_DS_Core(Core, DeepSeekCore):
         MAX_OUTPUT_TOKENS = min(
             MAX_TOKENS, self.max_output_tokens, self.config.max_output_tokens
         )
-        prompt_token_count = self.calculate_token_count(msgs, tools=None)
+        prompt_token_count = self.calculate_token_count(msgs, None, None, None)
         max_output_tokens = min(
             MAX_OUTPUT_TOKENS,
             self.context_length - prompt_token_count,
         )
 
         if max_output_tokens <= 0:
-            raise ValueError(
-                f"max_output_tokens <= 0. Prompt token count: {prompt_token_count}"
-            )
+            logger.warning("Prompt token count: %d", prompt_token_count)
+            raise ValueError("max_output_tokens <= 0")
 
         try:
-            client = openai.AsyncOpenAI(
-                api_key=os.environ["DEEPSEEK_API_KEY"],
-                base_url=os.environ["DEEPSEEK_BASE_URL"],
-            )
+            client = openai.AsyncOpenAI(api_key=os.environ["OPENAI_API_KEY"])
             response = await client.chat.completions.create(
                 model=self.model_name,
                 messages=msgs,  # type: ignore
-                max_tokens=max_output_tokens,
+                # frequency_penalty=0.5,
+                max_completion_tokens=max_output_tokens,
+                temperature=self.config.temperature,
+                n=self.config.return_n,
+                reasoning_effort=self.reasoning_effort,  # type: ignore
             )
 
             choice = response.choices[0]
             _content = getattr(choice.message, "content", None)
-            _reasoning_content = getattr(choice.message, "reasoning_content", None)
 
             token_usage = self.update_usage(response.usage)
+
             if _content:
-                response_string = _content
-                if _reasoning_content and include_rc:
-                    response_string = (
-                        f"<COT>\n{_reasoning_content}\n</COT>\n" + response_string
-                    )
                 return [
-                    {"role": CreatorRole.ASSISTANT.value, "content": response_string}
+                    {"role": CreatorRole.ASSISTANT.value, "content": _content}
                 ], token_usage
 
             failed_reason = choice.finish_reason
@@ -102,14 +133,13 @@ class O1Beta_DS_Core(Core, DeepSeekCore):
 
     def run(
         self, query: str, context: list[MessageBlock | dict] | None, **kwargs
-    ) -> tuple[list[MessageBlock | dict], TokenUsage]:
+    ) -> tuple[list[MessageBlock | dict[str, Any]], TokenUsage]:
         """
         Synchronously generate text based on the given query and context.
 
         Args:
             query (str): The query to generate text for.
             context (list): A list of context messages or dictionaries.
-            include_rc (bool): Whether to include `reasoning content` in the output, default is True.
             **kwargs: Additional keyword arguments.
 
         Returns:
@@ -119,10 +149,13 @@ class O1Beta_DS_Core(Core, DeepSeekCore):
         Notes:
         * No system prompt!
         * max_tokens -> max_completion_tokens
+        * temperature has to be 1.0
+        * frequency_penalty not supported
+        * reasoning_effort is only available to `o1`
         """
-        # MessageBlock(role=CreatorRole.USER.value, content=self.system_prompt)
-        include_rc: bool = kwargs.get("include_rc", True)
-        msgs: list[MessageBlock | dict] = []
+        msgs: list[MessageBlock | dict] = [
+            MessageBlock(role=CreatorRole.USER.value, content=self.system_prompt)
+        ]
 
         if context:
             msgs.extend(context)
@@ -133,48 +166,41 @@ class O1Beta_DS_Core(Core, DeepSeekCore):
         MAX_OUTPUT_TOKENS = min(
             MAX_TOKENS, self.max_output_tokens, self.config.max_output_tokens
         )
-        prompt_token_count = self.calculate_token_count(msgs, tools=None)
+        prompt_token_count = self.calculate_token_count(msgs, None, None, None)
         max_output_tokens = min(
             MAX_OUTPUT_TOKENS,
             self.context_length - prompt_token_count,
         )
 
         if max_output_tokens <= 0:
-            raise ValueError(
-                f"max_output_tokens <= 0. Prompt token count: {prompt_token_count}"
-            )
+            logger.warning("Prompt token count: %d", prompt_token_count)
+            raise ValueError("max_output_tokens <= 0")
 
         try:
-            client = openai.OpenAI(
-                api_key=os.environ["DEEPSEEK_API_KEY"],
-                base_url=os.environ["DEEPSEEK_BASE_URL"],
-            )
+            client = openai.OpenAI(api_key=os.environ["OPENAI_API_KEY"])
 
             response = client.chat.completions.create(
                 model=self.model_name,
                 messages=msgs,  # type: ignore
-                max_tokens=max_output_tokens,
+                # frequency_penalty=0.5,
+                max_completion_tokens=max_output_tokens,
+                temperature=self.config.temperature,
+                n=self.config.return_n,
+                reasoning_effort=self.reasoning_effort,  # type: ignore
             )
 
             choice = response.choices[0]
             _content = getattr(choice.message, "content", None)
-            _reasoning_content = getattr(choice.message, "reasoning_content", None)
 
             token_usage = self.update_usage(response.usage)
+
             if _content:
-                response_string = _content
-                if _reasoning_content and include_rc:
-                    response_string = (
-                        f"<COT>\n{_reasoning_content}\n</COT>\n" + response_string
-                    )  # re.sub(r"<COT>.*?</COT>\n*", "", x, flags=re.DOTALL)
                 return [
-                    {"role": CreatorRole.ASSISTANT.value, "content": response_string}
+                    {"role": CreatorRole.ASSISTANT.value, "content": _content}
                 ], token_usage
+
             failed_reason = choice.finish_reason
             raise RuntimeError(failed_reason)
-        except RuntimeError as rte:
-            logger.error("RuntimeError: %s", rte, exc_info=True, stack_info=True)
-            raise
         except Exception as e:
             logger.error("Exception: %s", e, exc_info=True, stack_info=True)
             raise

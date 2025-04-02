@@ -29,6 +29,8 @@ For developers requiring full-range customization or access to the latest featur
   - [Tool:](#tool)
   - [Loader:](#loader)
   - [Chunkers:](#chunkers)
+  - [Thinking/Reasoning](#thinkingreasoning)
+    - [Tested models:](#tested-models)
 - [License](#license)
 
 # Dependecies
@@ -333,6 +335,14 @@ Utility to split long text into chunks.
 * **Semantic**:
   * *SemanticChunker*: Split text into semantically coherent chunks.
   * *SimulatedAnnealingSemanticChunker*: Enhanced with Simulated Annealing optimization technique.
+
+## Thinking/Reasoning
+Call chat completion API with thinking/reasoning equiped models.
+
+### Tested models:
+- **OpenAI**: `o1-mini`, `o3-mini`
+- **gemini**: `gemini-2.5-pro-exp-03-25`, `gemini-2.0-flash-thinking-exp-01-21`
+- **DeepSeek**: `deepseek-reasoner`
 
 # License
 This project is licensed under the GNU General Public License v3.0 License. See the [LICENSE](LICENSE) file for details.

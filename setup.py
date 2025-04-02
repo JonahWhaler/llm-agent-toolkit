@@ -5,15 +5,15 @@ DESCRIPTION = "LLM Agent Toolkit provides minimal, modular interfaces for core c
 # python3 setup.py sdist bdist_wheel
 # twine upload --skip-existing dist/* --verbose
 
-VERSION = "0.0.30.8"
+VERSION = "0.0.31.1"
 
 with open("./README.md", "r", encoding="utf-8") as f:
     long_description = f.read()
 
 core_dependencies = [
     "python-dotenv==0.21.0",
-    "openai==1.58.0",
-    "tiktoken==0.8.0",
+    "openai==1.66.5",
+    "tiktoken==0.9.0",
     "chromadb==0.5.11",
     "faiss-cpu==1.9.0.post1",
     "aiohttp==3.10.11",

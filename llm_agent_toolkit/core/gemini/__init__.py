@@ -5,6 +5,7 @@ from .so import GMN_StructuredOutput_Core as StructuredOutput
 from .so import GMN_StructuredOutput_Core
 from .t2t_w_tool import T2T_GMN_Core_W_Tool as Text_to_Text_W_Tool
 from .i2t_w_tool import I2T_GMN_Core_W_Tool as Image_to_Text_W_Tool
+from .thinking import Thinking_Core
 
 __all__ = [
     "GeminiCore",
@@ -14,4 +15,5 @@ __all__ = [
     "GMN_StructuredOutput_Core",
     "Text_to_Text_W_Tool",
     "Image_to_Text_W_Tool",
+    "Thinking_Core",
 ]
