@@ -9,15 +9,14 @@ from .base import OpenAICore
 logger = logging.getLogger(__name__)
 
 
-class O1Beta_OAI_Core(Core, OpenAICore):
+class Reasoning_Core(Core, OpenAICore):
     """
-    `O1Beta_OAI_Core` is a concrete implementation of abstract base classes `Core`.
-    `O1Beta_OAI_Core` is also a child class of `OpenAICore`.
+    `Reasoning_Core` is a concrete implementation of abstract base classes `Core`.
+    `Reasoning_Core` is also a child class of `OpenAICore`.
 
     It facilitates synchronous and asynchronous communication with OpenAI's API.
 
-    This is specially implemented to support `o1-preview` and `o1-mini`.
-    Things are expected to change.
+    This is specially implemented to support `o3-mini` and `o1-mini`.
 
     Methods:
     - run(query: str, context: list[MessageBlock | dict] | None, **kwargs) -> tuple[list[MessageBlock | dict], TokenUsage]:
@@ -31,14 +30,17 @@ class O1Beta_OAI_Core(Core, OpenAICore):
     - If model is not available under OpenAI's listing, raise ValueError.
     - `context_length` is configurable.
     - `max_output_tokens` is configurable.
+    - `temperature` has to be 1.0
     """
 
-    SUPPORTED_MODELS = ("o1-preview", "o1-mini")
+    SUPPORTED_MODELS = ("o1-mini", "o3-mini")
+    SUPPORTED_EFFORT = ("low", "medium", "high")
 
     def __init__(
         self,
         system_prompt: str,
         config: ChatCompletionConfig,
+        reasoning_effort: str = "low",
     ):
         if config.name not in self.SUPPORTED_MODELS:
             raise ValueError(
@@ -50,6 +52,11 @@ class O1Beta_OAI_Core(Core, OpenAICore):
         Core.__init__(self, system_prompt, config)
         OpenAICore.__init__(self, config.name)
         self.profile = self.build_profile(config.name)
+        if reasoning_effort not in self.SUPPORTED_EFFORT:
+            raise ValueError(
+                f"{reasoning_effort} is not supported. Supported effort: {self.SUPPORTED_EFFORT}"
+            )
+        self.reasoning_effort = reasoning_effort
 
     async def run_async(
         self, query: str, context: list[MessageBlock | dict] | None, **kwargs
@@ -73,8 +80,9 @@ class O1Beta_OAI_Core(Core, OpenAICore):
         * frequency_penalty not supported
         * reasoning_effort is only available to `o1`
         """
-        # MessageBlock(role=CreatorRole.USER.value, content=self.system_prompt)
-        msgs: list[MessageBlock | dict] = []
+        msgs: list[MessageBlock | dict] = [
+            MessageBlock(role=CreatorRole.USER.value, content=self.system_prompt)
+        ]
 
         if context:
             msgs.extend(context)
@@ -104,6 +112,7 @@ class O1Beta_OAI_Core(Core, OpenAICore):
                 max_completion_tokens=max_output_tokens,
                 temperature=self.config.temperature,
                 n=self.config.return_n,
+                reasoning_effort=self.reasoning_effort,  # type: ignore
             )
 
             choice = response.choices[0]
@@ -144,8 +153,9 @@ class O1Beta_OAI_Core(Core, OpenAICore):
         * frequency_penalty not supported
         * reasoning_effort is only available to `o1`
         """
-        # MessageBlock(role=CreatorRole.USER.value, content=self.system_prompt)
-        msgs: list[MessageBlock | dict] = []
+        msgs: list[MessageBlock | dict] = [
+            MessageBlock(role=CreatorRole.USER.value, content=self.system_prompt)
+        ]
 
         if context:
             msgs.extend(context)
@@ -176,6 +186,7 @@ class O1Beta_OAI_Core(Core, OpenAICore):
                 max_completion_tokens=max_output_tokens,
                 temperature=self.config.temperature,
                 n=self.config.return_n,
+                reasoning_effort=self.reasoning_effort,  # type: ignore
             )
 
             choice = response.choices[0]
