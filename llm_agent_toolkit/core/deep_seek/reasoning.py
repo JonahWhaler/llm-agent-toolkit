@@ -1,5 +1,6 @@
 import os
 import logging
+from typing import Optional
 import openai
 from ..._core import Core
 from ..._util import CreatorRole, ChatCompletionConfig, MessageBlock, TokenUsage
@@ -8,7 +9,8 @@ from .base import DeepSeekCore
 logger = logging.getLogger(__name__)
 
 
-class O1Beta_DS_Core(Core, DeepSeekCore):
+class Reasoner_Core(Core, DeepSeekCore):
+    # https://api-docs.deepseek.com/guides/reasoning_model
     SUPPORTED_MODELS = "deepseek-reasoner"
 
     def __init__(
@@ -23,6 +25,50 @@ class O1Beta_DS_Core(Core, DeepSeekCore):
         Core.__init__(self, system_prompt, config)
         DeepSeekCore.__init__(self)
         self.profile = self.build_profile(config.name)
+
+    @staticmethod
+    def preprocessing(
+        system_prompt: str, query: str, context: Optional[list[MessageBlock | dict]]
+    ) -> list[MessageBlock | dict]:
+        """
+        Preprocess the input messages to be sent to the LLM model.
+
+        Rules:
+        1. System instruction is added under the USER role.
+        2. Ensure user/assistant role are interleaved.
+
+        Args:
+            system_prompt (str): The system prompt to be sent to the LLM model.
+            query (str): The query to be processed by the LLM model.
+            context (list[MessageBlock | dict] | None): The context to be used for the LLM model.
+
+        Returns:
+            list[MessageBlock | dict]: The preprocessed messages to be sent to the LLM model.
+        """
+        msgs: list[MessageBlock | dict] = [
+            MessageBlock(role=CreatorRole.USER.value, content=system_prompt)
+        ]
+
+        if context:
+            msgs.extend(context)
+
+        msgs.append(MessageBlock(role=CreatorRole.USER.value, content=query))
+
+        outputs: list[MessageBlock | dict] = []
+
+        a_role = msgs[0]["role"]
+        content = msgs[0]["content"]
+
+        for msg in msgs[1:]:
+            if msg["role"] == a_role:
+                content += "\n" + msg["content"]
+            else:
+                outputs.append({"role": a_role, "content": content})
+                a_role = msg["role"]
+                content = msg["content"]
+
+        outputs.append({"role": a_role, "content": content})
+        return outputs
 
     async def run_async(
         self, query: str, context: list[MessageBlock | dict] | None, **kwargs
@@ -44,13 +90,10 @@ class O1Beta_DS_Core(Core, DeepSeekCore):
         * No system prompt!
         * max_tokens -> max_completion_tokens
         """
-        # MessageBlock(role=CreatorRole.USER.value, content=self.system_prompt)
         include_rc: bool = kwargs.get("include_rc", True)
-        msgs: list[MessageBlock | dict] = []
-
-        if context:
-            msgs.extend(context)
-        msgs.append(MessageBlock(role=CreatorRole.USER.value, content=query))
+        msgs: list[MessageBlock | dict] = self.preprocessing(
+            self.system_prompt, query, context
+        )
 
         # Determine the maximum number of tokens allowed for the response
         MAX_TOKENS = min(self.config.max_tokens, self.context_length)
@@ -88,7 +131,8 @@ class O1Beta_DS_Core(Core, DeepSeekCore):
                 response_string = _content
                 if _reasoning_content and include_rc:
                     response_string = (
-                        f"<COT>\n{_reasoning_content}\n</COT>\n" + response_string
+                        f"<REASONING>\n{_reasoning_content}\n</REASONING>\n"
+                        + response_string
                     )
                 return [
                     {"role": CreatorRole.ASSISTANT.value, "content": response_string}
@@ -120,13 +164,11 @@ class O1Beta_DS_Core(Core, DeepSeekCore):
         * No system prompt!
         * max_tokens -> max_completion_tokens
         """
-        # MessageBlock(role=CreatorRole.USER.value, content=self.system_prompt)
-        include_rc: bool = kwargs.get("include_rc", True)
-        msgs: list[MessageBlock | dict] = []
 
-        if context:
-            msgs.extend(context)
-        msgs.append(MessageBlock(role=CreatorRole.USER.value, content=query))
+        include_rc: bool = kwargs.get("include_rc", True)
+        msgs: list[MessageBlock | dict] = self.preprocessing(
+            self.system_prompt, query, context
+        )
 
         # Determine the maximum number of tokens allowed for the response
         MAX_TOKENS = min(self.config.max_tokens, self.context_length)
@@ -165,7 +207,8 @@ class O1Beta_DS_Core(Core, DeepSeekCore):
                 response_string = _content
                 if _reasoning_content and include_rc:
                     response_string = (
-                        f"<COT>\n{_reasoning_content}\n</COT>\n" + response_string
+                        f"<REASONING>\n{_reasoning_content}\n</REASONING>\n"
+                        + response_string
                     )  # re.sub(r"<COT>.*?</COT>\n*", "", x, flags=re.DOTALL)
                 return [
                     {"role": CreatorRole.ASSISTANT.value, "content": response_string}
