@@ -46,7 +46,7 @@ class Reasoner_Core(Core, DeepSeekCore):
             list[MessageBlock | dict]: The preprocessed messages to be sent to the LLM model.
         """
         msgs: list[MessageBlock | dict] = [
-            MessageBlock(role=CreatorRole.USER.value, content=system_prompt)
+            MessageBlock(role=CreatorRole.SYSTEM.value, content=system_prompt)
         ]
 
         if context:
