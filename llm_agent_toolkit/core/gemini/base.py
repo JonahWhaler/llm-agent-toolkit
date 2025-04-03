@@ -240,7 +240,7 @@ class GeminiCore:
         if context is not None:
             for ctx in context:
                 _role = ctx["role"]
-                if _role == "system":
+                if _role in ["system", "assistant"]:
                     # This can happend when user force an system message into the context
                     _role = "model"
                 output.append(
