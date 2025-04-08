@@ -24,6 +24,7 @@ class OllamaEncoder(Encoder):
         EncoderProfile(
             name="snowflake-arctic-embed", dimension=1024, ctx_length=512
         ),  # ollama pull snowflake-arctic-embed
+        EncoderProfile(name="nomic-embed-text", dimension=768, ctx_length=2048),
     )
 
     def __init__(
