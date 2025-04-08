@@ -11,6 +11,7 @@ from ._util import (
     ResponseMode,
     CreatorRole,
     MessageBlock,
+    TokenUsage,
 )
 
 from ._chunkers import Chunker, ChunkerMetrics, RandomInitializer, UniformInitializer
@@ -58,6 +59,7 @@ __all__ = [
     "AsyncVectorMemory",
     "BaseLoader",
     "image_generator",
+    "TokenUsage",
 ]
 
 # transcriber
