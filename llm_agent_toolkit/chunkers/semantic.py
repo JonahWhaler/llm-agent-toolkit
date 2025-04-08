@@ -345,7 +345,7 @@ class SemanticChunker(Chunker):
         # [(i_start, i_end), (i+1_start, i+1_end), ..., (k-1_start, k-1_end), (k_start, k_end)]
         best_group = grouping
         iteration = 0
-        best_score: float = -100.0
+        best_score: float = 0
         MIN_COVERAGE: float = self.config.get("min_coverage", 0.9)
         logger.info("BEGIN Optimization")
         while iteration < MAX_ITERATION:
@@ -717,7 +717,7 @@ class SimulatedAnnealingSemanticChunker(SemanticChunker):
         # [(i_start, i_end), (i+1_start, i+1_end), ..., (k-1_start, k-1_end), (k_start, k_end)]
         best_group = grouping
         iteration = 0
-        best_score: float = -100.0
+        best_score: float = 0
         MIN_COVERAGE: float = self.config.get("min_coverage", 0.8)
         logger.info("BEGIN Optimization")
         while iteration < MAX_ITERATION:
