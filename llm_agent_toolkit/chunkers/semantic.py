@@ -349,21 +349,18 @@ class SemanticChunker(Chunker):
         MIN_COVERAGE: float = self.config.get("min_coverage", 0.9)
         logger.info("BEGIN Optimization")
         while iteration < MAX_ITERATION:
-            # logger.info("Iteration [%d]/[%d]", iteration, MAX_ITERATION)
             score: float = self.eval(embeddings, grouping)
-            if (
-                score > best_score
-                and ChunkerMetrics.calculate_coverage(TOTAL_CAPACITY, grouping)
-                > MIN_COVERAGE
-            ):
+            calculated_coverage = ChunkerMetrics.calculate_coverage(
+                TOTAL_CAPACITY, grouping
+            )
+            if score > best_score and calculated_coverage >= MIN_COVERAGE:
                 logger.info(
-                    "[%d] Update %.4ff to %.4ff, improved = %.4f",
+                    "[%d] Update best score to %.4ff, improved = %.4f\nGrouping: %s",
                     iteration,
-                    best_score,
                     score,
                     score - best_score,
+                    grouping,
                 )
-                logger.info("Grouping: %s", grouping)
                 best_score = score
                 # Update best group
                 best_group = grouping[:]
@@ -721,21 +718,17 @@ class SimulatedAnnealingSemanticChunker(SemanticChunker):
         MIN_COVERAGE: float = self.config.get("min_coverage", 0.8)
         logger.info("BEGIN Optimization")
         while iteration < MAX_ITERATION:
-            # logger.info("Iteration [%d]/[%d]", iteration, MAX_ITERATION)
             score: float = self.eval(
                 lines, token_counts, embeddings, grouping, TOTAL_CAPACITY
             )
-            if (
-                score > best_score
-                and ChunkerMetrics.calculate_coverage(TOTAL_CAPACITY, grouping)
-                > MIN_COVERAGE
-            ):
+            coverage = ChunkerMetrics.calculate_coverage(TOTAL_CAPACITY, grouping)
+            if score > best_score and coverage >= MIN_COVERAGE:
                 logger.info(
-                    "[%d] Update %.4ff to %.4ff, improved = %.4f",
+                    "[%d] Update best score to %.4ff, improved = %.4f\nGrouping: %s",
                     iteration,
-                    best_score,
                     score,
                     score - best_score,
+                    grouping,
                 )
                 logger.info("Grouping: %s", grouping)
                 best_score = score
