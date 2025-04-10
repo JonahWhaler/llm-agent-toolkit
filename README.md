@@ -290,7 +290,7 @@ A standardized wrapper for embedding models.
 **Features**:
 * Abstracts away model-specific details (e.g., dimensionality, framework differences).
 * Allows flexible integration with downstream components like Memory or retrieval mechanisms.
-* Support OpenAI, Ollama and Transformers.
+* Support OpenAI, Ollama, Gemini and Transformers.
 * Support asynchronous operation.
 
 ## Memory: 

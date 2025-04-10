@@ -20,3 +20,11 @@ try:
     __all__.extend(["OllamaEncoder"])
 except:
     pass
+
+# gemini
+try:
+    from .gemini import GeminiEncoder
+
+    __all__.extend(["GeminiEncoder"])
+except:
+    pass
