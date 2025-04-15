@@ -56,6 +56,21 @@ class ChunkerMetrics:
         coverage = len(occupied) / len(rooms)
         return coverage
 
+    @classmethod
+    def calculate_overlapped(
+        cls, capacity: int, grouping: list[tuple[int, int]]
+    ) -> float:
+        b = capacity
+        a = 0
+        for g_start, g_end in grouping:
+            a += g_end - g_start
+
+        overlapped = (a - b) / b
+        # Worse case scenario - a = K * b, result in overlapped = (K - 1)
+        # Do this to map it to [0.0, 1.0] space.
+        overlapped = max(0, overlapped / (len(grouping) - 1))
+        return overlapped
+
 
 @runtime_checkable
 class ChunkingInitializer(Protocol):
