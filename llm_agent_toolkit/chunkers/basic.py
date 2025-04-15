@@ -1,6 +1,6 @@
 import logging
 import re
-
+import charade
 from .._chunkers import Chunker, UniformInitializer
 
 logger = logging.getLogger(name=__name__)
@@ -194,3 +194,44 @@ class FixedGroupChunker(Chunker):
             output_list.append(g_string)
         # END
         return output_list
+
+
+class SentenceChunker(Chunker):
+    def __init__(self, config: dict):
+        super().__init__(config)
+
+    @staticmethod
+    def isascii(text: str) -> bool:
+        byte_sentence = text.encode("utf-8")
+        result = charade.detect(byte_sentence)
+        return result["encoding"] == "ascii"
+
+    @staticmethod
+    def patch_punctuation(lines: list[str], punctuation: str) -> list[str]:
+        new_lines = []
+        temp = ""
+        for line in lines:
+            if temp == "":
+                temp = line
+            elif line in punctuation:
+                temp += line
+                new_lines.append(temp)
+                temp = ""
+            else:
+                temp = f"{temp} {line}"
+        if temp:
+            new_lines.append(temp)
+        return new_lines
+
+    def split(self, long_text: str) -> list[str]:
+        if SentenceChunker.isascii(long_text):
+            pattern = r"([.?!;])\s*"
+            punctuation = '.;?!"'
+        else:
+            pattern = r"([.?!;。”？！；])\s*"
+            punctuation = '？！；。”.;?!"'
+
+        lines = re.split(pattern, long_text)
+        lines = list(map(lambda line: line.strip(), lines))
+        lines = list(filter(lambda line: line, lines))
+        return SentenceChunker.patch_punctuation(lines, punctuation)

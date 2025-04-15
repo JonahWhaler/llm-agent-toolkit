@@ -2,6 +2,7 @@
 wheel==0.45.1
 twine==5.1.1
 python-dotenv==0.21.0
+charade==1.0.3
 # AI
 openai==1.66.5
 ollama==0.4.4
