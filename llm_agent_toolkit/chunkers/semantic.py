@@ -271,13 +271,15 @@ class SemanticChunker(Chunker):
             float: Cohesion score.
         """
         assert len(args) >= 2, "Expect embeddings, grouping."
-        embeddings, grouping, *_ = args
+        embeddings, grouping, capacity, *_ = args
         cohesion: float = 0
         for g_start, g_end in grouping:
             cohesion += self.calculate_pairwise_similarity(embeddings, g_start, g_end)
         cohesion /= len(grouping) if grouping else 1
 
-        return cohesion
+        overlapped = ChunkerMetrics.calculate_overlapped(capacity, grouping)
+
+        return cohesion - overlapped
 
     def split(self, long_text: str):
         """
@@ -346,7 +348,7 @@ class SemanticChunker(Chunker):
         MIN_COVERAGE: float = self.config.get("min_coverage", 0.9)
         logger.info("BEGIN Optimization")
         while iteration < MAX_ITERATION:
-            score: float = self.eval(embeddings, grouping)
+            score: float = self.eval(embeddings, grouping, TOTAL_CAPACITY)
             calculated_coverage = ChunkerMetrics.calculate_coverage(
                 TOTAL_CAPACITY, grouping
             )
