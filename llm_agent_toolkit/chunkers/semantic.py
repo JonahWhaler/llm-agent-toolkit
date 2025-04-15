@@ -270,7 +270,7 @@ class SemanticChunker(Chunker):
         Returns:
             float: Cohesion score.
         """
-        assert len(args) >= 2, "Expect embeddings, grouping."
+        assert len(args) >= 3, "Expect embeddings, grouping, capacity."
         embeddings, grouping, capacity, *_ = args
         cohesion: float = 0
         for g_start, g_end in grouping:
@@ -278,8 +278,8 @@ class SemanticChunker(Chunker):
         cohesion /= len(grouping) if grouping else 1
 
         overlapped = ChunkerMetrics.calculate_overlapped(capacity, grouping)
-
-        return cohesion - overlapped
+        coverage = ChunkerMetrics.calculate_coverage(capacity, grouping)
+        return cohesion - overlapped + coverage
 
     def split(self, long_text: str):
         """
