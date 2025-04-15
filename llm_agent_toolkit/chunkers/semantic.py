@@ -314,6 +314,13 @@ class SemanticChunker(Chunker):
         sentence_chunker = SentenceChunker({})
         lines = sentence_chunker.split(text)
         TOTAL_CAPACITY = len(lines)
+        K: int = self.config.get("K", 0)
+        if K == 0:
+            raise ValueError("Missing Argument: K")
+
+        if len(lines) < K:
+            return lines
+
         # Transform individual parts into embedding
         logger.info("Embedding %d lines.", TOTAL_CAPACITY)
         embeddings: list[list[float]] = []
@@ -327,7 +334,7 @@ class SemanticChunker(Chunker):
         # Separators are not included, therefore, this is only a close estimation.
         total_tokens = sum(token_counts)
         ideal_k = total_tokens // self.encoder.ctx_length
-        K: int = self.config.get("K", ideal_k)
+
         if K < ideal_k:
             logger.warning(
                 msg=f"{K} < {ideal_k}. Chunk longer than the encoder's ctx_length will be truncated."
@@ -682,6 +689,14 @@ class SimulatedAnnealingSemanticChunker(SemanticChunker):
         sentence_chunker = SentenceChunker({})
         lines = sentence_chunker.split(text)
         TOTAL_CAPACITY = len(lines)
+
+        K: int = self.config.get("K", 0)
+        if K == 0:
+            raise ValueError("Missing Argument: K")
+
+        if len(lines) < K:
+            return lines
+
         # Transform individual parts into embedding
         logger.info("Embedding %d lines.", TOTAL_CAPACITY)
         embeddings: list[list[float]] = []
@@ -695,7 +710,6 @@ class SimulatedAnnealingSemanticChunker(SemanticChunker):
         # Separators are not included, therefore, this is only a close estimation.
         total_tokens = sum(token_counts)
         ideal_k = total_tokens // self.encoder.ctx_length
-        K: int = self.config.get("K", ideal_k)
         if K < ideal_k:
             logger.warning(
                 msg=f"{K} < {ideal_k}. Chunk longer than the encoder's ctx_length will be truncated."
