@@ -278,8 +278,8 @@ class SemanticChunker(Chunker):
         cohesion /= len(grouping) if grouping else 1
 
         overlapped = ChunkerMetrics.calculate_overlapped(capacity, grouping)
-
-        return cohesion - overlapped
+        coverage = ChunkerMetrics.calculate_coverage(capacity, grouping)
+        return cohesion - overlapped + coverage
 
     def split(self, long_text: str):
         """
