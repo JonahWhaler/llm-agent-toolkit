@@ -338,6 +338,7 @@ class SemanticChunker(Chunker):
             return [long_text]
 
         MAX_ITERATION: int = self.config.get("MAX_ITERATION", 20)
+        TEMPERATURE: float = 0.75
         # Initialization
         logger.info("Initializing...")
         initializer = RandomInitializer(TOTAL_CAPACITY, K)
@@ -365,7 +366,7 @@ class SemanticChunker(Chunker):
                 # Update best group
                 best_group = grouping[:]
             # Decide whether to revert
-            if best_score != score:
+            if best_score != score and random.random() > TEMPERATURE:
                 grouping = best_group[:]
             grouping = self.optimize(grouping, TOTAL_CAPACITY)
             iteration += 1
