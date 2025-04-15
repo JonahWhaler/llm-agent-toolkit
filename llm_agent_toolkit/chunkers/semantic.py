@@ -1,9 +1,8 @@
-import re
 import random
 import logging
-
 from .._chunkers import Chunker, ChunkerMetrics, RandomInitializer
 from .._encoder import Encoder
+from .basic import SentenceChunker
 
 logger = logging.getLogger(__name__)
 
@@ -308,13 +307,10 @@ class SemanticChunker(Chunker):
             )
         # Sanitize argument `long_text`
         text = long_text.strip()
-        # text = long_text.replace("\n\n", "\n").strip("\n ")  # Remove excessive newlines
-        # text = text.replace("\n", "\n")  # Convert viewable newline to readable newline
         if len(text) == 0:
             raise ValueError("Expect long_text to be non-empty string.")
-        # Split long text into multiple parts. ("Hello! How are you?") => ["Hello", "!", "How are you", "?"]
-        lines = re.split(r"([.?!\n\t])\s*", text)
-        lines = list(filter(lambda line: line, lines))  # Remove invalid lines
+        sentence_chunker = SentenceChunker({})
+        lines = sentence_chunker.split(text)
         TOTAL_CAPACITY = len(lines)
         # Transform individual parts into embedding
         logger.info("Embedding %d lines.", TOTAL_CAPACITY)
@@ -678,13 +674,11 @@ class SimulatedAnnealingSemanticChunker(SemanticChunker):
             )
         # Sanitize argument `long_text`
         text = long_text.strip()
-        # text = long_text.replace("\n\n", "\n").strip("\n ")  # Remove excessive newlines
-        # text = text.replace("\n", "\n")  # Convert viewable newline to readable newline
         if len(text) == 0:
             raise ValueError("Expect long_text to be non-empty string.")
-        # Split long text into multiple parts. ("Hello! How are you?") => ["Hello", "!", "How are you", "?"]
-        lines = re.split(r"([.?!\n\t])\s*", text)
-        lines = list(filter(lambda line: line, lines))  # Remove invalid lines
+
+        sentence_chunker = SentenceChunker({})
+        lines = sentence_chunker.split(text)
         TOTAL_CAPACITY = len(lines)
         # Transform individual parts into embedding
         logger.info("Embedding %d lines.", TOTAL_CAPACITY)
