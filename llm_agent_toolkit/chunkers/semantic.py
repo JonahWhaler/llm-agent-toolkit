@@ -270,7 +270,7 @@ class SemanticChunker(Chunker):
         Returns:
             float: Cohesion score.
         """
-        assert len(args) >= 2, "Expect embeddings, grouping."
+        assert len(args) >= 3, "Expect embeddings, grouping, capacity."
         embeddings, grouping, capacity, *_ = args
         cohesion: float = 0
         for g_start, g_end in grouping:
