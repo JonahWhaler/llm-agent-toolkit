@@ -12,6 +12,7 @@ with open("./README.md", "r", encoding="utf-8") as f:
 
 core_dependencies = [
     "python-dotenv==0.21.0",
+    "charade==1.0.3",
     "openai==1.66.5",
     "tiktoken==0.9.0",
     "chromadb==0.5.11",
