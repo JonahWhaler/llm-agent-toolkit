@@ -1,10 +1,15 @@
-from .basic import FixedCharacterChunker, FixedGroupChunker, SentenceChunker
-from .semantic import SemanticChunker, SimulatedAnnealingSemanticChunker
+from .basic import (
+    FixedCharacterChunker,
+    FixedGroupChunker,
+    SentenceChunker,
+    SectionChunker,
+)
 
 __all__ = [
     "FixedCharacterChunker",
     "FixedGroupChunker",
     "SentenceChunker",
+    "SectionChunker",
     "SemanticChunker",
     "SimulatedAnnealingSemanticChunker",
 ]
