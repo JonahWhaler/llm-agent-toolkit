@@ -240,29 +240,6 @@ class SectionChunker(Chunker):
     def __init__(self, config: dict):
         super().__init__(config)
 
-    @staticmethod
-    def isascii(text: str) -> bool:
-        byte_sentence = text.encode("utf-8")
-        result = charade.detect(byte_sentence)
-        return result["encoding"] == "ascii"
-
-    @staticmethod
-    def patch_punctuation(lines: list[str], punctuation: str) -> list[str]:
-        new_lines = []
-        temp = ""
-        for line in lines:
-            if temp == "":
-                temp = line
-            elif line in punctuation:
-                temp += line
-                new_lines.append(temp)
-                temp = ""
-            else:
-                temp = f"{temp} {line}"
-        if temp:
-            new_lines.append(temp)
-        return new_lines
-
     def split(self, long_text: str) -> list[str]:
         pattern = r"([\n]{2,})\s*"
         lines = re.split(pattern, long_text)
