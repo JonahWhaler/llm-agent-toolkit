@@ -4,6 +4,8 @@ from .basic import (
     SentenceChunker,
     SectionChunker,
 )
+from .semantic import SemanticChunker, SimulatedAnnealingSemanticChunker
+from .hybrid import HybridChunker
 
 __all__ = [
     "FixedCharacterChunker",
@@ -12,4 +14,5 @@ __all__ = [
     "SectionChunker",
     "SemanticChunker",
     "SimulatedAnnealingSemanticChunker",
+    "HybridChunker",
 ]
