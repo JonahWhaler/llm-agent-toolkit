@@ -197,6 +197,17 @@ class FixedGroupChunker(Chunker):
 
 
 class SentenceChunker(Chunker):
+    """Split long texts at sentence level.
+
+    Notes:
+    * Works better on well punctuated/formatted plain text content.
+    * Support both ascii and non-ascii text.
+
+    Constraints:
+    - 'audio.mp3' -> ['audio.', 'mp3']
+    - Does not support single quote, double quote, braces and brackets.
+    """
+
     def __init__(self, config: dict):
         super().__init__(config)
 
@@ -237,6 +248,12 @@ class SentenceChunker(Chunker):
 
 
 class SectionChunker(Chunker):
+    """Split long texts at section level.
+
+    Notes:
+    * Works better on well punctuated/formatted plain text content.
+    """
+
     def __init__(self, config: dict):
         super().__init__(config)
 
