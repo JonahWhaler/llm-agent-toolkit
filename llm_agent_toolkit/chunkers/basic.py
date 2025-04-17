@@ -232,7 +232,6 @@ class SentenceChunker(Chunker):
             punctuation = '\n？！；。”.;?!"'
 
         lines = re.split(pattern, long_text)
-        lines = list(map(lambda line: line.strip(), lines))
         lines = list(filter(lambda line: line, lines))
         return SentenceChunker.patch_punctuation(lines, punctuation)
 
