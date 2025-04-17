@@ -225,11 +225,11 @@ class SentenceChunker(Chunker):
 
     def split(self, long_text: str) -> list[str]:
         if SentenceChunker.isascii(long_text):
-            pattern = r"([.?!;])\s*"
-            punctuation = '.;?!"'
+            pattern = r"([\n.?!;])\s*"
+            punctuation = '\n.;?!"'
         else:
-            pattern = r"([.?!;。”？！；])\s*"
-            punctuation = '？！；。”.;?!"'
+            pattern = r"([\n.?!;。”？！；])\s*"
+            punctuation = '\n？！；。”.;?!"'
 
         lines = re.split(pattern, long_text)
         lines = list(map(lambda line: line.strip(), lines))
