@@ -151,7 +151,7 @@ class SemanticChunker(Chunker):
     ) -> list[tuple[int, int]]:
         output_list: list[tuple[int, int]] = input_list[:]
         k = len(input_list)
-        factor = min(1, int(k * self.update_rate))
+        factor = max(1, int(k * self.update_rate))
         for _ in range(factor):
             point = random.randint(0, k - 1)
             increment = random.randint(0, 1) == 0
