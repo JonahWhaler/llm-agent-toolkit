@@ -6,7 +6,7 @@ python-dotenv==0.21.0
 openai==1.58.0
 ollama==0.4.4
 tiktoken==0.8.0
-torch==2.5.1
+torch==2.6.0
 transformers==4.48.0
 # Vector DB
 chromadb==0.5.11
