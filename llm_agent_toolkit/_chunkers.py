@@ -1,15 +1,16 @@
 import random
 import logging
-from abc import abstractmethod, ABC
 from typing import runtime_checkable, Protocol
 
 logger = logging.getLogger(__name__)
 
 
 class ChunkerMetrics:
+
     @classmethod
     def calculate_utilization_rate(
-        cls, CTX_LENGTH: int, token_counts: list[int], grouping: list[tuple[int, int]]
+        cls, CTX_LENGTH: int, token_counts: list[int],
+        grouping: list[tuple[int, int]]
     ) -> float:
         utilization_scores = []
         for g_start, g_end in grouping:
@@ -25,7 +26,8 @@ class ChunkerMetrics:
 
     @classmethod
     def calculate_wastage_rate(
-        cls, CTX_LENGTH: int, token_counts: list[int], grouping: list[tuple[int, int]]
+        cls, CTX_LENGTH: int, token_counts: list[int],
+        grouping: list[tuple[int, int]]
     ) -> float:
         wastage_scores = []
         for g_start, g_end in grouping:
@@ -74,9 +76,9 @@ class ChunkerMetrics:
 
 @runtime_checkable
 class ChunkingInitializer(Protocol):
-    def init(
-        self,
-    ) -> list[tuple[int, int]]: ...
+
+    def init(self, ) -> list[tuple[int, int]]:
+        ...
 
 
 class UniformInitializer:
@@ -142,7 +144,7 @@ class RandomInitializer:
                 for _ in range(remainer):
                     index = random.randint(0, self.k - 1)
                     init_list[index] += 1
-                break  # All remaining capacity has been distributed
+                break    # All remaining capacity has been distributed
             # Randomly decide how much to add to each chunk in this iteration
             new_growth = [random.randint(1, even_size) for _ in range(self.k)]
             # Add the new growth to each chunk's size
@@ -152,13 +154,14 @@ class RandomInitializer:
             remainer -= sum(new_growth)
 
         offset = 0
-        output_list: list[tuple[int, int]] = []  # type: ignore
+        output_list: list[tuple[int, int]] = []    # type: ignore
         for size in init_list:
             output_list.append((offset, offset + size))
             offset += size
 
         assert (
-            ChunkerMetrics.calculate_coverage(self.total_capacity, output_list) == 1.0
+            ChunkerMetrics.calculate_coverage(self.total_capacity,
+                                              output_list) == 1.0
         )
         return output_list
 
