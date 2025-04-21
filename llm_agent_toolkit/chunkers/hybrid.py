@@ -40,7 +40,7 @@ from pydantic import BaseModel, field_validator
 from .._encoder import Encoder
 from .._chunkers import ChunkerMetrics, RandomInitializer
 from .basic import SectionChunker, SentenceChunker, FixedCharacterChunker, FixedCharacterChunkerConfig
-from .utility import estimate_token_count
+from .utility import estimate_token_count, reconstruct_chunk_v2, all_within_chunk_size
 
 logger = logging.getLogger(__name__)
 
@@ -442,10 +442,10 @@ class HybridChunker:
 
             group_cohesion: float = 0.0
             for vi in range(g_start, g_end - 1):
-                a_text = self.reconstruct_custom_chunk(
+                a_text = reconstruct_chunk_v2(
                     lines[g_start:vi + 1], "sentence"
                 )
-                b_text = self.reconstruct_custom_chunk(
+                b_text = reconstruct_chunk_v2(
                     lines[vi + 1:g_end], "sentence"
                 )
                 part_a_embedding = self.str_to_embedding(a_text)
@@ -513,13 +513,13 @@ class HybridChunker:
         inter_group_cohesion: float = 0
         for i in range(n_groups - 1):
             i_start, i_end = grouping[i]
-            i_line = self.reconstruct_custom_chunk(
+            i_line = reconstruct_chunk_v2(
                 lines[i_start:i_end], "sentence"
             )
             i_embedding = self.str_to_embedding(i_line)
             for j in range(i + 1, n_groups):
                 j_start, j_end = grouping[j]
-                j_line = self.reconstruct_custom_chunk(
+                j_line = reconstruct_chunk_v2(
                     lines[j_start:j_end], "sentence"
                 )
                 j_embedding = self.str_to_embedding(j_line)
@@ -575,7 +575,7 @@ class HybridChunker:
         """
         overflow: float = 0.0
         for g_start, g_end in grouping:
-            g_line = self.reconstruct_custom_chunk(
+            g_line = reconstruct_chunk_v2(
                 lines[g_start:g_end], "sentence"
             )
             g_overflow = max(
@@ -602,8 +602,8 @@ class HybridChunker:
     def resolve_tight_search_space(self,
                                    lines: list[str]) -> Optional[list[str]]:
         parts = [
-            self.reconstruct_custom_chunk(lines[:HybridChunker.C], "sentence"),
-            self.reconstruct_custom_chunk(lines[HybridChunker.C:], "sentence")
+            reconstruct_chunk_v2(lines[:HybridChunker.C], "sentence"),
+            reconstruct_chunk_v2(lines[HybridChunker.C:], "sentence")
         ]
         counter: int = 0
         for part in parts:
@@ -690,7 +690,7 @@ class HybridChunker:
                 )
                 grouping = self.find_best_grouping(sentences, G)
                 for g_start, g_end in grouping:
-                    g_chunk = self.reconstruct_custom_chunk(
+                    g_chunk = reconstruct_chunk_v2(
                         sentences[g_start:g_end], "sentence"
                     )
                     output.append(g_chunk)
@@ -704,7 +704,7 @@ class HybridChunker:
                 temp = section
             else:
                 if temp:
-                    temp = self.reconstruct_custom_chunk(
+                    temp = reconstruct_chunk_v2(
                         [temp, section], "section"
                     )
                 else:
@@ -713,6 +713,10 @@ class HybridChunker:
             output.append(temp)
 
         logger.warning("[END] split")
+
+        if any([estimate_token_count(line) > self.config.chunk_size for line in output]):
+            logger.warning("Some chunks exceed the chunk size.")
+
         return output
 
     def optimize(self, grouping: list[tuple[int, int]],
@@ -789,7 +793,14 @@ class HybridChunker:
                 non_improving_counter = 0
 
             coverage: float = ChunkerMetrics.calculate_coverage(L, grouping)
-            if score > best_score and coverage >= self.config.min_coverage:
+            within_chunk_size: bool = all_within_chunk_size(
+                lines, grouping, self.config.chunk_size
+            )
+            if (
+                score > best_score 
+                and coverage >= self.config.min_coverage 
+                and within_chunk_size
+            ):
                 best_score = score
                 best_grouping = grouping[:]
                 logger.warning("Improved! Score: %.4f.", score)
@@ -818,7 +829,7 @@ class HybridChunker:
         return best_grouping
 
     @staticmethod
-    def reconstruct_custom_chunk(partial_chunk: list[str], level: str) -> str:
+    def reconstruct_chunk_v2(partial_chunk: list[str], level: str) -> str:
         """
         Reconstructs a text chunk from a list of text units.
 
@@ -1083,10 +1094,10 @@ class AsyncHybridChunker:
 
             group_cohesion: float = 0.0
             for vi in range(g_start, g_end - 1):
-                a_text = self.reconstruct_custom_chunk(
+                a_text = reconstruct_chunk_v2(
                     lines[g_start:vi + 1], "sentence"
                 )
-                b_text = self.reconstruct_custom_chunk(
+                b_text = reconstruct_chunk_v2(
                     lines[vi + 1:g_end], "sentence"
                 )
                 part_a_embedding = await self.str_to_embedding(a_text)
@@ -1154,13 +1165,13 @@ class AsyncHybridChunker:
         inter_group_cohesion: float = 0
         for i in range(n_groups - 1):
             i_start, i_end = grouping[i]
-            i_line = self.reconstruct_custom_chunk(
+            i_line = reconstruct_chunk_v2(
                 lines[i_start:i_end], "sentence"
             )
             i_embedding = await self.str_to_embedding(i_line)
             for j in range(i + 1, n_groups):
                 j_start, j_end = grouping[j]
-                j_line = self.reconstruct_custom_chunk(
+                j_line = reconstruct_chunk_v2(
                     lines[j_start:j_end], "sentence"
                 )
                 j_embedding = await self.str_to_embedding(j_line)
@@ -1216,7 +1227,7 @@ class AsyncHybridChunker:
         """
         overflow: float = 0.0
         for g_start, g_end in grouping:
-            g_line = self.reconstruct_custom_chunk(
+            g_line = reconstruct_chunk_v2(
                 lines[g_start:g_end], "sentence"
             )
             g_overflow = max(
@@ -1243,8 +1254,8 @@ class AsyncHybridChunker:
     def resolve_tight_search_space(self,
                                    lines: list[str]) -> Optional[list[str]]:
         parts = [
-            self.reconstruct_custom_chunk(lines[:HybridChunker.C], "sentence"),
-            self.reconstruct_custom_chunk(lines[HybridChunker.C:], "sentence")
+            reconstruct_chunk_v2(lines[:HybridChunker.C], "sentence"),
+            reconstruct_chunk_v2(lines[HybridChunker.C:], "sentence")
         ]
         counter: int = 0
         for part in parts:
@@ -1331,7 +1342,7 @@ class AsyncHybridChunker:
                 )
                 grouping = await self.find_best_grouping(sentences, G)
                 for g_start, g_end in grouping:
-                    g_chunk = self.reconstruct_custom_chunk(
+                    g_chunk = reconstruct_chunk_v2(
                         sentences[g_start:g_end], "sentence"
                     )
                     output.append(g_chunk)
@@ -1345,7 +1356,7 @@ class AsyncHybridChunker:
                 temp = section
             else:
                 if temp:
-                    temp = self.reconstruct_custom_chunk(
+                    temp = reconstruct_chunk_v2(
                         [temp, section], "section"
                     )
                 else:
@@ -1354,6 +1365,10 @@ class AsyncHybridChunker:
             output.append(temp)
 
         logger.warning("[END] split")
+
+        if any([estimate_token_count(line) > self.config.chunk_size for line in output]):
+            logger.warning("Some chunks exceed the chunk size.")
+        
         return output
 
     def optimize(self, grouping: list[tuple[int, int]],
@@ -1430,7 +1445,14 @@ class AsyncHybridChunker:
                 non_improving_counter = 0
 
             coverage: float = ChunkerMetrics.calculate_coverage(L, grouping)
-            if score > best_score and coverage >= self.config.min_coverage:
+            within_chunk_size: bool = all_within_chunk_size(
+                lines, grouping, self.config.chunk_size
+            )
+            if (
+                score > best_score 
+                and coverage >= self.config.min_coverage 
+                and within_chunk_size
+            ):
                 best_score = score
                 best_grouping = grouping[:]
                 logger.warning("Improved! Score: %.4f.", score)
@@ -1447,7 +1469,14 @@ class AsyncHybridChunker:
 
         score: float = self.eval(lines, grouping, L, True)
         coverage: float = ChunkerMetrics.calculate_coverage(L, grouping)
-        if score > best_score and coverage >= self.config.min_coverage:
+        within_chunk_size: bool = all_within_chunk_size(
+                lines, grouping, self.config.chunk_size
+        )
+        if (
+            score > best_score 
+            and coverage >= self.config.min_coverage 
+            and within_chunk_size
+        ):
             best_score = score
             best_grouping = grouping[:]
             logger.warning("Improved! Score: %.4f.", score)
@@ -1457,23 +1486,4 @@ class AsyncHybridChunker:
         logger.warning("Best Grouping: %s", best_grouping)
         logger.warning("[END] find_best_grouping")
         return best_grouping
-
-    @staticmethod
-    def reconstruct_custom_chunk(partial_chunk: list[str], level: str) -> str:
-        """
-        Reconstructs a text chunk from a list of text units.
-
-        The reconstruction method depends on the specified level (e.g., "section"
-        or "sentence").
-
-        Args:
-            partial_chunk (List[str]): A list of text units.
-            level (str): The level of text unit ("section" or "sentence").
-
-        Returns:
-            output (str): 
-            The reconstructed text chunk.
-        """
-        if level == "section":
-            return "\n\n".join([chunk.strip() for chunk in partial_chunk])
-        return " ".join([chunk.strip() for chunk in partial_chunk])
+    

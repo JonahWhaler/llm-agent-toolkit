@@ -6,7 +6,7 @@ from pydantic import BaseModel, field_validator
 from .._chunkers import ChunkerMetrics, RandomInitializer
 from .._encoder import Encoder
 from .basic import SentenceChunker, FixedGroupChunkerConfig, FixedGroupChunker
-from .utility import reconstruct_chunk, estimate_token_count
+from .utility import reconstruct_chunk, estimate_token_count, all_within_chunk_size
 
 logger = logging.getLogger(__name__)
 
@@ -408,7 +408,12 @@ class SemanticChunker:
         while iteration < self.config.max_iteration:
             score = self.eval(embeddings, grouping, n_part, True)
             coverage = ChunkerMetrics.calculate_coverage(n_part, grouping)
-            if score > best_score and coverage >= self.config.min_coverage:
+            within_chunk_size: bool = all_within_chunk_size(parts, grouping, self.config.chunk_size)
+            if (
+                score > best_score 
+                and coverage >= self.config.min_coverage
+                and within_chunk_size
+            ):
                 best_score = score
                 best_grouping = grouping[:]
                 logger.warning("Improved! Score: %.4f.", score)
@@ -787,7 +792,14 @@ class AsyncSemanticChunker:
         while iteration < self.config.max_iteration:
             score = self.eval(embeddings, grouping, n_part, True)
             coverage = ChunkerMetrics.calculate_coverage(n_part, grouping)
-            if score > best_score and coverage >= self.config.min_coverage:
+            within_chunk_size: bool = all_within_chunk_size(
+                lines, grouping, self.config.chunk_size
+            )
+            if (
+                score > best_score 
+                and coverage >= self.config.min_coverage
+                and within_chunk_size
+            ):
                 best_score = score
                 best_grouping = grouping[:]
                 logger.warning("Improved! Score: %.4f.", score)
