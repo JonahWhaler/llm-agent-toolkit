@@ -301,25 +301,6 @@ class HybridChunkerConfig(BaseModel):
         """
         return self.__encoder.encode(text)
 
-    @staticmethod
-    def isascii(text: str) -> bool:
-        """
-        Determines if a given text string consists entirely of ASCII characters.
-
-        This method uses the `charade` library to detect the encoding of the input
-        text. If the detected encoding is ASCII, the function returns `True`;
-        otherwise, it returns `False`.
-
-        Args:
-            text (str): The text string to be checked.
-
-        Returns:
-            out (bool): `True` if the text is entirely ASCII, `False` otherwise.
-        """
-        byte_sentence = text.encode("utf-8")
-        result = charade.detect(byte_sentence)
-        return result["encoding"] == "ascii"
-
     def eval(self, *args) -> float:
         """
         Evaluates the current chunking based on semantic coherence and other metrics.
