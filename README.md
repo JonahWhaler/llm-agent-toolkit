@@ -332,9 +332,12 @@ Utility to split long text into chunks.
 * **Basic**: 
   * *FixedCharacterChunker*: Split text into fixed-size character chunks with optional overlapping.
   * *FixedGroupChunker*: Splits text into K chunks. Supporting two levels, `word` and `character`, default is `character`.
+  * *SectionChunker*: Splits text into chunks by section/paragraph.
+  * *SentenceChunker*: Splits text into chunks by sentence.
+
 * **Semantic**:
   * *SemanticChunker*: Split text into semantically coherent chunks.
-  * *SimulatedAnnealingSemanticChunker*: Enhanced with Simulated Annealing optimization technique.
+  * *HybridChunker*: Split text into semantically coherent chunks with dynamic splitting policy.
 
 ## Thinking/Reasoning
 Call chat completion API with thinking/reasoning equiped models.
