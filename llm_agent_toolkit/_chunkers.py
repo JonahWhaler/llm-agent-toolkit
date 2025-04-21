@@ -171,3 +171,9 @@ class Splitter(Protocol):
 
     def split(self, long_text: str) -> list[str]:
         ...
+
+
+@runtime_checkable
+class AsyncSplitter(Protocol):
+    async def split(self, long_text: str) -> list[str]:
+        ...
