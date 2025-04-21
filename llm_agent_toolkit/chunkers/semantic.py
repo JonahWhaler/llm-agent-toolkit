@@ -138,10 +138,6 @@ class SemanticChunker:
         **Criterias for Valid Chunk**:
             1. Not duplicated with other chunks
             2. Up to HybridChunker.C elements in a chunk
-
-        **Escape Local Optima**:
-            Reserve some randomness in the process to avoid local optima by reinitializing.
-            Higher randomness means more exploration. Lower randomness means more careful exploration.
             
         Args:
             current_grouping (List[Tuple[int, int]]): The current list of chunk tuples,
@@ -407,9 +403,9 @@ class SemanticChunker:
         iteration = 0
         best_score: float = 0
         logger.info("BEGIN Optimization")
+        logger.warning("======= [%d] =======", iteration)
+        logger.warning("Grouping: %s", grouping)
         while iteration < self.config.max_iteration:
-            logger.warning("======= [%d] =======", iteration)
-            iteration += 1
             score = self.eval(embeddings, grouping, n_part, True)
             coverage = ChunkerMetrics.calculate_coverage(n_part, grouping)
             if score > best_score and coverage >= self.config.min_coverage:
@@ -418,11 +414,14 @@ class SemanticChunker:
                 logger.warning("Improved! Score: %.4f.", score)
                 # logger.warning("Grouping: %s", grouping)
 
+            iteration += 1
+            logger.warning("======= [%d] =======", iteration)
             if random.random() < self.config.randomness:
+                logger.warning("Randomly re-initialize the grouping.")
                 grouping = RandomInitializer(n_part, self.config.n_chunk).init()
             else:
+                logger.warning("Step forward the grouping.")
                 grouping = self.step_forward(grouping, n_part)
-            logger.info("Score: %.4f", score)
             logger.info("Grouping: %s", grouping)
 
         # Wrap up
