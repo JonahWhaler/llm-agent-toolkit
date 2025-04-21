@@ -6,13 +6,13 @@ from enum import Enum
 from abc import ABC, abstractmethod
 from typing import Any, Optional
 
-import faiss  # type: ignore
+import faiss    # type: ignore
 import numpy as np
 
 from ._storage import SQLite3_Storage
 from .._encoder import Encoder
 from .._memory import VectorMemory
-from .._chunkers import Chunker
+from .._chunkers import Splitter
 
 logger = logging.getLogger(__name__)
 
@@ -23,6 +23,7 @@ class LoadStrategy(Enum):
 
 
 class FaissDB(ABC):
+
     @abstractmethod
     def add(
         self,
@@ -92,9 +93,9 @@ class FaissIFL2DB(FaissDB):
         assert self.__db_path is not None
         assert os.path.exists(self.__db_path)
 
-        if os.path.exists(f"{self.__db_path}/{namespace}.index") and os.path.exists(
-            f"{self.__db_path}/{namespace}.db"
-        ):
+        if os.path.exists(
+            f"{self.__db_path}/{namespace}.index"
+        ) and os.path.exists(f"{self.__db_path}/{namespace}.db"):
             index = faiss.read_index(f"{self.__db_path}/{namespace}.index")
         else:
             index = faiss.IndexFlatL2(self.__dimension)
@@ -113,7 +114,7 @@ class FaissIFL2DB(FaissDB):
             self.__sqlite = sqlite
         else:
             self.__index = None
-            self.__sqlite = None  # type: ignore
+            self.__sqlite = None    # type: ignore
 
     @property
     def index_path(self) -> str:
@@ -156,20 +157,21 @@ class FaissIFL2DB(FaissDB):
         """
         try:
             index = (
-                self.__index
-                if self.__index is not None
-                else faiss.read_index(self.index_path)
+                self.__index if self.__index is not None else
+                faiss.read_index(self.index_path)
             )
             sqlite = (
-                self.__sqlite
-                if self.__sqlite is not None
-                else SQLite3_Storage(
-                    db_path=self.db_path, table_name=self.__namespace, overwrite=False
+                self.__sqlite if self.__sqlite is not None else SQLite3_Storage(
+                    db_path=self.db_path,
+                    table_name=self.__namespace,
+                    overwrite=False
                 )
             )
         except Exception as loading_error:
             logger.error(
-                msg=f"Loading Error: {loading_error}", exc_info=True, stack_info=True
+                msg=f"Loading Error: {loading_error}",
+                exc_info=True,
+                stack_info=True
             )
             raise
         track = []
@@ -187,8 +189,10 @@ class FaissIFL2DB(FaissDB):
                     },
                 )
                 # Add to Faiss
-                np_embedding = np.expand_dims(np.array(e, dtype=np.float32), axis=0)
-                index.add(np_embedding)  # type: ignore
+                np_embedding = np.expand_dims(
+                    np.array(e, dtype=np.float32), axis=0
+                )
+                index.add(np_embedding)    # type: ignore
                 inserted = True
                 track.append(counter)
             except AssertionError as a_e:
@@ -246,20 +250,21 @@ class FaissIFL2DB(FaissDB):
 
         try:
             index = (
-                self.__index
-                if self.__index is not None
-                else faiss.read_index(self.index_path)
+                self.__index if self.__index is not None else
+                faiss.read_index(self.index_path)
             )
             sqlite = (
-                self.__sqlite
-                if self.__sqlite is not None
-                else SQLite3_Storage(
-                    db_path=self.db_path, table_name=self.__namespace, overwrite=False
+                self.__sqlite if self.__sqlite is not None else SQLite3_Storage(
+                    db_path=self.db_path,
+                    table_name=self.__namespace,
+                    overwrite=False
                 )
             )
         except Exception as loading_error:
             logger.error(
-                msg=f"Loading Error: {loading_error}", exc_info=True, stack_info=True
+                msg=f"Loading Error: {loading_error}",
+                exc_info=True,
+                stack_info=True
             )
             raise
 
@@ -267,7 +272,9 @@ class FaissIFL2DB(FaissDB):
             np_query_embedding = np.array(query_embedding, dtype=np.float32)
             np_query_embedding = np.expand_dims(np_query_embedding, axis=0)
             assert np_query_embedding.shape == (1, self.__dimension)
-            distances, indices = index.search(np_query_embedding, k=return_n)  # type: ignore
+            distances, indices = index.search(
+                np_query_embedding, k=return_n
+            )    # type: ignore
             distances = distances[0]
             indices = indices[0]
             # Post Processing
@@ -315,15 +322,17 @@ class FaissIFL2DB(FaissDB):
         """
         try:
             sqlite = (
-                self.__sqlite
-                if self.__sqlite is not None
-                else SQLite3_Storage(
-                    db_path=self.db_path, table_name=self.__namespace, overwrite=False
+                self.__sqlite if self.__sqlite is not None else SQLite3_Storage(
+                    db_path=self.db_path,
+                    table_name=self.__namespace,
+                    overwrite=False
                 )
             )
         except Exception as loading_error:
             logger.error(
-                msg=f"Loading Error: {loading_error}", exc_info=True, stack_info=True
+                msg=f"Loading Error: {loading_error}",
+                exc_info=True,
+                stack_info=True
             )
             raise
 
@@ -362,25 +371,29 @@ class FaissIFL2DB(FaissDB):
     def reconstruct(self, encoder: Encoder) -> None:
         try:
             sqlite = (
-                self.__sqlite
-                if self.__sqlite is not None
-                else SQLite3_Storage(
-                    db_path=self.db_path, table_name=self.__namespace, overwrite=False
+                self.__sqlite if self.__sqlite is not None else SQLite3_Storage(
+                    db_path=self.db_path,
+                    table_name=self.__namespace,
+                    overwrite=False
                 )
             )
         except Exception as loading_error:
             logger.error(
-                msg=f"Loading Error: {loading_error}", exc_info=True, stack_info=True
+                msg=f"Loading Error: {loading_error}",
+                exc_info=True,
+                stack_info=True
             )
             raise
         # Build a tmp sqlite db
         tmp_sqlite_path = f"{self.__db_path}/tmp.db"
         tmp_db = SQLite3_Storage(
-            db_path=tmp_sqlite_path, table_name=self.__namespace, overwrite=True
+            db_path=tmp_sqlite_path,
+            table_name=self.__namespace,
+            overwrite=True
         )
         # Build a tmp faiss index
         tmp_index = faiss.IndexFlatL2(self.__dimension)
-        counter = 0  # Start from 0
+        counter = 0    # Start from 0
         # Iterate over the original db
         for key in sqlite.keys():
             value_dict = sqlite.get(key=key)
@@ -395,12 +408,14 @@ class FaissIFL2DB(FaissDB):
             _embedding = np.array(encoder.encode(value_dict["document"]))
             _embedding = np.expand_dims(_embedding, axis=0)
             # pylint: disable = no-value-for-parameter
-            tmp_index.add(_embedding.astype(np.float32))  # type: ignore
+            tmp_index.add(_embedding.astype(np.float32))    # type: ignore
             counter += 1
         os.replace(tmp_sqlite_path, self.db_path)
         if self.load_strategy == LoadStrategy.EAGER:
             self.__sqlite = SQLite3_Storage(
-                db_path=self.db_path, table_name=self.__namespace, overwrite=False
+                db_path=self.db_path,
+                table_name=self.__namespace,
+                overwrite=False
             )
             self.__index = tmp_index
         faiss.write_index(tmp_index, self.index_path)
@@ -415,15 +430,17 @@ class FaissIFL2DB(FaissDB):
         """
         try:
             sqlite = (
-                self.__sqlite
-                if self.__sqlite is not None
-                else SQLite3_Storage(
-                    db_path=self.db_path, table_name=self.__namespace, overwrite=False
+                self.__sqlite if self.__sqlite is not None else SQLite3_Storage(
+                    db_path=self.db_path,
+                    table_name=self.__namespace,
+                    overwrite=False
                 )
             )
         except Exception as loading_error:
             logger.error(
-                msg=f"Loading Error: {loading_error}", exc_info=True, stack_info=True
+                msg=f"Loading Error: {loading_error}",
+                exc_info=True,
+                stack_info=True
             )
             raise
         self.__sqlite = sqlite
@@ -473,9 +490,9 @@ class FaissHNSWDB(FaissDB):
         assert self.__db_path is not None
         assert os.path.exists(self.__db_path)
 
-        if os.path.exists(f"{self.__db_path}/{namespace}.index") and os.path.exists(
-            f"{self.__db_path}/{namespace}.db"
-        ):
+        if os.path.exists(
+            f"{self.__db_path}/{namespace}.index"
+        ) and os.path.exists(f"{self.__db_path}/{namespace}.db"):
             index = faiss.read_index(f"{self.__db_path}/{namespace}.index")
         else:
             index = faiss.IndexHNSWFlat(self.__dimension, FaissHNSWDB.M)
@@ -496,7 +513,7 @@ class FaissHNSWDB(FaissDB):
             self.__sqlite = sqlite
         else:
             self.__index = None
-            self.__sqlite = None  # type: ignore
+            self.__sqlite = None    # type: ignore
 
     @property
     def index_path(self) -> str:
@@ -539,20 +556,21 @@ class FaissHNSWDB(FaissDB):
         """
         try:
             index = (
-                self.__index
-                if self.__index is not None
-                else faiss.read_index(self.index_path)
+                self.__index if self.__index is not None else
+                faiss.read_index(self.index_path)
             )
             sqlite = (
-                self.__sqlite
-                if self.__sqlite is not None
-                else SQLite3_Storage(
-                    db_path=self.db_path, table_name=self.__namespace, overwrite=False
+                self.__sqlite if self.__sqlite is not None else SQLite3_Storage(
+                    db_path=self.db_path,
+                    table_name=self.__namespace,
+                    overwrite=False
                 )
             )
         except Exception as loading_error:
             logger.error(
-                msg=f"Loading Error: {loading_error}", exc_info=True, stack_info=True
+                msg=f"Loading Error: {loading_error}",
+                exc_info=True,
+                stack_info=True
             )
             raise
         track = []
@@ -570,7 +588,9 @@ class FaissHNSWDB(FaissDB):
                     },
                 )
                 # Add to Faiss
-                index.add(np.expand_dims(np.array(e, dtype=np.float32), axis=0))  # type: ignore
+                index.add(
+                    np.expand_dims(np.array(e, dtype=np.float32), axis=0)
+                )    # type: ignore
                 inserted = True
                 track.append(counter)
             except AssertionError as a_e:
@@ -628,20 +648,21 @@ class FaissHNSWDB(FaissDB):
 
         try:
             index = (
-                self.__index
-                if self.__index is not None
-                else faiss.read_index(self.index_path)
+                self.__index if self.__index is not None else
+                faiss.read_index(self.index_path)
             )
             sqlite = (
-                self.__sqlite
-                if self.__sqlite is not None
-                else SQLite3_Storage(
-                    db_path=self.db_path, table_name=self.__namespace, overwrite=False
+                self.__sqlite if self.__sqlite is not None else SQLite3_Storage(
+                    db_path=self.db_path,
+                    table_name=self.__namespace,
+                    overwrite=False
                 )
             )
         except Exception as loading_error:
             logger.error(
-                msg=f"Loading Error: {loading_error}", exc_info=True, stack_info=True
+                msg=f"Loading Error: {loading_error}",
+                exc_info=True,
+                stack_info=True
             )
             raise
 
@@ -650,7 +671,9 @@ class FaissHNSWDB(FaissDB):
                 np.array(query_embedding, dtype=np.float32), axis=0
             )
             assert np_query_embedding.shape == (1, self.__dimension)
-            distances, indices = index.search(np_query_embedding, k=return_n)  # type: ignore
+            distances, indices = index.search(
+                np_query_embedding, k=return_n
+            )    # type: ignore
             distances = distances[0]
             indices = indices[0]
             # Post Processing
@@ -696,15 +719,17 @@ class FaissHNSWDB(FaissDB):
         """
         try:
             sqlite = (
-                self.__sqlite
-                if self.__sqlite is not None
-                else SQLite3_Storage(
-                    db_path=self.db_path, table_name=self.__namespace, overwrite=False
+                self.__sqlite if self.__sqlite is not None else SQLite3_Storage(
+                    db_path=self.db_path,
+                    table_name=self.__namespace,
+                    overwrite=False
                 )
             )
         except Exception as loading_error:
             logger.error(
-                msg=f"Loading Error: {loading_error}", exc_info=True, stack_info=True
+                msg=f"Loading Error: {loading_error}",
+                exc_info=True,
+                stack_info=True
             )
             raise
 
@@ -741,27 +766,31 @@ class FaissHNSWDB(FaissDB):
     def reconstruct(self, encoder: Encoder) -> None:
         try:
             sqlite = (
-                self.__sqlite
-                if self.__sqlite is not None
-                else SQLite3_Storage(
-                    db_path=self.db_path, table_name=self.__namespace, overwrite=False
+                self.__sqlite if self.__sqlite is not None else SQLite3_Storage(
+                    db_path=self.db_path,
+                    table_name=self.__namespace,
+                    overwrite=False
                 )
             )
         except Exception as loading_error:
             logger.error(
-                msg=f"Loading Error: {loading_error}", exc_info=True, stack_info=True
+                msg=f"Loading Error: {loading_error}",
+                exc_info=True,
+                stack_info=True
             )
             raise
         # Build a tmp sqlite db
         tmp_sqlite_path = f"{self.__db_path}/tmp.db"
         tmp_db = SQLite3_Storage(
-            db_path=tmp_sqlite_path, table_name=self.__namespace, overwrite=True
+            db_path=tmp_sqlite_path,
+            table_name=self.__namespace,
+            overwrite=True
         )
         # Build a tmp faiss index
         tmp_index = faiss.IndexHNSWFlat(self.__dimension, FaissHNSWDB.M)
         tmp_index.hnsw.efConstruction = FaissHNSWDB.EF_CONSTRUCTION
         tmp_index.hnsw.efSearch = FaissHNSWDB.EF_SEARCH
-        counter = 0  # Start from 0
+        counter = 0    # Start from 0
         # Iterate over the original db
         for key in sqlite.keys():
             value_dict = sqlite.get(key=key)
@@ -778,12 +807,14 @@ class FaissHNSWDB(FaissDB):
             )
             _embedding = np.expand_dims(_embedding, axis=0)
             # pylint: disable = no-value-for-parameter
-            tmp_index.add(_embedding.astype(np.float32))  # type: ignore
+            tmp_index.add(_embedding.astype(np.float32))    # type: ignore
             counter += 1
         os.replace(tmp_sqlite_path, self.db_path)
         if self.load_strategy == LoadStrategy.EAGER:
             self.__sqlite = SQLite3_Storage(
-                db_path=self.db_path, table_name=self.__namespace, overwrite=False
+                db_path=self.db_path,
+                table_name=self.__namespace,
+                overwrite=False
             )
             self.__index = tmp_index
         faiss.write_index(tmp_index, self.index_path)
@@ -798,15 +829,17 @@ class FaissHNSWDB(FaissDB):
         """
         try:
             sqlite = (
-                self.__sqlite
-                if self.__sqlite is not None
-                else SQLite3_Storage(
-                    db_path=self.db_path, table_name=self.__namespace, overwrite=False
+                self.__sqlite if self.__sqlite is not None else SQLite3_Storage(
+                    db_path=self.db_path,
+                    table_name=self.__namespace,
+                    overwrite=False
                 )
             )
         except Exception as loading_error:
             logger.error(
-                msg=f"Loading Error: {loading_error}", exc_info=True, stack_info=True
+                msg=f"Loading Error: {loading_error}",
+                exc_info=True,
+                stack_info=True
             )
             raise
         self.__sqlite = sqlite
@@ -819,11 +852,12 @@ class FaissHNSWDB(FaissDB):
 
 
 class FaissMemory(VectorMemory):
+
     def __init__(
         self,
         vdb: FaissDB,
         encoder: Encoder,
-        chunker: Chunker,
+        chunker: Splitter,
         **kwargs,
     ):
         super().__init__(vdb, encoder, chunker, **kwargs)
@@ -850,16 +884,25 @@ class FaissMemory(VectorMemory):
                 documents=document_chunks,
                 metadatas=metas,
                 ids=ids,
-                embeddings=[self.encoder.encode(chunk) for chunk in document_chunks],
+                embeddings=[
+                    self.encoder.encode(chunk) for chunk in document_chunks
+                ],
             )
         else:
             self.vdb.add(
                 documents=document_chunks,
                 metadatas=[
-                    {"parent": identifier} for _ in range(number_of_document_chunks)
+                    {
+                        "parent": identifier
+                    } for _ in range(number_of_document_chunks)
                 ],
-                ids=[f"{identifier}-{i}" for i in range(number_of_document_chunks)],
-                embeddings=[self.encoder.encode(chunk) for chunk in document_chunks],
+                ids=[
+                    f"{identifier}-{i}"
+                    for i in range(number_of_document_chunks)
+                ],
+                embeddings=[
+                    self.encoder.encode(chunk) for chunk in document_chunks
+                ],
             )
 
     def query(self, query_string: str, **kwargs):
@@ -895,4 +938,6 @@ class FaissMemory(VectorMemory):
     def delete(self, identifier: str) -> None:
         assert isinstance(self.vdb, FaissDB)
         self.vdb.remove(ids=None, where={"parent": identifier})
-        self.vdb.reconstruct(encoder=self.encoder)  # Very costly!!! But must call!!!
+        self.vdb.reconstruct(
+            encoder=self.encoder
+        )    # Very costly!!! But must call!!!

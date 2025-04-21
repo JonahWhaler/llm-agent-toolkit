@@ -8,7 +8,7 @@ import chromadb
 
 from .._encoder import Encoder
 from .._memory import VectorMemory, AsyncVectorMemory
-from .._chunkers import Chunker
+from .._chunkers import Splitter
 
 logger = logging.getLogger(__name__)
 
@@ -21,16 +21,16 @@ class ChromaMemory(VectorMemory):
 
     def __init__(
         self,
-        vdb: chromadb.ClientAPI,  # type: ignore
+        vdb: chromadb.ClientAPI,    # type: ignore
         encoder: Encoder,
-        chunker: Chunker,
+        chunker: Splitter,
         **kwargs,
     ):
         super().__init__(vdb, encoder, chunker, **kwargs)
         self.__namespace = kwargs.get("namespace", "default")
         overwrite: bool = kwargs.get("overwrite", False)
 
-        assert isinstance(self.vdb, chromadb.ClientAPI)  # type: ignore
+        assert isinstance(self.vdb, chromadb.ClientAPI)    # type: ignore
 
         if overwrite:
             try:
@@ -56,7 +56,7 @@ class ChromaMemory(VectorMemory):
             )
 
     def add(self, document_string: str, **kwargs):
-        assert isinstance(self.vdb, chromadb.ClientAPI)  # type: ignore
+        assert isinstance(self.vdb, chromadb.ClientAPI)    # type: ignore
         collection = self.vdb.get_or_create_collection(name=self.__namespace)
         identifier = kwargs.get("identifier", str(uuid.uuid4()))
         metadata = kwargs.get("metadata", {})
@@ -75,11 +75,13 @@ class ChromaMemory(VectorMemory):
             documents=document_chunks,
             metadatas=metas,
             ids=ids,
-            embeddings=[self.encoder.encode(chunk) for chunk in document_chunks],
+            embeddings=[
+                self.encoder.encode(chunk) for chunk in document_chunks
+            ],
         )
 
     def query(self, query_string: str, **kwargs):
-        assert isinstance(self.vdb, chromadb.ClientAPI)  # type: ignore
+        assert isinstance(self.vdb, chromadb.ClientAPI)    # type: ignore
         return_n = kwargs.get("return_n", 5)
         advance_filter = kwargs.get("advance_filter", None)
         output_types = kwargs.get(
@@ -143,7 +145,10 @@ def _query_(
     )
 
 
-def _delete_collection_(client: chromadb.ClientAPI, collection_name: str):  # type: ignore
+def _delete_collection_(
+    client: chromadb.ClientAPI,    # type: ignore
+    collection_name: str,
+):
     return client.delete_collection(name=collection_name)
 
 
@@ -152,11 +157,12 @@ def _delete_document_(collection: chromadb.Collection, identifier: str) -> None:
 
 
 class AsyncChromaMemory(AsyncVectorMemory):
+
     def __init__(
         self,
-        vdb: chromadb.ClientAPI,  # type: ignore
+        vdb: chromadb.ClientAPI,    # type: ignore
         encoder: Encoder,
-        chunker: Chunker,
+        chunker: Splitter,
         max_workers: int = 4,
         **kwargs,
     ) -> None:
@@ -167,7 +173,7 @@ class AsyncChromaMemory(AsyncVectorMemory):
         self.init()
 
     def init(self) -> None:
-        assert isinstance(self.vdb, chromadb.ClientAPI)  # type: ignore
+        assert isinstance(self.vdb, chromadb.ClientAPI)    # type: ignore
         if self.__overwrite:
             try:
                 self.vdb.delete_collection(name=self.__namespace)
@@ -190,7 +196,7 @@ class AsyncChromaMemory(AsyncVectorMemory):
             )
 
     async def add(self, document_string: str, **kwargs) -> None:
-        assert isinstance(self.vdb, chromadb.ClientAPI)  # type: ignore
+        assert isinstance(self.vdb, chromadb.ClientAPI)    # type: ignore
         collection = self.vdb.get_or_create_collection(name=self.__namespace)
         identifier = kwargs.get("identifier", str(uuid.uuid4()))
         metadata = kwargs.get("metadata", {})
@@ -205,7 +211,9 @@ class AsyncChromaMemory(AsyncVectorMemory):
             metas.append(meta)
             ids.append(f"{identifier}-{i}")
 
-        emb_tasks = [self.encoder.encode_async(chunk) for chunk in document_chunks]
+        emb_tasks = [
+            self.encoder.encode_async(chunk) for chunk in document_chunks
+        ]
         embeddings = await asyncio.gather(*emb_tasks)
 
         try:
@@ -229,7 +237,7 @@ class AsyncChromaMemory(AsyncVectorMemory):
             raise
 
     async def query(self, query_string, **kwargs):
-        assert isinstance(self.vdb, chromadb.ClientAPI)  # type: ignore
+        assert isinstance(self.vdb, chromadb.ClientAPI)    # type: ignore
         return_n = kwargs.get("return_n", 5)
         advance_filter = kwargs.get("advance_filter", None)
         output_types = kwargs.get(
@@ -257,11 +265,11 @@ class AsyncChromaMemory(AsyncVectorMemory):
         return {"query": query_string, "result": result}
 
     async def clear(self):
-        assert isinstance(self.vdb, chromadb.AsyncClientAPI)  # type: ignore
+        assert isinstance(self.vdb, chromadb.AsyncClientAPI)    # type: ignore
         loop = asyncio.get_running_loop()
         await loop.run_in_executor(
             self.__executor, _delete_collection_, self.vdb, self.__namespace
-        )  # type: ignore
+        )    # type: ignore
 
     async def delete(self, identifier: str) -> None:
         collection: chromadb.Collection = self.vdb.get_or_create_collection(
