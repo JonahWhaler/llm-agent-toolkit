@@ -6,7 +6,7 @@ from abc import ABC, abstractmethod
 
 from ._util import MessageBlock
 from ._encoder import Encoder
-from ._chunkers import Chunker
+from ._chunkers import Splitter
 
 
 class ShortTermMemory:
@@ -30,7 +30,7 @@ class ShortTermMemory:
 
 
 class VectorMemory(ABC):
-    def __init__(self, vdb, encoder: Encoder, chunker: Chunker, **kwargs):
+    def __init__(self, vdb, encoder: Encoder, chunker: Splitter, **kwargs):
         self.__vdb = vdb
         self.__encoder = encoder
         self.__chunker = chunker
@@ -101,7 +101,7 @@ class VectorMemory(ABC):
 
 
 class AsyncVectorMemory(ABC):
-    def __init__(self, vdb, encoder: Encoder, chunker: Chunker, **kwargs):
+    def __init__(self, vdb, encoder: Encoder, chunker: Splitter, **kwargs):
         self.__vdb = vdb
         self.__encoder = encoder
         self.__chunker = chunker
