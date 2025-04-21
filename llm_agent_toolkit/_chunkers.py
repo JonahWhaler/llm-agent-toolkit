@@ -1,15 +1,16 @@
 import random
 import logging
-from abc import abstractmethod, ABC
 from typing import runtime_checkable, Protocol
 
 logger = logging.getLogger(__name__)
 
 
 class ChunkerMetrics:
+
     @classmethod
     def calculate_utilization_rate(
-        cls, CTX_LENGTH: int, token_counts: list[int], grouping: list[tuple[int, int]]
+        cls, CTX_LENGTH: int, token_counts: list[int],
+        grouping: list[tuple[int, int]]
     ) -> float:
         utilization_scores = []
         for g_start, g_end in grouping:
@@ -25,7 +26,8 @@ class ChunkerMetrics:
 
     @classmethod
     def calculate_wastage_rate(
-        cls, CTX_LENGTH: int, token_counts: list[int], grouping: list[tuple[int, int]]
+        cls, CTX_LENGTH: int, token_counts: list[int],
+        grouping: list[tuple[int, int]]
     ) -> float:
         wastage_scores = []
         for g_start, g_end in grouping:
@@ -74,9 +76,9 @@ class ChunkerMetrics:
 
 @runtime_checkable
 class ChunkingInitializer(Protocol):
-    def init(
-        self,
-    ) -> list[tuple[int, int]]: ...
+
+    def init(self, ) -> list[tuple[int, int]]:
+        ...
 
 
 class UniformInitializer:
@@ -142,7 +144,7 @@ class RandomInitializer:
                 for _ in range(remainer):
                     index = random.randint(0, self.k - 1)
                     init_list[index] += 1
-                break  # All remaining capacity has been distributed
+                break    # All remaining capacity has been distributed
             # Randomly decide how much to add to each chunk in this iteration
             new_growth = [random.randint(1, even_size) for _ in range(self.k)]
             # Add the new growth to each chunk's size
@@ -152,74 +154,20 @@ class RandomInitializer:
             remainer -= sum(new_growth)
 
         offset = 0
-        output_list: list[tuple[int, int]] = []  # type: ignore
+        output_list: list[tuple[int, int]] = []    # type: ignore
         for size in init_list:
             output_list.append((offset, offset + size))
             offset += size
 
         assert (
-            ChunkerMetrics.calculate_coverage(self.total_capacity, output_list) == 1.0
+            ChunkerMetrics.calculate_coverage(self.total_capacity,
+                                              output_list) == 1.0
         )
         return output_list
 
 
-class Chunker(ABC):
-    """
-    Abstract base class for text chunkers.
+@runtime_checkable
+class Splitter(Protocol):
 
-    The `Chunker` class provides a standardized interface and common utilities
-    for splitting long texts into smaller, manageable chunks. Subclasses must
-    implement the `split` method to define specific chunking strategies.
-
-    Attributes:
-        config (dict): Configuration parameters for the chunker.
-
-    Methods:
-        split(long_text: str) -> list[str]:
-            Splits the provided long text into a list of smaller text chunks.
-            Must be implemented by all subclasses.
-
-        reconstruct_chunk(partial_chunk: list[str]) -> str:
-            Reconstructs a single text string from a list of partial chunks.
-            Ensures proper spacing and punctuation between chunks.
-    """
-
-    def __init__(self, config: dict):
-        self.__config = config
-
-    @property
-    def config(self) -> dict:
-        return self.__config
-
-    @abstractmethod
     def split(self, long_text: str) -> list[str]:
-        raise NotImplementedError
-
-    @staticmethod
-    def reconstruct_chunk(partial_chunk: list[str]) -> str:
-        """
-        Reconstructs a single text string from a list of partial chunks.
-
-        This method ensures proper spacing between chunks and correctly handles punctuation.
-
-        Args:
-            partial_chunk (list[str]): A list of text segments to be combined.
-
-        Returns:
-            str: The reconstructed text string.
-        """
-        reconstructed = []
-        previous_chunk = ""
-
-        for chunk in partial_chunk:
-            if previous_chunk:
-                if "#" in chunk or "`" in chunk:
-                    reconstructed.append("\n")
-                elif (
-                    chunk not in {".", "?", "!", "\n", "\t"} and previous_chunk != "\n"
-                ):
-                    reconstructed.append(" ")
-            reconstructed.append(chunk)
-            previous_chunk = chunk
-
-        return "".join(reconstructed)
+        ...

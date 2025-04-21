@@ -1,11 +1,11 @@
-from setuptools import setup, find_packages  # type: ignore
+from setuptools import setup, find_packages    # type: ignore
 
 DESCRIPTION = "LLM Agent Toolkit provides minimal, modular interfaces for core components in LLM-based applications."
 
 # python3 setup.py sdist bdist_wheel
 # twine upload --skip-existing dist/* --verbose
 
-VERSION = "0.0.32.6"
+VERSION = "0.0.32.7"
 
 with open("./README.md", "r", encoding="utf-8") as f:
     long_description = f.read()
@@ -37,10 +37,14 @@ gemini_dependencies = ["google-genai==1.0.0"]
 ollama_dependencies = ["ollama==0.4.4"]
 
 extras = {
-    "transformers": transformers_dependencies,
-    "transcriber": transcriber_dependencies,
-    "gemini": gemini_dependencies,
-    "ollama": ollama_dependencies,
+    "transformers":
+    transformers_dependencies,
+    "transcriber":
+    transcriber_dependencies,
+    "gemini":
+    gemini_dependencies,
+    "ollama":
+    ollama_dependencies,
     "all": [
         *transformers_dependencies,
         *transcriber_dependencies,

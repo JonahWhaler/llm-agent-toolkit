@@ -1,7 +1,7 @@
 import json
 import logging
 from math import ceil
-from typing import Any
+from typing import Any, Optional
 
 # External Packages
 import ollama
@@ -57,10 +57,14 @@ class OllamaCore:
                     return True
             return False
         except ollama.RequestError as ore:
-            logger.error("RequestError: %s", str(ore), exc_info=True, stack_info=True)
+            logger.error(
+                "RequestError: %s", str(ore), exc_info=True, stack_info=True
+            )
             raise
         except Exception as e:
-            logger.error("Exception: %s", str(e), exc_info=True, stack_info=True)
+            logger.error(
+                "Exception: %s", str(e), exc_info=True, stack_info=True
+            )
             raise
 
     def __try_pull_model(self):
@@ -74,16 +78,25 @@ class OllamaCore:
             client = ollama.Client(host=self.CONN_STRING)
             _ = client.pull(self.__model_name, stream=False)
         except ollama.RequestError as oreqe:
-            logger.error("RequestError: %s", str(oreqe), exc_info=True, stack_info=True)
+            logger.error(
+                "RequestError: %s", str(oreqe), exc_info=True, stack_info=True
+            )
             raise
         except ollama.ResponseError as orespe:
             logger.error(
-                "ResponseError: %s", str(orespe), exc_info=True, stack_info=True
+                "ResponseError: %s",
+                str(orespe),
+                exc_info=True,
+                stack_info=True
             )
             raise
         except Exception as e:
             logger.error(
-                "Exception: %s (%s)", str(e), type(e), exc_info=True, stack_info=True
+                "Exception: %s (%s)",
+                str(e),
+                type(e),
+                exc_info=True,
+                stack_info=True
             )
             raise
 
@@ -111,7 +124,9 @@ class OllamaCore:
                             if column == "context_length":
                                 profile[column] = int(value)
                             elif column == "max_output_tokens":
-                                profile[column] = 2048 if value == "" else int(value)
+                                profile[column] = 2048 if value == "" else int(
+                                    value
+                                )
                             elif column == "remarks":
                                 profile[column] = value
                             elif value == "TRUE":
@@ -145,7 +160,9 @@ class OllamaCore:
             # Expect no columns is missing
             diff = EXPECTED_COLUMNS.difference(set(columns))
             if diff:
-                raise ValueError(f"Missing columns in {input_path}: {', '.join(diff)}")
+                raise ValueError(
+                    f"Missing columns in {input_path}: {', '.join(diff)}"
+                )
             # Expect all columns are in exact order
             if header != COLUMNS_STRING:
                 raise ValueError(
@@ -160,11 +177,15 @@ class OllamaCore:
                         assert isinstance(
                             value, str
                         ), f"{name}.{column} must be a string."
-                    elif column in ["context_length", "max_output_tokens"] and value:
+                    elif column in [
+                        "context_length", "max_output_tokens"
+                    ] and value:
                         try:
                             _ = int(value)
                         except ValueError:
-                            logger.warning(f"{name}.{column} must be an integer.")
+                            logger.warning(
+                                f"{name}.{column} must be an integer."
+                            )
                             raise
                     elif value:
                         assert value.lower() in [
@@ -228,7 +249,9 @@ class OllamaCore:
             for image_path in images:
                 with Image.open(image_path) as img:
                     width, height = img.size
-                    image_token_count += self.calculate_image_tokens(width, height)
+                    image_token_count += self.calculate_image_tokens(
+                        width, height
+                    )
 
         logger.debug(
             "Token Estimation:\nText: %d\nImage: %d",
@@ -266,19 +289,20 @@ class OllamaCore:
 
     @staticmethod
     def update_usage(
-        response: dict[str, Any], token_usage: TokenUsage | None = None
+        response: dict[str, Any],
+        token_usage: TokenUsage | None = None
     ) -> TokenUsage:
         """Transforms CompletionUsage to TokenUsage. This is a adapter function."""
         if token_usage is None:
             token_usage = TokenUsage(input_tokens=0, output_tokens=0)
 
-        input_tokens = response.get("prompt_eval_count", None)
-        output_tokens = response.get("eval_count", None)
+        input_tokens: Optional[int] = response.get("prompt_eval_count", None)
+        output_tokens: Optional[int] = response.get("eval_count", None)
         if input_tokens is None and output_tokens is None:
             raise RuntimeError("Both input_tokens and output_tokens are None.")
 
-        token_usage.input_tokens += input_tokens
-        token_usage.output_tokens += output_tokens
+        token_usage.input_tokens += input_tokens    # type: ignore
+        token_usage.output_tokens += output_tokens    # type: ignore
         logger.debug("Token Usage: %s", token_usage)
         return token_usage
 

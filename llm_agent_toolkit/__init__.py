@@ -14,7 +14,7 @@ from ._util import (
     TokenUsage,
 )
 
-from ._chunkers import Chunker, ChunkerMetrics, RandomInitializer, UniformInitializer
+from ._chunkers import Splitter, ChunkerMetrics, RandomInitializer, UniformInitializer
 from ._core import Core, ToolSupport, ImageInterpreter
 from ._memory import VectorMemory, ShortTermMemory, AsyncVectorMemory
 from ._encoder import Encoder
@@ -45,7 +45,7 @@ __all__ = [
     "ResponseMode",
     "CreatorRole",
     "MessageBlock",
-    "Chunker",
+    "Splitter",
     "ChunkerMetrics",
     "RandomInitializer",
     "UniformInitializer",
