@@ -1,18 +1,19 @@
 from .basic import (
-    FixedCharacterChunker,
-    FixedGroupChunker,
-    SentenceChunker,
-    SectionChunker,
+    FixedCharacterChunker, FixedGroupChunker, SentenceChunker, SectionChunker,
+    FixedCharacterChunkerConfig, FixedGroupChunkerConfig
 )
-from .semantic import SemanticChunker, SimulatedAnnealingSemanticChunker
-from .hybrid import HybridChunker
+from .semantic import SemanticChunker, SemanticChunkerConfig
+from .hybrid import HybridChunker, HybridChunkerConfig
 
 __all__ = [
     "FixedCharacterChunker",
     "FixedGroupChunker",
     "SentenceChunker",
     "SectionChunker",
+    "FixedCharacterChunkerConfig",
+    "FixedGroupChunkerConfig",
     "SemanticChunker",
-    "SimulatedAnnealingSemanticChunker",
+    "SemanticChunkerConfig",
     "HybridChunker",
+    "HybridChunkerConfig",
 ]
