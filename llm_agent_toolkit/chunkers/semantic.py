@@ -274,16 +274,24 @@ class SemanticChunker:
 
     def eval(self, *args) -> float:
         """
-        Evaluates the current grouping based on pairwise similarity.
+        Evaluates the current chunking based on semantic coherence and other metrics.
 
         Args:
-            *args: Variable length argument list. Expected to include embeddings and grouping.
+            args (list[Any]): Variable length argument list. Must contain:
+                - embeddings (List[List[float]]): Embeddings of all lines.
+                - grouping (List[Tuple[int, int]]): The current grouping of lines.
+                - capacity (int): The total number of lines.
+                - verbose (bool): Whether to log metrics.
 
         Returns:
-            float: Cohesion score.
+            score (float): A score representing the quality of the chunking. 
+            Higher score indicate better chunking.
+            ```python
+            score = cohesion - overlapped + coverage
+            ```
         """
-        assert len(args) >= 3, "Expect embeddings, grouping, capacity."
-        embeddings, grouping, capacity, *_ = args
+        assert len(args) >= 4, "Expect embeddings, grouping, capacity, verbose."
+        embeddings, grouping, capacity, verbose, *_ = args
         cohesion: float = 0
         for g_start, g_end in grouping:
             cohesion += self.calculate_pairwise_similarity(
@@ -293,10 +301,14 @@ class SemanticChunker:
 
         overlapped = ChunkerMetrics.calculate_overlapped(capacity, grouping)
         coverage = ChunkerMetrics.calculate_coverage(capacity, grouping)
-        logger.info("metrics/cohesion: %.4f", cohesion)
-        logger.info("metrics/overlapped: %.4f", overlapped)
-        logger.info("metrics/coverage: %.4f", coverage)
-        return cohesion - overlapped + coverage
+
+        score: float = cohesion - overlapped + coverage
+        if verbose:
+            logger.info("metrics/cohesion: %.4f", cohesion)
+            logger.info("metrics/overlapped: %.4f", overlapped)
+            logger.info("metrics/coverage: %.4f", coverage)
+            logger.info("metrics/score: %.4f", score)
+        return score
 
     def split(self, long_text: str):
         """
@@ -398,7 +410,7 @@ class SemanticChunker:
         while iteration < self.config.max_iteration:
             logger.warning("======= [%d] =======", iteration)
             iteration += 1
-            score = self.eval(embeddings, grouping, n_part)
+            score = self.eval(embeddings, grouping, n_part, True)
             coverage = ChunkerMetrics.calculate_coverage(n_part, grouping)
             if score > best_score and coverage >= self.config.min_coverage:
                 best_score = score
@@ -414,7 +426,7 @@ class SemanticChunker:
             logger.info("Grouping: %s", grouping)
 
         # Wrap up
-        score = self.eval(embeddings, grouping, n_part)
+        score = self.eval(embeddings, grouping, n_part, True)
         coverage = ChunkerMetrics.calculate_coverage(n_part, grouping)
         if score > best_score and coverage >= self.config.min_coverage:
             best_score = score
