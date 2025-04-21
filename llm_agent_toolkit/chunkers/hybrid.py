@@ -186,6 +186,59 @@ class HybridChunkerConfig(BaseModel):
             raise ValueError("Patient must be greater than or equal to 0.")
         return v
 
+
+class HybridChunker:
+    """
+    Dynamically optimizes text chunk boundaries for semantic coherence.
+
+    Combines:
+      1. Coarse splits (sections → paragraphs/headings),
+      2. Fallback to sentence‑level splits (if a section is too big),
+      3. An iterative hill‑climbing optimizer that tweaks start/end
+         indices to maximize cohesion within chunks and separation
+         between chunks—while enforcing sufficient coverage, minimal overlap,
+         and minimal overflow past the model’s context window.
+
+    Notes:
+        - The chunking process is stochastic, so results may vary.
+        - The class uses memoization to cache the results of the `str_to_embedding` method
+          for efficiency, especially when processing large texts with repeated phrases.
+    """
+
+    DEFAULT_UPDATE_RATE: float = 0.5
+    DEFAULT_CHUNK_SIZE: int = 512
+    DEFAULT_MAX_ITERATION: int = 20
+    DEFAULT_MIN_COVERAGE: float = 0.9
+    DEFAULT_TEMPERATURE: float = 0.25
+    DEFAULT_DELTA: float = 0.0001
+    DEFAULT_PATIENT: int = 5
+
+    C: int = 2
+
+    def __init__(
+        self,
+        encoder: Encoder,
+        config: HybridChunkerConfig,
+    ):
+        """
+        Initializes the HybridChunker with an encoder and configuration.
+
+        Args:
+            encoder (Encoder): The text encoder to use.
+            config (dict): A dictionary of configuration parameters.
+        """
+        self.__encoder = encoder
+        self.__config = config
+
+    @property
+    def encoder(self) -> Encoder:
+        """Returns the encoder used by this chunker."""
+        return self.__encoder
+
+    @property
+    def config(self):
+        return self.__config
+
     def step_forward(
         self, current_grouping: list[tuple[int, int]], N_LINE: int
     ) -> list[tuple[int, int]]:
@@ -224,7 +277,7 @@ class HybridChunkerConfig(BaseModel):
         """
         new_grouping: list[tuple[int, int]] = current_grouping[:]
         G = len(current_grouping)
-        F = max(1, int(G * self.update_rate))
+        F = max(1, int(G * self.config.update_rate))
         N_COMBS = self.calculate_number_of_combinations(N_LINE, HybridChunker.C)
         # Update a random chunk `F` times
         for _ in range(F):
@@ -257,7 +310,7 @@ class HybridChunkerConfig(BaseModel):
 
                 loop_counter += 1
 
-            if found:
+            if not found:
                 new_grouping[point] = (left, right)
 
         return new_grouping
@@ -290,7 +343,7 @@ class HybridChunkerConfig(BaseModel):
         """
         Encodes a text string into its embedding vector using the encoder.
 
-        This method uses memoization (lru_cache) to avoid redundant encoding of the
+        This method uses memoization (lru_cache) to reduce redundant encoding of the
         same text.
 
         Args:
@@ -510,17 +563,14 @@ class HybridChunkerConfig(BaseModel):
             A value of 0 indicates no chunks exceed the token limit. 
             Positive values indicate the degree of exceedance.
 
-        Notes:
-        * **Token Estimation**: The token scale factor is 0.5 for ASCII and 0.75 for non-ASCII.
-
         Example:
             >>> lines = [L1, L2, L3, L4, L5, L6, L7, L8, L9]
             >>> grouping = [(0, 3), (3, 5), (5, 9)]
-            >>> # est_token_count = method to estimate token count
+            >>> # estimate_token_count = method to estimate token count
             >>> overflow = [
-                    max(0, est_token_count(L1+L2+L3) / chunk_size), 
-                    max(0, est_token_count(L4+L5) / chunk_size), 
-                    max(0, est_token_count(L6+L7+L8+L9) / chunk_size)
+                    max(0, estimate_token_count(L1+L2+L3) / chunk_size), 
+                    max(0, estimate_token_count(L4+L5) / chunk_size), 
+                    max(0, estimate_token_count(L6+L7+L8+L9) / chunk_size)
                 ] / len(grouping)
         """
         overflow: float = 0.0
@@ -528,9 +578,10 @@ class HybridChunkerConfig(BaseModel):
             g_line = self.reconstruct_custom_chunk(
                 lines[g_start:g_end], "sentence"
             )
-            coef = 0.5 if self.isascii(g_line) else 0.75
-            est_token_count = len(g_line) * coef
-            g_overflow = max(0.0, est_token_count / self.chunk_size - 1.0)
+            g_overflow = max(
+                0.0,
+                estimate_token_count(g_line) / self.config.chunk_size - 1.0
+            )
             overflow += g_overflow
         overflow /= len(grouping)
 
@@ -556,8 +607,8 @@ class HybridChunkerConfig(BaseModel):
         ]
         counter: int = 0
         for part in parts:
-            part_token_count = len(part) * 0.5 if self.isascii(part) else 0.75
-            if part_token_count > self.chunk_size:
+            part_token_count = estimate_token_count(part)
+            if part_token_count > self.config.chunk_size:
                 counter += 1
         if counter == 0:
             return parts
@@ -585,8 +636,7 @@ class HybridChunkerConfig(BaseModel):
             coherent chunk of the original text.
         """
         logger.warning("[BEG] split")
-        logger.warning("CONFIG: %s", self.config)
-        logger.warning("Encoder: %s", self.encoder)
+        logger.warning("Configuration: %s", self.config)
 
         if not isinstance(long_text, str):
             raise TypeError(
@@ -598,20 +648,17 @@ class HybridChunkerConfig(BaseModel):
         if len(text) == 0:
             raise ValueError("Expect long_text to be non-empty string.")
 
-        coef = 0.5 if self.isascii(text) else 0.75
-        if len(text) * coef < self.chunk_size:
+        if estimate_token_count(text) < self.config.chunk_size:
             return [text]
 
-        section_chunker = SectionChunker({})
-        sentence_chunker = SentenceChunker({})
+        section_chunker = SectionChunker()
+        sentence_chunker = SentenceChunker()
 
         output: list[str] = []
         temp: str = ""
         for section in section_chunker.split(text):
-            section_len = len(section)
-            coef = 0.5 if self.isascii(section) else 0.75
-            est_tc = section_len * coef
-            if est_tc > self.chunk_size:
+            est_tc = estimate_token_count(section)
+            if est_tc > self.config.chunk_size:
                 logger.warning("Content:\n%s", section)
                 sentences = sentence_chunker.split(section)
                 L = len(sentences)
@@ -625,10 +672,10 @@ class HybridChunkerConfig(BaseModel):
                         continue
 
                     splitter = FixedCharacterChunker(
-                        {
-                            "chunk_size": 128,
-                            "stride_rate": 0.9
-                        }
+                        FixedCharacterChunkerConfig(
+                            chunk_length=int(self.config.chunk_size * 0.5),
+                            stride_rate=1.0
+                        )
                     )
                     sentences = splitter.split(section)
                     L = len(sentences)
@@ -638,7 +685,7 @@ class HybridChunkerConfig(BaseModel):
                 # At least 2 groups
                 G: int = max(
                     2,
-                    int(est_tc // self.chunk_size),
+                    int(est_tc // self.config.chunk_size),
                     L // 20,
                 )
                 grouping = self.find_best_grouping(sentences, G)
@@ -647,12 +694,12 @@ class HybridChunkerConfig(BaseModel):
                         sentences[g_start:g_end], "sentence"
                     )
                     output.append(g_chunk)
-            elif est_tc > self.chunk_size * 0.75:
+            elif est_tc > self.config.chunk_size * 0.75:
                 if temp:
                     output.append(temp)
                     temp = ""
                 output.append(section)
-            elif est_tc + len(temp) * coef > self.chunk_size:
+            elif est_tc + estimate_token_count(temp) > self.config.chunk_size:
                 output.append(temp)
                 temp = section
             else:
@@ -674,7 +721,7 @@ class HybridChunkerConfig(BaseModel):
         Performs a single optimization step on the current chunk grouping.
 
         The optimization step either initializes a new random grouping (based on the
-        `temperature` parameter) or performs a random adjustment of the existing
+        `randomness` parameter) or performs a random adjustment of the existing
         chunk boundaries using the `step_forward` method.
 
         Args:
@@ -685,7 +732,7 @@ class HybridChunkerConfig(BaseModel):
             grouping (List[Tuple[int, int]]): 
             The new list of chunk tuples after the optimization step.
         """
-        if random.random() < self.temperature:
+        if random.random() < self.config.randomness:
             logger.warning("Initializing new random grouping")
             initializer = RandomInitializer(n_line, len(grouping))
             return initializer.init()
@@ -703,6 +750,9 @@ class HybridChunkerConfig(BaseModel):
         optimization process continues for a maximum number of iterations (`max_iteration`)
         or until no significant improvement is observed for a certain number of
         consecutive iterations (`patient`), implementing an early stopping mechanism.
+
+        At the chance of `randomness`, a new random grouping is initialized. 
+        It acts as a restart mechanism to escape local optima.
 
         Args:
             lines (List[str]): A list of text units (e.g., sentences) to be grouped.
@@ -726,35 +776,40 @@ class HybridChunkerConfig(BaseModel):
         non_improving_counter: int = 0
 
         logger.warning("Lines: %d, Groups: %d", L, G)
-        while iteration < self.max_iteration:
-            logger.warning("======= [%d] =======", iteration)
-            iteration += 1
-            score: float = self.eval(lines, grouping, L)
-            if score - best_score < self.delta:
+        logger.warning("======= [%d] =======", iteration)
+        logger.warning("Grouping: %s", grouping)
+        while iteration < self.config.max_iteration:
+            score: float = self.eval(lines, grouping, L, True)
+            if score - best_score < self.config.delta:
                 non_improving_counter += 1
-                if non_improving_counter >= self.patient:
+                if non_improving_counter >= self.config.patient:
                     logger.warning("Early Stopping!")
-                    logger.warning("Grouping: %s", grouping)
                     break
             else:
                 non_improving_counter = 0
 
             coverage: float = ChunkerMetrics.calculate_coverage(L, grouping)
-            if score > best_score and coverage >= self.min_coverage:
+            if score > best_score and coverage >= self.config.min_coverage:
                 best_score = score
                 best_grouping = grouping[:]
                 logger.warning("Improved! Score: %.4f.", score)
-                logger.warning("Grouping: %s", grouping)
 
-            grouping = self.optimize(grouping, L)
+            iteration += 1
+            logger.warning("======= [%d] =======", iteration)
+            if random.random() < self.config.randomness:
+                logger.warning("Initializing new random grouping")
+                grouping = initializer.init()
+            else:
+                logger.warning("Step forward")
+                grouping = self.step_forward(grouping, L)
+            logger.warning("Grouping: %s", grouping)
 
-        score: float = self.eval(lines, grouping, L)
+        score: float = self.eval(lines, grouping, L, True)
         coverage: float = ChunkerMetrics.calculate_coverage(L, grouping)
-        if score > best_score and coverage >= self.min_coverage:
+        if score > best_score and coverage >= self.config.min_coverage:
             best_score = score
             best_grouping = grouping[:]
             logger.warning("Improved! Score: %.4f.", score)
-            logger.warning("Grouping: %s", grouping)
 
         # Sort the best grouping
         best_grouping.sort(key=lambda x: x[0])
