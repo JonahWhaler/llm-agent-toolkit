@@ -23,228 +23,168 @@ Configurable parameters (via `config` dict):
   - max_iteration  (int)   : hill‑climb iterations
   - min_coverage   (float) : [0.0,1.0] minimum coverage
   - update_rate    (float) : (0.0,1.0] fraction of chunks tweaked per step
-  - temperature    (float) : [0.0,1.0] random‑restart chance
+  - randomness    (float) : [0.0,1.0] random‑restart chance
   - delta          (float) : ≥0.0 early‑stop improvement threshold
   - patient        (int)   : non‑improving rounds before stopping
 """
 
 import logging
 import random
-import charade
 from functools import lru_cache
 from typing import Optional
 
+# External packages
+from pydantic import BaseModel, field_validator
+
 # Custom packages
 from .._encoder import Encoder
-from .._chunkers import Chunker, ChunkerMetrics, RandomInitializer
-from .basic import SectionChunker, SentenceChunker, FixedCharacterChunker
+from .._chunkers import ChunkerMetrics, RandomInitializer
+from .basic import SectionChunker, SentenceChunker, FixedCharacterChunker, FixedCharacterChunkerConfig
+from .utility import estimate_token_count
 
 logger = logging.getLogger(__name__)
 
 
-class HybridChunker(Chunker):
+class HybridChunkerConfig(BaseModel):
     """
-    Dynamically optimizes text chunk boundaries for semantic coherence.
+    Configuration for the HybridChunker.
 
-    Combines:
-      1. Coarse splits (sections → paragraphs/headings),
-      2. Fallback to sentence‑level splits (if a section is too big),
-      3. An iterative hill‑climbing optimizer that tweaks start/end
-         indices to maximize cohesion within chunks and separation
-         between chunks—while enforcing full coverage, minimal overlap,
-         and no overflow past the model’s context window.
-
-    Uses an `Encoder` for embeddings and scores groupings by:
-      - Intra‑group cohesion (avg. cosine sim. of sub‑splits)
-      - Inter‑group cohesion (avg. cos. sim. between chunks)
-      - Coverage (fraction of text covered)
-      - Overlap (penalty for redundant coverage)
-      - Overflow (penalty for token‑length excess)
-
-    Config parameters (via `config`):
-      - chunk_size     : max tokens per chunk (≤ encoder.ctx_length)
-      - max_iteration  : total optimization steps
-      - min_coverage   : required coverage ratio
-      - update_rate    : fraction of chunks to adjust each step
-      - temperature    : randomness factor for reinitialization
-      - delta          : min score delta to reset patience counter
-      - patient        : non‑improving iterations allowed
-
+    Attributes:
+        chunk_size (int): Maximum number of tokens per chunk.
+        max_iteration (int): Maximum number of optimization iterations.
+        min_coverage (float): Minimum required coverage of the input text.
+        update_rate (float): Fraction of chunks updated in each optimization iteration.
+        randomness (float): Randomness factor for chunk updates.
+        delta (float): Minimum improvement in evaluation score to reset early stopping counter.
+        patient (int): Number of non-improving iterations before early stopping.
     """
+    chunk_size: int = 512
+    max_iteration: int = 20
+    min_coverage: float = 0.9
+    update_rate: float = 0.5
+    randomness: float = 0.25
+    delta: float = 0.0001
+    patient: int = 5
 
-    DEFAULT_UPDATE_RATE: float = 0.5
-    DEFAULT_CHUNK_SIZE: int = 512
-    DEFAULT_MAX_ITERATION: int = 20
-    DEFAULT_MIN_COVERAGE: float = 0.9
-    DEFAULT_TEMPERATURE: float = 0.25
-    DEFAULT_DELTA: float = 0.0001
-    DEFAULT_PATIENT: int = 5
-
-    C: int = 2
-
-    def __init__(
-        self,
-        encoder: Encoder,
-        config: dict,
-    ):
+    @field_validator("n_chunk")
+    def validate_n_chunk(cls, v: int) -> int:
         """
-        Initializes the HybridChunker with an encoder and configuration.
+        Validates the number of chunks to create.
 
         Args:
-            encoder (Encoder): The text encoder to use.
-            config (dict): A dictionary of configuration parameters.
+            v (int): Number of chunks.
+
+        Returns:
+            int: Validated number of chunks.
         """
-        super().__init__(config)
-        self.__encoder = encoder
-        self.unpack_parameters(config)
-        self.validate_parameters()
+        if v < 1:
+            raise ValueError("Number of chunks must be at least 1.")
+        return v
 
-    @property
-    def encoder(self) -> Encoder:
-        """Returns the encoder used by this chunker."""
-        return self.__encoder
-
-    @property
-    def update_rate(self) -> float:
+    @field_validator("chunk_size")
+    def validate_chunk_size(cls, v: int) -> int:
         """
-        The fraction of chunks updated in each optimization iteration.
-
-        Constraints:
-            Must be within (0.0, 1.0]
-
-        Example:
-        ```
-        # G (int): Number of groups
-        # F (int): Numbers of groups to be updated
-
-        F: int = max(1, int(G * update_rate))
-        ```
-        """
-        return self.__update_rate
-
-    @property
-    def chunk_size(self) -> int:
-        """The maximum number of tokens per chunk."""
-        return self.__chunk_size
-
-    @property
-    def max_iteration(self) -> int:
-        """
-        The maximum number of optimization iterations.
-
-        Constraints:
-            max_iteration > 0
-            max_iteration > patient
-        """
-        return self.__max_iteration
-
-    @property
-    def min_coverage(self) -> float:
-        """
-        The minimum required coverage of the input text.
-
-        Constraints:
-            0.0 < min_coverage <= 1.0
-        """
-        return self.__min_coverage
-
-    @property
-    def temperature(self) -> float:
-        """
-        Controls the randomness of chunk updates during optimization.
-
-        Higher values mean more random updates.
-
-        Constraints:
-            0.0 <= temperature <= 1.0
-        """
-        return self.__temperature
-
-    @property
-    def delta(self) -> float:
-        """
-        The minimum improvement in the evaluation score to reset the early stopping counter.
-
-        Constraints:
-            delta >= 0.0
-        """
-        return self.__delta
-
-    @property
-    def patient(self) -> int:
-        """
-        The number of non-improving iterations before early stopping.
-
-        Constraints:
-            0 <= patient <= max_iteration
-        """
-        return self.__patient
-
-    def unpack_parameters(self, config: dict) -> None:
-        """
-        Extracts and sets the configuration parameters for the HybridChunker from the provided dictionary.
-
-        This method retrieves values for `update_rate`, `chunk_size`, `max_iteration`,
-        `min_coverage`, `temperature`, `delta`, and `patient` from the `config`
-        dictionary. If a parameter is not found in the dictionary, its default
-        value (defined as a class attribute) is used.
+        Validates the maximum number of tokens per chunk.
 
         Args:
-            config (dict): A dictionary containing configuration parameters.
+            v (int): Maximum number of tokens.
+
+        Returns:
+            int: Validated maximum number of tokens.
         """
-        self.__update_rate: float = config.get(
-            "update_rate", self.DEFAULT_UPDATE_RATE
-        )
-        self.__chunk_size: int = config.get(
-            "chunk_size", self.DEFAULT_CHUNK_SIZE
-        )
-        self.__max_iteration: int = config.get(
-            "max_iteration", self.DEFAULT_MAX_ITERATION
-        )
-        self.__min_coverage: float = config.get(
-            "min_coverage", self.DEFAULT_MIN_COVERAGE
-        )
-        self.__temperature: float = config.get(
-            "temperature", self.DEFAULT_TEMPERATURE
-        )
-        self.__delta: float = config.get("delta", self.DEFAULT_DELTA)
-        self.__patient: int = config.get("patient", self.DEFAULT_PATIENT)
+        if v <= 0:
+            raise ValueError("Chunk size must be greater than 0.")
+        return v
 
-    def validate_parameters(self) -> None:
+    @field_validator("max_iteration")
+    def validate_max_iteration(cls, v: int) -> int:
         """
-        Validates the configuration parameters of the HybridChunker to ensure they fall within acceptable ranges.
+        Validates the maximum number of optimization iterations.
 
-        Raises:
-            ValueError: If any of the configuration parameters are outside their
-                allowed ranges, providing a descriptive error message.
+        Args:
+            v (int): Maximum number of iterations.
+
+        Returns:
+            int: Validated maximum number of iterations.
         """
-        if self.update_rate <= 0.0 or self.update_rate > 1.0:
-            raise ValueError(
-                f"Expect update_rate within the range of (0.0, 1.0], got {self.update_rate}."
-            )
+        if v < 1:
+            raise ValueError("Maximum iterations must be at least 1.")
+        return v
 
-        if self.chunk_size <= 0 or self.chunk_size > self.encoder.ctx_length:
-            raise ValueError(
-                f"Expect chunk_size within the range of (0, encoder.ctx_length], got {self.chunk_size}."
-            )
+    @field_validator("min_coverage")
+    def validate_min_coverage(cls, v: float) -> float:
+        """
+        Validates the minimum required coverage of the input text.
 
-        if self.min_coverage <= 0.0 or self.min_coverage > 1.0:
-            raise ValueError(
-                f"Expect min_coverage within the range of (0.0, 1.0], got {self.min_coverage}."
-            )
+        Args:
+            v (float): Minimum coverage.
 
-        if self.temperature < 0.0 or self.temperature > 1.0:
-            raise ValueError(
-                f"Expect temperature within the range of [0.0, 1.0], got {self.temperature}."
-            )
+        Returns:
+            float: Validated minimum coverage.
+        """
+        if not (0.0 < v <= 1.0):
+            raise ValueError("Coverage must be between 0.0 and 1.0.")
+        return v
 
-        if self.delta < 0.0:
-            raise ValueError(f"Expect delta >= 0.0, got {self.delta}.")
+    @field_validator("update_rate")
+    def validate_update_rate(cls, v: float) -> float:
+        """
+        Validates the fraction of chunks updated in each optimization iteration.
 
-        if self.patient < 0 or self.patient > self.max_iteration:
-            raise ValueError(
-                f"Expect patient within the range of [0, max_iteration], got {self.patient}."
-            )
+        Args:
+            v (float): Update rate.
+
+        Returns:
+            float: Validated update rate.
+        """
+        if not (0.0 < v <= 1.0):
+            raise ValueError("Update rate must be between 0.0 and 1.0.")
+        return v
+
+    @field_validator("randomness")
+    def validate_randomness(cls, v: float) -> float:
+        """
+        Validates the randomness factor for chunk updates.
+
+        Args:
+            v (float): Randomness.
+
+        Returns:
+            float: Validated randomness.
+        """
+        if not (0.0 <= v <= 1.0):
+            raise ValueError("Randomness must be between 0.0 and 1.0.")
+        return v
+
+    @field_validator("delta")
+    def validate_delta(cls, v: float) -> float:
+        """
+        Validates the minimum improvement in evaluation score to reset early stopping counter.
+
+        Args:
+            v (float): Delta.
+
+        Returns:
+            float: Validated delta.
+        """
+        if v < 0.0:
+            raise ValueError("Delta must be greater than or equal to 0.0.")
+        return v
+
+    @field_validator("patient")
+    def validate_patient(cls, v: int) -> int:
+        """
+        Validates the number of non-improving iterations before early stopping.
+
+        Args:
+            v (int): Patient.
+
+        Returns:
+            int: Validated patient.
+        """
+        if v < 0:
+            raise ValueError("Patient must be greater than or equal to 0.")
+        return v
 
     def step_forward(
         self, current_grouping: list[tuple[int, int]], N_LINE: int
