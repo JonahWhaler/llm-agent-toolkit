@@ -32,6 +32,7 @@ import logging
 import random
 from functools import lru_cache
 from typing import Optional
+from math import ceil
 
 # External packages
 from pydantic import BaseModel, field_validator
@@ -636,11 +637,15 @@ class HybridChunker:
         section_chunker = SectionChunker()
         sentence_chunker = SentenceChunker()
 
+        # Since the token estimation is not exact, we need to
+        # shrink the chunk size to avoid overflow.
+        shifted_chunk_size: int = ceil(self.config.chunk_size * 0.8)
+
         output: list[str] = []
         temp: str = ""
         for section in section_chunker.split(text):
             est_tc = estimate_token_count(section)
-            if est_tc > self.config.chunk_size:
+            if est_tc > shifted_chunk_size:
                 logger.warning("Content:\n%s", section)
                 sentences = sentence_chunker.split(section)
                 L = len(sentences)
@@ -655,7 +660,7 @@ class HybridChunker:
 
                     splitter = FixedCharacterChunker(
                         FixedCharacterChunkerConfig(
-                            chunk_length=int(self.config.chunk_size * 0.5),
+                            chunk_length=ceil(self.config.chunk_size * 0.25),
                             stride_rate=1.0
                         )
                     )
@@ -663,32 +668,30 @@ class HybridChunker:
                     L = len(sentences)
 
                 # When distributed evenly, every chunks are about chunk_size.
-                # 20 sentences per group
+                g_by_token_count = ceil(est_tc / shifted_chunk_size)
+                # 15 sentences per group
+                g_by_sentence_len = ceil(L / 15)
                 # At least 2 groups
-                G: int = max(
-                    2,
-                    int(est_tc // self.config.chunk_size),
-                    L // 20,
-                )
+                G: int = max(2, g_by_token_count, g_by_sentence_len)
                 grouping = self.find_best_grouping(sentences, G)
                 for g_start, g_end in grouping:
                     g_chunk = reconstruct_chunk_v2(
                         sentences[g_start:g_end], "sentence"
                     )
                     output.append(g_chunk)
-            elif est_tc > self.config.chunk_size * 0.75:
-                if temp:
-                    output.append(temp)
-                    temp = ""
-                output.append(section)
-            elif est_tc + estimate_token_count(temp) > self.config.chunk_size:
-                output.append(temp)
-                temp = section
-            else:
+            elif est_tc + estimate_token_count(temp) < shifted_chunk_size:
+                # Merge with previous section
                 if temp:
                     temp = reconstruct_chunk_v2([temp, section], "section")
                 else:
                     temp = section
+            else:
+                # Add to output
+                if temp:
+                    output.append(temp)
+                    temp = ""
+                output.append(section)
+
         if temp:
             output.append(temp)
 
@@ -767,6 +770,12 @@ class HybridChunker:
         logger.warning("Lines: %d, Groups: %d", L, G)
         logger.warning("======= [%d] =======", iteration)
         logger.warning("Grouping: %s", grouping)
+        within_chunk_size: bool = all_within_chunk_size(
+            lines, grouping, self.config.chunk_size
+        )
+
+        assert within_chunk_size, "All chunks should be within chunk size."
+
         while iteration < self.config.max_iteration:
             score: float = self.eval(lines, grouping, L, True)
             if score - best_score < self.config.delta:
@@ -791,17 +800,27 @@ class HybridChunker:
 
             iteration += 1
             logger.warning("======= [%d] =======", iteration)
-            if random.random() < self.config.randomness:
+            if score != best_score and random.random() < self.config.randomness:
                 logger.warning("Initializing new random grouping")
                 grouping = initializer.init()
             else:
-                logger.warning("Step forward")
-                grouping = self.step_forward(grouping, L)
+                if not within_chunk_size or coverage < self.config.min_coverage:
+                    logger.warning("Revert to best grouping")
+                    grouping = best_grouping[:]
+                else:
+                    logger.warning("Step forward")
+                    grouping = self.step_forward(grouping, L)
             logger.warning("Grouping: %s", grouping)
 
         score: float = self.eval(lines, grouping, L, True)
         coverage: float = ChunkerMetrics.calculate_coverage(L, grouping)
-        if score > best_score and coverage >= self.config.min_coverage:
+        within_chunk_size: bool = all_within_chunk_size(
+            lines, grouping, self.config.chunk_size
+        )
+        if (
+            score > best_score and coverage >= self.config.min_coverage
+            and within_chunk_size
+        ):
             best_score = score
             best_grouping = grouping[:]
             logger.warning("Improved! Score: %.4f.", score)
@@ -811,26 +830,6 @@ class HybridChunker:
         logger.warning("Best Grouping: %s", best_grouping)
         logger.warning("[END] find_best_grouping")
         return best_grouping
-
-    @staticmethod
-    def reconstruct_chunk_v2(partial_chunk: list[str], level: str) -> str:
-        """
-        Reconstructs a text chunk from a list of text units.
-
-        The reconstruction method depends on the specified level (e.g., "section"
-        or "sentence").
-
-        Args:
-            partial_chunk (List[str]): A list of text units.
-            level (str): The level of text unit ("section" or "sentence").
-
-        Returns:
-            output (str): 
-            The reconstructed text chunk.
-        """
-        if level == "section":
-            return "\n\n".join([chunk.strip() for chunk in partial_chunk])
-        return " ".join([chunk.strip() for chunk in partial_chunk])
 
 
 class AsyncHybridChunker:
@@ -1280,11 +1279,15 @@ class AsyncHybridChunker:
         section_chunker = SectionChunker()
         sentence_chunker = SentenceChunker()
 
+        # Since the token estimation is not exact, we need to
+        # shrink the chunk size to avoid overflow.
+        shifted_chunk_size: int = ceil(self.config.chunk_size * 0.8)
+
         output: list[str] = []
         temp: str = ""
         for section in section_chunker.split(text):
             est_tc = estimate_token_count(section)
-            if est_tc > self.config.chunk_size:
+            if est_tc > shifted_chunk_size:
                 logger.warning("Content:\n%s", section)
                 sentences = sentence_chunker.split(section)
                 L = len(sentences)
@@ -1299,7 +1302,7 @@ class AsyncHybridChunker:
 
                     splitter = FixedCharacterChunker(
                         FixedCharacterChunkerConfig(
-                            chunk_length=int(self.config.chunk_size * 0.5),
+                            chunk_length=int(self.config.chunk_size * 0.25),
                             stride_rate=1.0
                         )
                     )
@@ -1307,32 +1310,29 @@ class AsyncHybridChunker:
                     L = len(sentences)
 
                 # When distributed evenly, every chunks are about chunk_size.
-                # 20 sentences per group
+                g_by_token_count = ceil(est_tc / shifted_chunk_size)
+                # 15 sentences per group
+                g_by_sentence_len = ceil(L / 15)
                 # At least 2 groups
-                G: int = max(
-                    2,
-                    int(est_tc // self.config.chunk_size),
-                    L // 20,
-                )
+                G: int = max(2, g_by_token_count, g_by_sentence_len)
                 grouping = await self.find_best_grouping(sentences, G)
                 for g_start, g_end in grouping:
                     g_chunk = reconstruct_chunk_v2(
                         sentences[g_start:g_end], "sentence"
                     )
                     output.append(g_chunk)
-            elif est_tc > self.config.chunk_size * 0.75:
-                if temp:
-                    output.append(temp)
-                    temp = ""
-                output.append(section)
-            elif est_tc + estimate_token_count(temp) > self.config.chunk_size:
-                output.append(temp)
-                temp = section
-            else:
+            elif est_tc + estimate_token_count(temp) < shifted_chunk_size:
+                # Merge with previous section
                 if temp:
                     temp = reconstruct_chunk_v2([temp, section], "section")
                 else:
                     temp = section
+            else:
+                # Add to output
+                if temp:
+                    output.append(temp)
+                    temp = ""
+                output.append(section)
         if temp:
             output.append(temp)
 
@@ -1411,6 +1411,12 @@ class AsyncHybridChunker:
         logger.warning("Lines: %d, Groups: %d", L, G)
         logger.warning("======= [%d] =======", iteration)
         logger.warning("Grouping: %s", grouping)
+        within_chunk_size: bool = all_within_chunk_size(
+            lines, grouping, self.config.chunk_size
+        )
+
+        assert within_chunk_size, "All chunks should be within chunk size."
+
         while iteration < self.config.max_iteration:
             score: float = await self.eval(lines, grouping, L, True)
             if score - best_score < self.config.delta:
@@ -1435,15 +1441,19 @@ class AsyncHybridChunker:
 
             iteration += 1
             logger.warning("======= [%d] =======", iteration)
-            if random.random() < self.config.randomness:
+            if score != best_score and random.random() < self.config.randomness:
                 logger.warning("Initializing new random grouping")
                 grouping = initializer.init()
             else:
-                logger.warning("Step forward")
-                grouping = self.step_forward(grouping, L)
+                if not within_chunk_size or coverage < self.config.min_coverage:
+                    logger.warning("Revert to best grouping")
+                    grouping = best_grouping[:]
+                else:
+                    logger.warning("Step forward")
+                    grouping = self.step_forward(grouping, L)
             logger.warning("Grouping: %s", grouping)
 
-        score: float = self.eval(lines, grouping, L, True)
+        score: float = await self.eval(lines, grouping, L, True)
         coverage: float = ChunkerMetrics.calculate_coverage(L, grouping)
         within_chunk_size: bool = all_within_chunk_size(
             lines, grouping, self.config.chunk_size

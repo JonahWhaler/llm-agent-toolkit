@@ -145,13 +145,13 @@ class RandomInitializer:
                     index = random.randint(0, self.k - 1)
                     init_list[index] += 1
                 break    # All remaining capacity has been distributed
-            # Randomly decide how much to add to each chunk in this iteration
-            new_growth = [random.randint(1, even_size) for _ in range(self.k)]
+
             # Add the new growth to each chunk's size
             for index in range(self.k):
-                init_list[index] += new_growth[index]
+                # Randomly decide how much to add to each chunk in this iteration
+                init_list[index] += random.randint(1, even_size)
             # Decrease the remaining capacity by the total allocated in this iteration
-            remainer -= sum(new_growth)
+            remainer = self.total_capacity - sum(init_list)
 
         offset = 0
         output_list: list[tuple[int, int]] = []    # type: ignore
@@ -175,5 +175,6 @@ class Splitter(Protocol):
 
 @runtime_checkable
 class AsyncSplitter(Protocol):
+
     async def split(self, long_text: str) -> list[str]:
         ...
