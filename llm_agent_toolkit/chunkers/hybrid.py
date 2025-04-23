@@ -32,6 +32,7 @@ import logging
 import random
 from functools import lru_cache
 from typing import Optional
+from math import ceil
 
 # External packages
 from pydantic import BaseModel, field_validator
@@ -678,19 +679,19 @@ class HybridChunker:
                         sentences[g_start:g_end], "sentence"
                     )
                     output.append(g_chunk)
-            elif est_tc > self.config.chunk_size * 0.75:
-                if temp:
-                    output.append(temp)
-                    temp = ""
-                output.append(section)
-            elif est_tc + estimate_token_count(temp) > self.config.chunk_size:
-                output.append(temp)
-                temp = section
-            else:
+            elif est_tc + estimate_token_count(temp) < shifted_chunk_size:
+                # Merge with previous section
                 if temp:
                     temp = reconstruct_chunk_v2([temp, section], "section")
                 else:
                     temp = section
+            else:
+                # Add to output
+                if temp:
+                    output.append(temp)
+                    temp = ""
+                output.append(section)
+
         if temp:
             output.append(temp)
 
@@ -1320,19 +1321,18 @@ class AsyncHybridChunker:
                         sentences[g_start:g_end], "sentence"
                     )
                     output.append(g_chunk)
-            elif est_tc > self.config.chunk_size * 0.75:
-                if temp:
-                    output.append(temp)
-                    temp = ""
-                output.append(section)
-            elif est_tc + estimate_token_count(temp) > self.config.chunk_size:
-                output.append(temp)
-                temp = section
-            else:
+            elif est_tc + estimate_token_count(temp) < shifted_chunk_size:
+                # Merge with previous section
                 if temp:
                     temp = reconstruct_chunk_v2([temp, section], "section")
                 else:
                     temp = section
+            else:
+                # Add to output
+                if temp:
+                    output.append(temp)
+                    temp = ""
+                output.append(section)
         if temp:
             output.append(temp)
 
