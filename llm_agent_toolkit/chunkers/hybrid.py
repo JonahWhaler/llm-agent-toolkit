@@ -66,22 +66,8 @@ class HybridChunkerConfig(BaseModel):
     delta: float = 0.0001
     patient: int = 5
 
-    @field_validator("n_chunk")
-    def validate_n_chunk(cls, v: int) -> int:
-        """
-        Validates the number of chunks to create.
-
-        Args:
-            v (int): Number of chunks.
-
-        Returns:
-            int: Validated number of chunks.
-        """
-        if v < 1:
-            raise ValueError("Number of chunks must be at least 1.")
-        return v
-
     @field_validator("chunk_size")
+    @classmethod
     def validate_chunk_size(cls, v: int) -> int:
         """
         Validates the maximum number of tokens per chunk.
@@ -97,6 +83,7 @@ class HybridChunkerConfig(BaseModel):
         return v
 
     @field_validator("max_iteration")
+    @classmethod
     def validate_max_iteration(cls, v: int) -> int:
         """
         Validates the maximum number of optimization iterations.
@@ -112,6 +99,7 @@ class HybridChunkerConfig(BaseModel):
         return v
 
     @field_validator("min_coverage")
+    @classmethod
     def validate_min_coverage(cls, v: float) -> float:
         """
         Validates the minimum required coverage of the input text.
@@ -127,6 +115,7 @@ class HybridChunkerConfig(BaseModel):
         return v
 
     @field_validator("update_rate")
+    @classmethod
     def validate_update_rate(cls, v: float) -> float:
         """
         Validates the fraction of chunks updated in each optimization iteration.
@@ -142,6 +131,7 @@ class HybridChunkerConfig(BaseModel):
         return v
 
     @field_validator("randomness")
+    @classmethod
     def validate_randomness(cls, v: float) -> float:
         """
         Validates the randomness factor for chunk updates.
@@ -157,6 +147,7 @@ class HybridChunkerConfig(BaseModel):
         return v
 
     @field_validator("delta")
+    @classmethod
     def validate_delta(cls, v: float) -> float:
         """
         Validates the minimum improvement in evaluation score to reset early stopping counter.
@@ -172,6 +163,7 @@ class HybridChunkerConfig(BaseModel):
         return v
 
     @field_validator("patient")
+    @classmethod
     def validate_patient(cls, v: int) -> int:
         """
         Validates the number of non-improving iterations before early stopping.
@@ -442,12 +434,8 @@ class HybridChunker:
 
             group_cohesion: float = 0.0
             for vi in range(g_start, g_end - 1):
-                a_text = reconstruct_chunk_v2(
-                    lines[g_start:vi + 1], "sentence"
-                )
-                b_text = reconstruct_chunk_v2(
-                    lines[vi + 1:g_end], "sentence"
-                )
+                a_text = reconstruct_chunk_v2(lines[g_start:vi + 1], "sentence")
+                b_text = reconstruct_chunk_v2(lines[vi + 1:g_end], "sentence")
                 part_a_embedding = self.str_to_embedding(a_text)
                 part_b_embedding = self.str_to_embedding(b_text)
 
@@ -513,15 +501,11 @@ class HybridChunker:
         inter_group_cohesion: float = 0
         for i in range(n_groups - 1):
             i_start, i_end = grouping[i]
-            i_line = reconstruct_chunk_v2(
-                lines[i_start:i_end], "sentence"
-            )
+            i_line = reconstruct_chunk_v2(lines[i_start:i_end], "sentence")
             i_embedding = self.str_to_embedding(i_line)
             for j in range(i + 1, n_groups):
                 j_start, j_end = grouping[j]
-                j_line = reconstruct_chunk_v2(
-                    lines[j_start:j_end], "sentence"
-                )
+                j_line = reconstruct_chunk_v2(lines[j_start:j_end], "sentence")
                 j_embedding = self.str_to_embedding(j_line)
                 cosine_similarity = self.calculate_cosine_similarity(
                     i_embedding, j_embedding
@@ -575,9 +559,7 @@ class HybridChunker:
         """
         overflow: float = 0.0
         for g_start, g_end in grouping:
-            g_line = reconstruct_chunk_v2(
-                lines[g_start:g_end], "sentence"
-            )
+            g_line = reconstruct_chunk_v2(lines[g_start:g_end], "sentence")
             g_overflow = max(
                 0.0,
                 estimate_token_count(g_line) / self.config.chunk_size - 1.0
@@ -704,9 +686,7 @@ class HybridChunker:
                 temp = section
             else:
                 if temp:
-                    temp = reconstruct_chunk_v2(
-                        [temp, section], "section"
-                    )
+                    temp = reconstruct_chunk_v2([temp, section], "section")
                 else:
                     temp = section
         if temp:
@@ -714,7 +694,12 @@ class HybridChunker:
 
         logger.warning("[END] split")
 
-        if any([estimate_token_count(line) > self.config.chunk_size for line in output]):
+        if any(
+            [
+                estimate_token_count(line) > self.config.chunk_size
+                for line in output
+            ]
+        ):
             logger.warning("Some chunks exceed the chunk size.")
 
         return output
@@ -797,8 +782,7 @@ class HybridChunker:
                 lines, grouping, self.config.chunk_size
             )
             if (
-                score > best_score 
-                and coverage >= self.config.min_coverage 
+                score > best_score and coverage >= self.config.min_coverage
                 and within_chunk_size
             ):
                 best_score = score
@@ -1094,12 +1078,8 @@ class AsyncHybridChunker:
 
             group_cohesion: float = 0.0
             for vi in range(g_start, g_end - 1):
-                a_text = reconstruct_chunk_v2(
-                    lines[g_start:vi + 1], "sentence"
-                )
-                b_text = reconstruct_chunk_v2(
-                    lines[vi + 1:g_end], "sentence"
-                )
+                a_text = reconstruct_chunk_v2(lines[g_start:vi + 1], "sentence")
+                b_text = reconstruct_chunk_v2(lines[vi + 1:g_end], "sentence")
                 part_a_embedding = await self.str_to_embedding(a_text)
                 part_b_embedding = await self.str_to_embedding(b_text)
 
@@ -1165,15 +1145,11 @@ class AsyncHybridChunker:
         inter_group_cohesion: float = 0
         for i in range(n_groups - 1):
             i_start, i_end = grouping[i]
-            i_line = reconstruct_chunk_v2(
-                lines[i_start:i_end], "sentence"
-            )
+            i_line = reconstruct_chunk_v2(lines[i_start:i_end], "sentence")
             i_embedding = await self.str_to_embedding(i_line)
             for j in range(i + 1, n_groups):
                 j_start, j_end = grouping[j]
-                j_line = reconstruct_chunk_v2(
-                    lines[j_start:j_end], "sentence"
-                )
+                j_line = reconstruct_chunk_v2(lines[j_start:j_end], "sentence")
                 j_embedding = await self.str_to_embedding(j_line)
                 cosine_similarity = self.calculate_cosine_similarity(
                     i_embedding, j_embedding
@@ -1227,9 +1203,7 @@ class AsyncHybridChunker:
         """
         overflow: float = 0.0
         for g_start, g_end in grouping:
-            g_line = reconstruct_chunk_v2(
-                lines[g_start:g_end], "sentence"
-            )
+            g_line = reconstruct_chunk_v2(lines[g_start:g_end], "sentence")
             g_overflow = max(
                 0.0,
                 estimate_token_count(g_line) / self.config.chunk_size - 1.0
@@ -1356,9 +1330,7 @@ class AsyncHybridChunker:
                 temp = section
             else:
                 if temp:
-                    temp = reconstruct_chunk_v2(
-                        [temp, section], "section"
-                    )
+                    temp = reconstruct_chunk_v2([temp, section], "section")
                 else:
                     temp = section
         if temp:
@@ -1366,9 +1338,14 @@ class AsyncHybridChunker:
 
         logger.warning("[END] split")
 
-        if any([estimate_token_count(line) > self.config.chunk_size for line in output]):
+        if any(
+            [
+                estimate_token_count(line) > self.config.chunk_size
+                for line in output
+            ]
+        ):
             logger.warning("Some chunks exceed the chunk size.")
-        
+
         return output
 
     def optimize(self, grouping: list[tuple[int, int]],
@@ -1395,7 +1372,7 @@ class AsyncHybridChunker:
         return self.step_forward(grouping, n_line)
 
     async def find_best_grouping(self, lines: list[str],
-                           G: int) -> list[tuple[int, int]]:
+                                 G: int) -> list[tuple[int, int]]:
         """
         Iteratively optimizes the grouping of text units into semantically coherent chunks.
 
@@ -1449,8 +1426,7 @@ class AsyncHybridChunker:
                 lines, grouping, self.config.chunk_size
             )
             if (
-                score > best_score 
-                and coverage >= self.config.min_coverage 
+                score > best_score and coverage >= self.config.min_coverage
                 and within_chunk_size
             ):
                 best_score = score
@@ -1470,11 +1446,10 @@ class AsyncHybridChunker:
         score: float = self.eval(lines, grouping, L, True)
         coverage: float = ChunkerMetrics.calculate_coverage(L, grouping)
         within_chunk_size: bool = all_within_chunk_size(
-                lines, grouping, self.config.chunk_size
+            lines, grouping, self.config.chunk_size
         )
         if (
-            score > best_score 
-            and coverage >= self.config.min_coverage 
+            score > best_score and coverage >= self.config.min_coverage
             and within_chunk_size
         ):
             best_score = score
@@ -1486,4 +1461,3 @@ class AsyncHybridChunker:
         logger.warning("Best Grouping: %s", best_grouping)
         logger.warning("[END] find_best_grouping")
         return best_grouping
-    

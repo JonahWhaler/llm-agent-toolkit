@@ -25,6 +25,7 @@ class FixedCharacterChunkerConfig(BaseModel):
     stride_rate: float = 1.0
 
     @field_validator("chunk_length")
+    @classmethod
     def validate_chunk_size(cls, value: int) -> int:
         if value <= 0:
             raise ValueError(
@@ -33,6 +34,7 @@ class FixedCharacterChunkerConfig(BaseModel):
         return value
 
     @field_validator("stride_rate")
+    @classmethod
     def validate_stride_rate(cls, value: float) -> float:
         if value <= 0 or value > 1.0:
             raise ValueError(
@@ -103,12 +105,14 @@ class FixedGroupChunkerConfig(BaseModel):
     level: str = "character"
 
     @field_validator("G")
+    @classmethod
     def validate_G(cls, value: int) -> int:
         if value <= 0:
             raise ValueError(f"Expect G to be greater than 0, got {value}.")
         return value
 
     @field_validator("level")
+    @classmethod
     def validate_level(cls, value: str) -> str:
         if value not in ["character", "word"]:
             raise ValueError(
