@@ -636,11 +636,15 @@ class HybridChunker:
         section_chunker = SectionChunker()
         sentence_chunker = SentenceChunker()
 
+        # Since the token estimation is not exact, we need to
+        # shrink the chunk size to avoid overflow.
+        shifted_chunk_size: int = ceil(self.config.chunk_size * 0.8)
+
         output: list[str] = []
         temp: str = ""
         for section in section_chunker.split(text):
             est_tc = estimate_token_count(section)
-            if est_tc > self.config.chunk_size:
+            if est_tc > shifted_chunk_size:
                 logger.warning("Content:\n%s", section)
                 sentences = sentence_chunker.split(section)
                 L = len(sentences)
@@ -1268,11 +1272,15 @@ class AsyncHybridChunker:
         section_chunker = SectionChunker()
         sentence_chunker = SentenceChunker()
 
+        # Since the token estimation is not exact, we need to
+        # shrink the chunk size to avoid overflow.
+        shifted_chunk_size: int = ceil(self.config.chunk_size * 0.8)
+
         output: list[str] = []
         temp: str = ""
         for section in section_chunker.split(text):
             est_tc = estimate_token_count(section)
-            if est_tc > self.config.chunk_size:
+            if est_tc > shifted_chunk_size:
                 logger.warning("Content:\n%s", section)
                 sentences = sentence_chunker.split(section)
                 L = len(sentences)
