@@ -34,7 +34,7 @@ def reconstruct_chunk(partial_chunk: list[str]) -> str:
 
 
 def reconstruct_chunk_v2(partial_chunk: list[str], level: str) -> str:
-        """
+    """
         Reconstructs a text chunk from a list of text units.
 
         The reconstruction method depends on the specified level (e.g., "section"
@@ -48,9 +48,9 @@ def reconstruct_chunk_v2(partial_chunk: list[str], level: str) -> str:
             output (str): 
             The reconstructed text chunk.
         """
-        if level == "section":
-            return "\n\n".join([chunk.strip() for chunk in partial_chunk])
-        return " ".join([chunk.strip() for chunk in partial_chunk])
+    if level == "section":
+        return "\n\n".join([chunk.strip() for chunk in partial_chunk])
+    return " ".join([chunk.strip() for chunk in partial_chunk])
 
 
 def estimate_token_count(text: str) -> int:
@@ -69,7 +69,9 @@ def estimate_token_count(text: str) -> int:
     return ceil(len(text) * 0.6)
 
 
-def all_within_chunk_size(lines: list[str], grouping: list[tuple[int, int]], chunk_size: int) -> bool:
+def all_within_chunk_size(
+    lines: list[str], grouping: list[tuple[int, int]], chunk_size: int
+) -> bool:
     """
     Check if all chunks in the grouping are within the specified chunk size.
 
