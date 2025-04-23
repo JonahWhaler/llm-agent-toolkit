@@ -769,6 +769,12 @@ class HybridChunker:
         logger.warning("Lines: %d, Groups: %d", L, G)
         logger.warning("======= [%d] =======", iteration)
         logger.warning("Grouping: %s", grouping)
+        within_chunk_size: bool = all_within_chunk_size(
+            lines, grouping, self.config.chunk_size
+        )
+
+        assert within_chunk_size, "All chunks should be within chunk size."
+
         while iteration < self.config.max_iteration:
             score: float = self.eval(lines, grouping, L, True)
             if score - best_score < self.config.delta:
@@ -1405,6 +1411,12 @@ class AsyncHybridChunker:
         logger.warning("Lines: %d, Groups: %d", L, G)
         logger.warning("======= [%d] =======", iteration)
         logger.warning("Grouping: %s", grouping)
+        within_chunk_size: bool = all_within_chunk_size(
+            lines, grouping, self.config.chunk_size
+        )
+
+        assert within_chunk_size, "All chunks should be within chunk size."
+
         while iteration < self.config.max_iteration:
             score: float = await self.eval(lines, grouping, L, True)
             if score - best_score < self.config.delta:
