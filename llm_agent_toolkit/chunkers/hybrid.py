@@ -659,7 +659,7 @@ class HybridChunker:
 
                     splitter = FixedCharacterChunker(
                         FixedCharacterChunkerConfig(
-                            chunk_length=int(self.config.chunk_size * 0.5),
+                            chunk_length=ceil(self.config.chunk_size * 0.25),
                             stride_rate=1.0
                         )
                     )
@@ -1295,7 +1295,7 @@ class AsyncHybridChunker:
 
                     splitter = FixedCharacterChunker(
                         FixedCharacterChunkerConfig(
-                            chunk_length=int(self.config.chunk_size * 0.5),
+                            chunk_length=int(self.config.chunk_size * 0.25),
                             stride_rate=1.0
                         )
                     )
