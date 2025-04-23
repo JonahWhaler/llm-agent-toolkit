@@ -1,3 +1,4 @@
+import logging
 import charade
 from math import ceil
 
@@ -80,10 +81,15 @@ def all_within_chunk_size(lines: list[str], grouping: list[tuple[int, int]], chu
     Returns:
         bool: True if all chunks are within the specified chunk size, False otherwise.
     """
+    logger = logging.getLogger(__name__)
+
     for g_start, g_end in grouping:
         g_line = reconstruct_chunk_v2(lines[g_start:g_end], level="sentence")
-
-        if estimate_token_count(g_line) > chunk_size:
+        g_tc = estimate_token_count(g_line)
+        if g_tc > chunk_size:
+            logger.warning(
+                f"Chunk {g_start}-{g_end} exceeds chunk size: {g_tc} > {chunk_size}"
+            )
             return False
-        
+
     return True
