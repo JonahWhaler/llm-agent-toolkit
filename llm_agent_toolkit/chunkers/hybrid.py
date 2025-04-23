@@ -663,13 +663,11 @@ class HybridChunker:
                     L = len(sentences)
 
                 # When distributed evenly, every chunks are about chunk_size.
-                # 20 sentences per group
+                g_by_token_count = ceil(est_tc / shifted_chunk_size)
+                # 15 sentences per group
+                g_by_sentence_len = ceil(L / 15)
                 # At least 2 groups
-                G: int = max(
-                    2,
-                    int(est_tc // self.config.chunk_size),
-                    L // 20,
-                )
+                G: int = max(2, g_by_token_count, g_by_sentence_len)
                 grouping = self.find_best_grouping(sentences, G)
                 for g_start, g_end in grouping:
                     g_chunk = reconstruct_chunk_v2(
@@ -1297,13 +1295,11 @@ class AsyncHybridChunker:
                     L = len(sentences)
 
                 # When distributed evenly, every chunks are about chunk_size.
-                # 20 sentences per group
+                g_by_token_count = ceil(est_tc / shifted_chunk_size)
+                # 15 sentences per group
+                g_by_sentence_len = ceil(L / 15)
                 # At least 2 groups
-                G: int = max(
-                    2,
-                    int(est_tc // self.config.chunk_size),
-                    L // 20,
-                )
+                G: int = max(2, g_by_token_count, g_by_sentence_len)
                 grouping = await self.find_best_grouping(sentences, G)
                 for g_start, g_end in grouping:
                     g_chunk = reconstruct_chunk_v2(
