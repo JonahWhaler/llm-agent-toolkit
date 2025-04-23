@@ -791,12 +791,16 @@ class HybridChunker:
 
             iteration += 1
             logger.warning("======= [%d] =======", iteration)
-            if random.random() < self.config.randomness:
+            if score != best_score and random.random() < self.config.randomness:
                 logger.warning("Initializing new random grouping")
                 grouping = initializer.init()
             else:
-                logger.warning("Step forward")
-                grouping = self.step_forward(grouping, L)
+                if not within_chunk_size or coverage < self.config.min_coverage:
+                    logger.warning("Revert to best grouping")
+                    grouping = best_grouping[:]
+                else:
+                    logger.warning("Step forward")
+                    grouping = self.step_forward(grouping, L)
             logger.warning("Grouping: %s", grouping)
 
         score: float = self.eval(lines, grouping, L, True)
@@ -1421,12 +1425,16 @@ class AsyncHybridChunker:
 
             iteration += 1
             logger.warning("======= [%d] =======", iteration)
-            if random.random() < self.config.randomness:
+            if score != best_score and random.random() < self.config.randomness:
                 logger.warning("Initializing new random grouping")
                 grouping = initializer.init()
             else:
-                logger.warning("Step forward")
-                grouping = self.step_forward(grouping, L)
+                if not within_chunk_size or coverage < self.config.min_coverage:
+                    logger.warning("Revert to best grouping")
+                    grouping = best_grouping[:]
+                else:
+                    logger.warning("Step forward")
+                    grouping = self.step_forward(grouping, L)
             logger.warning("Grouping: %s", grouping)
 
         score: float = await self.eval(lines, grouping, L, True)
