@@ -67,6 +67,7 @@ class HybridChunkerConfig(BaseModel):
     patient: int = 5
 
     @field_validator("chunk_size")
+    @classmethod
     def validate_chunk_size(cls, v: int) -> int:
         """
         Validates the maximum number of tokens per chunk.
@@ -82,6 +83,7 @@ class HybridChunkerConfig(BaseModel):
         return v
 
     @field_validator("max_iteration")
+    @classmethod
     def validate_max_iteration(cls, v: int) -> int:
         """
         Validates the maximum number of optimization iterations.
@@ -97,6 +99,7 @@ class HybridChunkerConfig(BaseModel):
         return v
 
     @field_validator("min_coverage")
+    @classmethod
     def validate_min_coverage(cls, v: float) -> float:
         """
         Validates the minimum required coverage of the input text.
@@ -112,6 +115,7 @@ class HybridChunkerConfig(BaseModel):
         return v
 
     @field_validator("update_rate")
+    @classmethod
     def validate_update_rate(cls, v: float) -> float:
         """
         Validates the fraction of chunks updated in each optimization iteration.
@@ -127,6 +131,7 @@ class HybridChunkerConfig(BaseModel):
         return v
 
     @field_validator("randomness")
+    @classmethod
     def validate_randomness(cls, v: float) -> float:
         """
         Validates the randomness factor for chunk updates.
@@ -142,6 +147,7 @@ class HybridChunkerConfig(BaseModel):
         return v
 
     @field_validator("delta")
+    @classmethod
     def validate_delta(cls, v: float) -> float:
         """
         Validates the minimum improvement in evaluation score to reset early stopping counter.
@@ -157,6 +163,7 @@ class HybridChunkerConfig(BaseModel):
         return v
 
     @field_validator("patient")
+    @classmethod
     def validate_patient(cls, v: int) -> int:
         """
         Validates the number of non-improving iterations before early stopping.

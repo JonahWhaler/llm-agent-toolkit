@@ -33,36 +33,42 @@ class SemanticChunkerConfig(BaseModel):
     randomness: float = 0.2
 
     @field_validator("n_chunk")
+    @classmethod
     def validate_n_chunk(cls, value: int) -> int:    # pylint: disable=no-self-argument
         if value <= 0:
             raise ValueError("n_chunk must be greater than 0")
         return value
 
     @field_validator("chunk_size")
+    @classmethod
     def validate_chunk_size(cls, value: int) -> int:    # pylint: disable=no-self-argument
         if value <= 0:
             raise ValueError("K must be greater than 0")
         return value
 
     @field_validator("update_rate")
+    @classmethod
     def validate_update_rate(cls, value: float) -> float:    # pylint: disable=no-self-argument
         if value < 0 or value > 1:
             raise ValueError("update_rate must be between 0 and 1")
         return value
 
     @field_validator("min_coverage")
+    @classmethod
     def validate_min_coverage(cls, value: float) -> float:    # pylint: disable=no-self-argument
         if value < 0 or value > 1:
             raise ValueError("min_coverage must be between 0 and 1")
         return value
 
     @field_validator("max_iteration")
+    @classmethod
     def validate_max_iteration(cls, value: int) -> int:    # pylint: disable=no-self-argument
         if value < 1:
             raise ValueError("max_iteration must be at least 1")
         return value
 
     @field_validator("randomness")
+    @classmethod
     def validate_randomness(cls, value: float) -> float:    # pylint: disable=no-self-argument
         if value < 0 or value > 1:
             raise ValueError("randomness must be between 0 and 1")
@@ -408,10 +414,11 @@ class SemanticChunker:
         while iteration < self.config.max_iteration:
             score = self.eval(embeddings, grouping, n_part, True)
             coverage = ChunkerMetrics.calculate_coverage(n_part, grouping)
-            within_chunk_size: bool = all_within_chunk_size(parts, grouping, self.config.chunk_size)
+            within_chunk_size: bool = all_within_chunk_size(
+                parts, grouping, self.config.chunk_size
+            )
             if (
-                score > best_score 
-                and coverage >= self.config.min_coverage
+                score > best_score and coverage >= self.config.min_coverage
                 and within_chunk_size
             ):
                 best_score = score
@@ -630,7 +637,7 @@ class AsyncSemanticChunker:
         )
 
     async def _encode(self, lines: list[str], start: int,
-                end: int) -> tuple[list[float], int]:
+                      end: int) -> tuple[list[float], int]:
         """Cached encoding.
 
         Args:
@@ -796,8 +803,7 @@ class AsyncSemanticChunker:
                 lines, grouping, self.config.chunk_size
             )
             if (
-                score > best_score 
-                and coverage >= self.config.min_coverage
+                score > best_score and coverage >= self.config.min_coverage
                 and within_chunk_size
             ):
                 best_score = score
@@ -833,7 +839,7 @@ class AsyncSemanticChunker:
         logger.warning("Best Grouping: %s", best_grouping)
         logger.warning("[END] find_best_grouping")
         return output
-    
+
 
 # class SimulatedAnnealingSemanticChunker(SemanticChunker):
 #     """
