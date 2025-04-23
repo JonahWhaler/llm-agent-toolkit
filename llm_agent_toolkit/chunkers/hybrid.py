@@ -812,26 +812,6 @@ class HybridChunker:
         logger.warning("[END] find_best_grouping")
         return best_grouping
 
-    @staticmethod
-    def reconstruct_chunk_v2(partial_chunk: list[str], level: str) -> str:
-        """
-        Reconstructs a text chunk from a list of text units.
-
-        The reconstruction method depends on the specified level (e.g., "section"
-        or "sentence").
-
-        Args:
-            partial_chunk (List[str]): A list of text units.
-            level (str): The level of text unit ("section" or "sentence").
-
-        Returns:
-            output (str): 
-            The reconstructed text chunk.
-        """
-        if level == "section":
-            return "\n\n".join([chunk.strip() for chunk in partial_chunk])
-        return " ".join([chunk.strip() for chunk in partial_chunk])
-
 
 class AsyncHybridChunker:
     """
