@@ -1429,7 +1429,7 @@ class AsyncHybridChunker:
                 grouping = self.step_forward(grouping, L)
             logger.warning("Grouping: %s", grouping)
 
-        score: float = self.eval(lines, grouping, L, True)
+        score: float = await self.eval(lines, grouping, L, True)
         coverage: float = ChunkerMetrics.calculate_coverage(L, grouping)
         within_chunk_size: bool = all_within_chunk_size(
             lines, grouping, self.config.chunk_size
