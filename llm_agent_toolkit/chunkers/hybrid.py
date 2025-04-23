@@ -801,7 +801,13 @@ class HybridChunker:
 
         score: float = self.eval(lines, grouping, L, True)
         coverage: float = ChunkerMetrics.calculate_coverage(L, grouping)
-        if score > best_score and coverage >= self.config.min_coverage:
+        within_chunk_size: bool = all_within_chunk_size(
+            lines, grouping, self.config.chunk_size
+        )
+        if (
+            score > best_score and coverage >= self.config.min_coverage
+            and within_chunk_size
+        ):
             best_score = score
             best_grouping = grouping[:]
             logger.warning("Improved! Score: %.4f.", score)
