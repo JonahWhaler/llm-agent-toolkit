@@ -30,9 +30,11 @@ Configurable parameters (via `config` dict):
 
 import logging
 import random
+import time
 from functools import lru_cache
 from typing import Optional
 from math import ceil
+from hashlib import md5
 
 # External packages
 from pydantic import BaseModel, field_validator
@@ -838,6 +840,11 @@ class AsyncHybridChunker:
 
     Fundamentally similar with `HybridChunker`, excepts calling any method that
     generates embeddings asynchronously.
+
+    **Embedding Cache**:
+    - **Data Structure**: Dictionary that stores the text and its corresponding embedding vector. 
+    - **Parameters**: Expiration time is set to 30 minutes, maximum size is set to 512.
+    - **X Thread-Safe**: The cache is not thread-safe!!!
     """
 
     DEFAULT_UPDATE_RATE: float = 0.5
@@ -849,6 +856,8 @@ class AsyncHybridChunker:
     DEFAULT_PATIENT: int = 5
 
     C: int = 2
+    CACHE_EXPIRATION: int = 30 * 60    # 30 minutes
+    CACHE_MAX_SIZE: int = 512
 
     def __init__(
         self,
@@ -864,6 +873,7 @@ class AsyncHybridChunker:
         """
         self.__encoder = encoder
         self.__config = config
+        self.__e_cache: dict[str, tuple[list[float], float]] = {}
 
     @property
     def encoder(self) -> Encoder:
@@ -973,13 +983,57 @@ class AsyncHybridChunker:
             similarity = 0
         return similarity
 
-    @lru_cache(maxsize=512)
+    def __update_cache(self, key: str, value: list[float]):
+        self.__e_cache[key] = (value, time.time())
+
+        # Clean up the cache
+        # Remove expired items
+        for key in list(self.__e_cache.keys()):
+            value_tuple = self.__e_cache[key]
+            if time.time() - value_tuple[1] > self.CACHE_EXPIRATION:
+                del self.__e_cache[key]
+
+        # Remove the oldest item if the cache exceeds the max size
+        keys = list(self.__e_cache.keys())
+        if len(keys) > self.CACHE_MAX_SIZE:
+            keys.sort(key=lambda k: self.__e_cache[k][1])
+            del self.__e_cache[keys[0]]
+
+    def __query_cache(self, key: str) -> Optional[list[float]]:
+        """
+        Queries the cache for a given key.
+
+        Args:
+            key (str): The key to query in the cache.
+
+        Returns:
+            embeddings (Optional[list[float]]):
+            The embedding vector associated with the key if found and not expired,
+            otherwise None.
+
+        Notes:
+        - If the key is found, checks whether the item has expired.
+        - If the item has expired, remove it from the cache and return None.
+        """
+        if key in self.__e_cache:
+            value_tuple = self.__e_cache[key]
+            if value_tuple[1] + self.CACHE_EXPIRATION < time.time():
+                # Expired
+                del self.__e_cache[key]
+                return None
+
+            value_tuple = (value_tuple[0], time.time())
+            self.__e_cache[key] = value_tuple
+            return value_tuple[0]
+
+        return None
+
     async def str_to_embedding(self, text: str) -> list[float]:
         """
         Encodes a text string into its embedding vector using the encoder.
 
-        This method uses memoization (lru_cache) to reduce redundant encoding of the
-        same text.
+        This method use custom cache to reduce redundant encoding of the
+        same text. 
 
         Args:
             text (str): The text string to encode.
@@ -987,7 +1041,12 @@ class AsyncHybridChunker:
         Returns:
             out (List[float]): The embedding vector of the text.
         """
-        return await self.__encoder.encode_async(text)
+        key = md5(text.encode()).hexdigest()
+        embeddings = self.__query_cache(key)
+        if embeddings is None:
+            embeddings = await self.encoder.encode_async(text)
+            self.__update_cache(key, embeddings)
+        return embeddings
 
     async def eval(self, *args) -> float:
         """
