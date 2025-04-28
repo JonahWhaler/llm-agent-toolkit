@@ -649,6 +649,10 @@ class HybridChunker:
         for section in section_chunker.split(text):
             est_tc = estimate_token_count(section)
             if est_tc > shifted_chunk_size:
+                if temp:
+                    output.append(temp)
+                    temp = ""
+
                 logger.warning("Content:\n%s", section)
                 sentences = sentence_chunker.split(section)
                 L = len(sentences)
@@ -1351,6 +1355,10 @@ class AsyncHybridChunker:
         for section in section_chunker.split(text):
             est_tc = estimate_token_count(section)
             if est_tc > shifted_chunk_size:
+                if temp:
+                    output.append(temp)
+                    temp = ""
+
                 logger.warning("Content:\n%s", section)
                 sentences = sentence_chunker.split(section)
                 L = len(sentences)
