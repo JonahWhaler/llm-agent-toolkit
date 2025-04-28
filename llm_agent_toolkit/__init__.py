@@ -14,7 +14,7 @@ from ._util import (
     TokenUsage,
 )
 
-from ._chunkers import Splitter, ChunkerMetrics, RandomInitializer, UniformInitializer
+from ._chunkers import Splitter, ChunkerMetrics, RandomInitializer, UniformInitializer, AsyncSplitter
 from ._core import Core, ToolSupport, ImageInterpreter
 from ._memory import VectorMemory, ShortTermMemory, AsyncVectorMemory
 from ._encoder import Encoder
@@ -46,6 +46,7 @@ __all__ = [
     "CreatorRole",
     "MessageBlock",
     "Splitter",
+    "AsyncSplitter",
     "ChunkerMetrics",
     "RandomInitializer",
     "UniformInitializer",
