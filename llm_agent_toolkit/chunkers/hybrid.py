@@ -209,6 +209,7 @@ class HybridChunker:
     DEFAULT_PATIENT: int = 5
 
     C: int = 2
+    N_SENTENCE_PER_GROUP: int = 25
 
     def __init__(
         self,
@@ -671,8 +672,10 @@ class HybridChunker:
 
                 # When distributed evenly, every chunks are about chunk_size.
                 g_by_token_count = ceil(est_tc / shifted_chunk_size)
-                # 15 sentences per group
-                g_by_sentence_len = ceil(L / 15)
+                # N_SENTENCE_PER_GROUP sentences per group
+                g_by_sentence_len = ceil(
+                    L / AsyncHybridChunker.N_SENTENCE_PER_GROUP
+                )
                 # At least 2 groups
                 G: int = max(2, g_by_token_count, g_by_sentence_len)
                 grouping = self.find_best_grouping(sentences, G)
@@ -856,6 +859,7 @@ class AsyncHybridChunker:
     DEFAULT_PATIENT: int = 5
 
     C: int = 2
+    N_SENTENCE_PER_GROUP: int = 25
     CACHE_EXPIRATION: int = 30 * 60    # 30 minutes
     CACHE_MAX_SIZE: int = 512
 
@@ -1370,8 +1374,10 @@ class AsyncHybridChunker:
 
                 # When distributed evenly, every chunks are about chunk_size.
                 g_by_token_count = ceil(est_tc / shifted_chunk_size)
-                # 15 sentences per group
-                g_by_sentence_len = ceil(L / 15)
+                # N_SENTENCE_PER_GROUP sentences per group
+                g_by_sentence_len = ceil(
+                    L / AsyncHybridChunker.N_SENTENCE_PER_GROUP
+                )
                 # At least 2 groups
                 G: int = max(2, g_by_token_count, g_by_sentence_len)
                 grouping = await self.find_best_grouping(sentences, G)
