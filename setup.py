@@ -24,7 +24,7 @@ core_dependencies = [
 ]
 transformers_dependencies = [
     "torch==2.6.0",
-    "transformers==4.48.0",
+    "transformers==4.50.0",
 ]
 transcriber_dependencies = [
     "pydub==0.25.1",
