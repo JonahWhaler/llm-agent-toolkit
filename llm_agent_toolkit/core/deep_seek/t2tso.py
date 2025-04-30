@@ -1,10 +1,13 @@
 import os
 import logging
 import json
+import time
+import asyncio
 from typing import Any, Optional, Type, TypeVar
 # from math import ceil
 
 import openai
+from openai import RateLimitError
 from pydantic import BaseModel
 
 from ..._core import Core
@@ -125,7 +128,27 @@ class T2TSO_DS_Core(Core, DeepSeekCore):
                 return [
                     {"role": CreatorRole.ASSISTANT.value, "content": content}
                 ], token_usage
-            raise RuntimeError(f"Content not available. Reason: {choice.finish_reason}")
+        except RateLimitError as rle:
+            logger.warning("RateLimitError: %s", rle)
+            delay: Optional[float] = kwargs.get("delay", None)
+            attempt: Optional[int] = kwargs.get("attempt", None)
+
+            if delay is None:
+                delay = 5.0
+
+            if attempt is None:
+                attempt = 1
+
+            if attempt > 5:
+                logger.warning("Max attempts reached. Raising error.")
+                raise
+
+            warn_msg = f"[{attempt}] Retrying in {delay} seconds..."
+            logger.warning(warn_msg)
+            await asyncio.sleep(delay)
+            _kwargs = kwargs
+            _kwargs.update({"delay": delay * 1.5, "attempt": attempt + 1})
+            return await self.run_async(query, context=context, **_kwargs)
         except Exception as e:
             logger.error("Exception: %s", e, exc_info=True, stack_info=True)
             raise
@@ -206,7 +229,27 @@ class T2TSO_DS_Core(Core, DeepSeekCore):
                 return [
                     {"role": CreatorRole.ASSISTANT.value, "content": content}
                 ], token_usage
-            raise RuntimeError(f"Content not available. Reason: {choice.finish_reason}")
+        except RateLimitError as rle:
+            logger.warning("RateLimitError: %s", rle)
+            delay: Optional[float] = kwargs.get("delay", None)
+            attempt: Optional[int] = kwargs.get("attempt", None)
+
+            if delay is None:
+                delay = 5.0
+
+            if attempt is None:
+                attempt = 1
+
+            if attempt > 5:
+                logger.warning("Max attempts reached. Raising error.")
+                raise
+
+            warn_msg = f"[{attempt}] Retrying in {delay} seconds..."
+            logger.warning(warn_msg)
+            time.sleep(delay)
+            _kwargs = kwargs
+            _kwargs.update({"delay": delay * 1.5, "attempt": attempt + 1})
+            return self.run(query, context=context, **_kwargs)
         except Exception as e:
             logger.error("Exception: %s", e, exc_info=True, stack_info=True)
             raise
