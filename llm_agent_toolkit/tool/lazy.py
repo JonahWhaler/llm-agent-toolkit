@@ -202,9 +202,11 @@ class LazyTool(Tool):
         valid_input, error_msg = self.validate(**j_params)
         if not valid_input and error_msg:
             return error_msg
-        if self.is_coroutine_function:
-            return asyncio.run(self.__function(**j_params))  # type: ignore
-        return self.__function(**j_params)  # type: ignore
+
+        result = self.__function(**j_params)
+        if inspect.isawaitable(result):
+            result = _run_in_new_loop(result)
+        return result    # type: ignore
 
     async def run_async(self, params: str) -> str:
         """
