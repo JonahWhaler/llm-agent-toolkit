@@ -1,8 +1,9 @@
 import os
 import logging
+import time
 import asyncio
 import json
-from typing import Any
+from typing import Any, Optional
 from concurrent.futures import ThreadPoolExecutor
 
 from google import genai
@@ -214,8 +215,26 @@ class T2T_GMN_Core_W_Tool(Core, GeminiCore, ToolSupport):
             output = self.postprocessing(msgs[NUMBER_OF_PRIMERS:])
             return output, token_usage  # Return only the generated messages messages
         except Exception as e:
-            if response:
-                logger.warning("Response: %s", response)
+            if "502 Bad Gateway" in str(e):
+                delay: Optional[float] = kwargs.get("delay", None)
+                attempt: Optional[int] = kwargs.get("attempt", None)
+                if delay is None:
+                    delay = 5.0
+
+                if attempt is None:
+                    attempt = 1
+
+                if attempt > 5:
+                    logger.warning("Max attempts reached. Raising error.")
+                    raise
+
+                warn_msg = f"[{attempt}] Retrying in {delay} seconds..."
+                logger.warning(warn_msg)
+                time.sleep(delay)
+                _kwargs = kwargs
+                _kwargs.update({"delay": delay * 1.5, "attempt": attempt + 1})
+                return self.run(query, context=context, **_kwargs)
+
             logger.error("Exception: %s", e, exc_info=True, stack_info=True)
             raise
 
@@ -336,8 +355,26 @@ class T2T_GMN_Core_W_Tool(Core, GeminiCore, ToolSupport):
             output = self.postprocessing(msgs[NUMBER_OF_PRIMERS:])
             return output, token_usage  # Return only the generated messages messages
         except Exception as e:
-            if response:
-                logger.warning("Response: %s", response)
+            if "502 Bad Gateway" in str(e):
+                delay: Optional[float] = kwargs.get("delay", None)
+                attempt: Optional[int] = kwargs.get("attempt", None)
+                if delay is None:
+                    delay = 5.0
+
+                if attempt is None:
+                    attempt = 1
+
+                if attempt > 5:
+                    logger.warning("Max attempts reached. Raising error.")
+                    raise
+
+                warn_msg = f"[{attempt}] Retrying in {delay} seconds..."
+                logger.warning(warn_msg)
+                time.sleep(delay)
+                _kwargs = kwargs
+                _kwargs.update({"delay": delay * 1.5, "attempt": attempt + 1})
+                return await self.run_async(query, context=context, **_kwargs)
+
             logger.error("Exception: %s", e, exc_info=True, stack_info=True)
             raise
 
