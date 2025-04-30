@@ -1,7 +1,11 @@
 import os
 import logging
-from typing import Any
+import time
+import asyncio
+from typing import Any, Optional
 import openai
+from openai import RateLimitError
+
 from ..._core import Core
 from ..._util import CreatorRole, ChatCompletionConfig, MessageBlock, TokenUsage
 from .base import OpenAICore
@@ -127,6 +131,27 @@ class Reasoning_Core(Core, OpenAICore):
 
             failed_reason = choice.finish_reason
             raise RuntimeError(failed_reason)
+        except RateLimitError as rle:
+            logger.warning("RateLimitError: %s", rle)
+            delay: Optional[float] = kwargs.get("delay", None)
+            attempt: Optional[int] = kwargs.get("attempt", None)
+
+            if delay is None:
+                delay = 5.0
+
+            if attempt is None:
+                attempt = 1
+
+            if attempt > 5:
+                logger.warning("Max attempts reached. Raising error.")
+                raise
+
+            warn_msg = f"[{attempt}] Retrying in {delay} seconds..."
+            logger.warning(warn_msg)
+            await asyncio.sleep(delay)
+            _kwargs = kwargs
+            _kwargs.update({"delay": delay * 1.5, "attempt": attempt + 1})
+            return await self.run_async(query, context=context, **_kwargs)
         except Exception as e:
             logger.error("Exception: %s", e, exc_info=True, stack_info=True)
             raise
@@ -201,6 +226,27 @@ class Reasoning_Core(Core, OpenAICore):
 
             failed_reason = choice.finish_reason
             raise RuntimeError(failed_reason)
+        except RateLimitError as rle:
+            logger.warning("RateLimitError: %s", rle)
+            delay: Optional[float] = kwargs.get("delay", None)
+            attempt: Optional[int] = kwargs.get("attempt", None)
+
+            if delay is None:
+                delay = 5.0
+
+            if attempt is None:
+                attempt = 1
+
+            if attempt > 5:
+                logger.warning("Max attempts reached. Raising error.")
+                raise
+
+            warn_msg = f"[{attempt}] Retrying in {delay} seconds..."
+            logger.warning(warn_msg)
+            time.sleep(delay)
+            _kwargs = kwargs
+            _kwargs.update({"delay": delay * 1.5, "attempt": attempt + 1})
+            return self.run(query, context=context, **_kwargs)
         except Exception as e:
             logger.error("Exception: %s", e, exc_info=True, stack_info=True)
             raise
