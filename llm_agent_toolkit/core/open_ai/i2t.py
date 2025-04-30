@@ -174,7 +174,7 @@ class I2T_OAI_Core(Core, OpenAICore, ImageInterpreter, ToolSupport):
 
                 tool_calls = choice.message.tool_calls
                 if tool_calls:
-                    output, ttku = self.call_tools(tool_calls)
+                    output, ttku = await self.call_tools_async(tool_calls)
                     msgs.extend(output)
                     token_usage += ttku
 
