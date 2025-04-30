@@ -173,7 +173,7 @@ class LazyTool(Tool):
             FunctionInfo:
                 An object containing the function's name, description, and input schema.
         """
-        signature = inspect.signature(function)  # type: ignore
+        signature = inspect.signature(function)    # type: ignore
         parameters = signature.parameters
         ppt = []
         required = []
@@ -255,5 +255,5 @@ class LazyTool(Tool):
             return error_msg
 
         if self.is_coroutine_function:
-            return await self.__function(**j_params)  # type: ignore
-        return self.__function(**j_params)  # type: ignore
+            return await self.__function(**j_params)    # type: ignore
+        return self.__function(**j_params)    # type: ignore
