@@ -1,7 +1,8 @@
-from typing import Any, Callable, Coroutine, Union
+from typing import Any, Awaitable, Callable, Coroutine, Union
 import json
 import asyncio
 import inspect
+import threading
 
 from .._tool import (
     FunctionInfo,
@@ -10,6 +11,23 @@ from .._tool import (
     FunctionParameters,
     Tool,
 )
+
+
+def _run_in_new_loop(coro: Awaitable):
+    """Run the coroutine in its own event loop, in a separate thread."""
+    loop = asyncio.new_event_loop()
+    result_container = {}
+
+    def _target():
+        asyncio.set_event_loop(loop)
+        result_container['result'] = loop.run_until_complete(coro)
+        loop.close()
+
+    t = threading.Thread(target=_target)
+    t.daemon = True
+    t.start()
+    t.join()
+    return result_container.get('result')
 
 
 class LazyTool(Tool):
@@ -35,7 +53,7 @@ class LazyTool(Tool):
         - Enhancing `LazyTool` to parse and utilize docstrings for more comprehensive metadata generation is planned for future work.
 
     **Attributes:**
-    * `__function` (Callable | Coroutine):
+    * `__function` (Callable):
         The Python function that this tool wraps and executes.
 
     * `info` (dict):
@@ -79,7 +97,7 @@ class LazyTool(Tool):
 
     def __init__(
         self,
-        function: Union[Callable[..., Any], Coroutine[Any, Any, str]],
+        function: Callable[..., Union[Any, Coroutine[Any, Any, Any]]],
         is_coroutine_function: bool = False,
     ):
         """
@@ -138,7 +156,9 @@ class LazyTool(Tool):
             return FunctionPropertyType.OBJECT
 
     @classmethod
-    def get_func_info(cls, function: Union[Callable, Coroutine]) -> FunctionInfo:
+    def get_func_info(
+        cls, function: Callable[..., Union[Any, Coroutine[Any, Any, Any]]]
+    ) -> FunctionInfo:
         """
         Generate `FunctionInfo` by analyzing the provided function.
 
