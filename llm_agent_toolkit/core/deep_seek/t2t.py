@@ -133,7 +133,7 @@ class T2T_DS_Core(Core, DeepSeekCore, ToolSupport):
                     tool_calls = choice.message.tool_calls
 
                     if finish_reason == "tool_calls" and tool_calls:
-                        output, ttku = self.call_tools(tool_calls)
+                        output, ttku = await self.call_tools_async(tool_calls)
                         if output:
                             messages.append(choice.message)  # type: ignore
                             messages.extend(output)
