@@ -2,8 +2,9 @@ import os
 import logging
 import time
 import asyncio
+import json
 from typing import Optional
-
+from copy import deepcopy
 import openai
 from openai import RateLimitError
 
@@ -15,8 +16,48 @@ logger = logging.getLogger(__name__)
 
 
 class Reasoner_Core(Core, DeepSeekCore):
-    # https://api-docs.deepseek.com/guides/reasoning_model
+    """
+    `Reasoner_Core` is a concrete implementation of abstract class `Core` and `DeepSeekCore`
+    to provide chat completion capabilities with reasoning support.
+
+    It includes methods for preprocessing input, running asynchronous and synchronous
+    execution, and handling retries with progressive backoff in case of errors.
+
+    Attributes:
+        SUPPORTED_MODELS (str): The name of the supported reasoning model.
+        MAX_ATTEMPT (int): The maximum number of retry attempts for API calls.
+        DELAY_FACTOR (float): The factor by which the delay increases after each retry.
+        MAX_DELAY (float): The maximum delay between retries.
+
+    **Methods**:
+        preprocessing(system_prompt: str, query: str, context: Optional[list[MessageBlock | dict]]) -> list[MessageBlock | dict]:
+            Preprocesses the input messages to be sent to the LLM model, ensuring proper
+            interleaving of user and assistant roles.
+        run_async(query: str, context: list[MessageBlock | dict] | None, **kwargs) -> tuple[list[MessageBlock | dict], TokenUsage]:
+            Asynchronously runs the LLM model with the given query and context, handling
+            retries and token usage.
+        run(query: str, context: list[MessageBlock | dict] | None, **kwargs) -> tuple[list[MessageBlock | dict], TokenUsage]:
+            Synchronously runs the LLM model with the given query and context, handling
+            retries and token usage.
+
+    **Notes**:
+        - The class supports progressive backoff for retrying API calls in case of
+          RateLimitError or other exceptions.
+        - The `include_rc` parameter determines whether reasoning content is included
+          in the output.
+        - config.max_iteration hardcode as 1
+
+    **Constraints**:
+        - **features**:
+            deepseek-reasoner does not support function calling、JSON output
+        - **parameters**:
+            deepseek-reasoner does not accept temperature、top_p、presence_penalty、frequency_penalty、logprobs、top_logprobs
+    """
+
     SUPPORTED_MODELS = "deepseek-reasoner"
+    MAX_ATTEMPT: int = 5
+    DELAY_FACTOR: float = 1.5
+    MAX_DELAY: float = 60.0
 
     def __init__(
         self,
@@ -92,7 +133,6 @@ class Reasoner_Core(Core, DeepSeekCore):
             TokenUsage: The recorded token usage.
 
         Notes:
-        * No system prompt!
         * max_tokens -> max_completion_tokens
         """
         include_rc: bool = kwargs.get("include_rc", True)
@@ -105,70 +145,85 @@ class Reasoner_Core(Core, DeepSeekCore):
         MAX_OUTPUT_TOKENS = min(
             MAX_TOKENS, self.max_output_tokens, self.config.max_output_tokens
         )
-        prompt_token_count = self.calculate_token_count(msgs, tools=None)
-        max_output_tokens = min(
-            MAX_OUTPUT_TOKENS,
-            self.context_length - prompt_token_count,
-        )
 
-        if max_output_tokens <= 0:
-            raise ValueError(
-                f"max_output_tokens <= 0. Prompt token count: {prompt_token_count}"
+        attempt: int = 1
+        delay: float = 5.0
+
+        while attempt < Reasoner_Core.MAX_ATTEMPT:
+            logger.debug("Attempt %d", attempt)
+            messages = deepcopy(msgs)
+            prompt_token_count = self.calculate_token_count(messages, tools=None)
+            max_output_tokens = min(
+                MAX_OUTPUT_TOKENS,
+                self.context_length - prompt_token_count,
             )
 
-        try:
-            client = openai.AsyncOpenAI(
-                api_key=os.environ["DEEPSEEK_API_KEY"],
-                base_url=os.environ["DEEPSEEK_BASE_URL"],
-            )
-            response = await client.chat.completions.create(
-                model=self.model_name,
-                messages=msgs,  # type: ignore
-                max_tokens=max_output_tokens,
-            )
+            if max_output_tokens <= 0:
+                raise ValueError(
+                    f"max_output_tokens <= 0. Prompt token count: {prompt_token_count}"
+                )
 
-            choice = response.choices[0]
-            _content = getattr(choice.message, "content", None)
-            _reasoning_content = getattr(choice.message, "reasoning_content", None)
+            try:
+                client = openai.AsyncOpenAI(
+                    api_key=os.environ["DEEPSEEK_API_KEY"],
+                    base_url=os.environ["DEEPSEEK_BASE_URL"],
+                )
+                response = await client.chat.completions.create(
+                    model=self.model_name,
+                    messages=messages,  # type: ignore
+                    max_tokens=max_output_tokens,
+                )
 
-            token_usage = self.update_usage(response.usage)
-            if _content:
-                response_string = _content
-                if _reasoning_content and include_rc:
-                    response_string = (
-                        f"<REASONING>\n{_reasoning_content}\n</REASONING>\n"
-                        + response_string
+                token_usage = self.update_usage(response.usage)
+
+                choice = response.choices[0]
+                finish_reason = choice.finish_reason
+                content = choice.message.content
+                if finish_reason == "stop" and content:
+                    reasoning_content = getattr(
+                        choice.message, "reasoning_content", None
                     )
-                return [
-                    {"role": CreatorRole.ASSISTANT.value, "content": response_string}
-                ], token_usage
+                    response_string = content
+                    if reasoning_content and include_rc:
+                        response_string = (
+                            f"<REASONING>\n{reasoning_content}\n</REASONING>\n"
+                            + response_string
+                        )
 
-            failed_reason = choice.finish_reason
-            raise RuntimeError(failed_reason)
-        except RateLimitError as rle:
-            logger.warning("RateLimitError: %s", rle)
-            delay: Optional[float] = kwargs.get("delay", None)
-            attempt: Optional[int] = kwargs.get("attempt", None)
+                    output: list[dict | MessageBlock] = [
+                        MessageBlock(
+                            role=CreatorRole.ASSISTANT.value, content=response_string
+                        )
+                    ]
+                    return output, token_usage
 
-            if delay is None:
-                delay = 5.0
+                if finish_reason == "length" and content:
+                    e = {"error": "Early Termination: Length", "text": content}
+                    output: list[dict | MessageBlock] = [
+                        MessageBlock(
+                            role=CreatorRole.ASSISTANT.value,
+                            content=json.dumps(e, ensure_ascii=False),
+                        )
+                    ]
+                    return output, token_usage
 
-            if attempt is None:
-                attempt = 1
-
-            if attempt > 5:
-                logger.warning("Max attempts reached. Raising error.")
+                logger.warning("Malformed response: %s", response)
+                logger.warning("Config: %s", self.config)
+                raise RuntimeError(f"Terminated: {finish_reason}")
+            except RateLimitError as rle:
+                logger.warning("RateLimitError: %s", rle)
+                warn_msg = f"[{attempt}] Retrying in {delay} seconds..."
+                logger.warning(warn_msg)
+                await asyncio.sleep(delay)
+                attempt += 1
+                delay = delay * Reasoner_Core.DELAY_FACTOR
+                delay = min(Reasoner_Core.MAX_DELAY, delay)
+                continue
+            except Exception as e:
+                logger.error("Exception: %s", e, exc_info=True, stack_info=True)
                 raise
 
-            warn_msg = f"[{attempt}] Retrying in {delay} seconds..."
-            logger.warning(warn_msg)
-            await asyncio.sleep(delay)
-            _kwargs = kwargs
-            _kwargs.update({"delay": delay * 1.5, "attempt": attempt + 1})
-            return await self.run_async(query, context=context, **_kwargs)
-        except Exception as e:
-            logger.error("Exception: %s", e, exc_info=True, stack_info=True)
-            raise
+        raise RuntimeError("Max re-attempt reached")
 
     def run(
         self, query: str, context: list[MessageBlock | dict] | None, **kwargs
@@ -187,10 +242,8 @@ class Reasoner_Core(Core, DeepSeekCore):
             TokenUsage: The recorded token usage.
 
         Notes:
-        * No system prompt!
         * max_tokens -> max_completion_tokens
         """
-
         include_rc: bool = kwargs.get("include_rc", True)
         msgs: list[MessageBlock | dict] = self.preprocessing(
             self.system_prompt, query, context
@@ -201,67 +254,82 @@ class Reasoner_Core(Core, DeepSeekCore):
         MAX_OUTPUT_TOKENS = min(
             MAX_TOKENS, self.max_output_tokens, self.config.max_output_tokens
         )
-        prompt_token_count = self.calculate_token_count(msgs, tools=None)
-        max_output_tokens = min(
-            MAX_OUTPUT_TOKENS,
-            self.context_length - prompt_token_count,
-        )
 
-        if max_output_tokens <= 0:
-            raise ValueError(
-                f"max_output_tokens <= 0. Prompt token count: {prompt_token_count}"
+        attempt: int = 1
+        delay: float = 5.0
+
+        while attempt < Reasoner_Core.MAX_ATTEMPT:
+            logger.debug("Attempt %d", attempt)
+            messages = deepcopy(msgs)
+            prompt_token_count = self.calculate_token_count(messages, tools=None)
+            max_output_tokens = min(
+                MAX_OUTPUT_TOKENS,
+                self.context_length - prompt_token_count,
             )
 
-        try:
-            client = openai.OpenAI(
-                api_key=os.environ["DEEPSEEK_API_KEY"],
-                base_url=os.environ["DEEPSEEK_BASE_URL"],
-            )
+            if max_output_tokens <= 0:
+                raise ValueError(
+                    f"max_output_tokens <= 0. Prompt token count: {prompt_token_count}"
+                )
 
-            response = client.chat.completions.create(
-                model=self.model_name,
-                messages=msgs,  # type: ignore
-                max_tokens=max_output_tokens,
-            )
+            try:
+                client = openai.OpenAI(
+                    api_key=os.environ["DEEPSEEK_API_KEY"],
+                    base_url=os.environ["DEEPSEEK_BASE_URL"],
+                )
+                response = client.chat.completions.create(
+                    model=self.model_name,
+                    messages=messages,  # type: ignore
+                    max_tokens=max_output_tokens,
+                )
 
-            choice = response.choices[0]
-            _content = getattr(choice.message, "content", None)
-            _reasoning_content = getattr(choice.message, "reasoning_content", None)
+                token_usage = self.update_usage(response.usage)
 
-            token_usage = self.update_usage(response.usage)
-            if _content:
-                response_string = _content
-                if _reasoning_content and include_rc:
-                    response_string = (
-                        f"<REASONING>\n{_reasoning_content}\n</REASONING>\n"
-                        + response_string
-                    )  # re.sub(r"<COT>.*?</COT>\n*", "", x, flags=re.DOTALL)
-                return [
-                    {"role": CreatorRole.ASSISTANT.value, "content": response_string}
-                ], token_usage
-            failed_reason = choice.finish_reason
-            raise RuntimeError(failed_reason)
-        except RateLimitError as rle:
-            logger.warning("RateLimitError: %s", rle)
-            delay: Optional[float] = kwargs.get("delay", None)
-            attempt: Optional[int] = kwargs.get("attempt", None)
+                choice = response.choices[0]
+                finish_reason = choice.finish_reason
+                content = choice.message.content
+                if finish_reason == "stop" and content:
+                    reasoning_content = getattr(
+                        choice.message, "reasoning_content", None
+                    )
+                    response_string = content
+                    if reasoning_content and include_rc:
+                        response_string = (
+                            f"<REASONING>\n{reasoning_content}\n</REASONING>\n"
+                            + response_string
+                        )
 
-            if delay is None:
-                delay = 5.0
+                    output: list[dict | MessageBlock] = [
+                        MessageBlock(
+                            role=CreatorRole.ASSISTANT.value, content=response_string
+                        )
+                    ]
+                    return output, token_usage
 
-            if attempt is None:
-                attempt = 1
+                if finish_reason == "length" and content:
+                    e = {"error": "Early Termination: Length", "text": content}
+                    output: list[dict | MessageBlock] = [
+                        MessageBlock(
+                            role=CreatorRole.ASSISTANT.value,
+                            content=json.dumps(e, ensure_ascii=False),
+                        )
+                    ]
+                    return output, token_usage
 
-            if attempt > 5:
-                logger.warning("Max attempts reached. Raising error.")
+                logger.warning("Malformed response: %s", response)
+                logger.warning("Config: %s", self.config)
+                raise RuntimeError(f"Terminated: {finish_reason}")
+            except RateLimitError as rle:
+                logger.warning("RateLimitError: %s", rle)
+                warn_msg = f"[{attempt}] Retrying in {delay} seconds..."
+                logger.warning(warn_msg)
+                time.sleep(delay)
+                attempt += 1
+                delay = delay * Reasoner_Core.DELAY_FACTOR
+                delay = min(Reasoner_Core.MAX_DELAY, delay)
+                continue
+            except Exception as e:
+                logger.error("Exception: %s", e, exc_info=True, stack_info=True)
                 raise
 
-            warn_msg = f"[{attempt}] Retrying in {delay} seconds..."
-            logger.warning(warn_msg)
-            time.sleep(delay)
-            _kwargs = kwargs
-            _kwargs.update({"delay": delay * 1.5, "attempt": attempt + 1})
-            return self.run(query, context=context, **_kwargs)
-        except Exception as e:
-            logger.error("Exception: %s", e, exc_info=True, stack_info=True)
-            raise
+        raise RuntimeError("Max re-attempt reached")
