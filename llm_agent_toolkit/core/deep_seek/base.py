@@ -70,7 +70,7 @@ class DeepSeekCore:
                 character_count += len(json.dumps(tool))
 
         text_token_count = ceil(character_count * CONVERSION_FACTOR)
-        logger.info("Token Estimation:\nText: %d", text_token_count)
+        logger.debug("Token Estimation:\nText: %d", text_token_count)
         return text_token_count
 
     @staticmethod
