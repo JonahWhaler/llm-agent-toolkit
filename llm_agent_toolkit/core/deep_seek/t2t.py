@@ -387,7 +387,7 @@ class T2T_DS_Core(Core, DeepSeekCore, ToolSupport):
                     output.append(
                         {
                             "role": CreatorRole.TOOL.value,
-                            "content": str(e),
+                            "content": f"{tool_call.function_name}({args}) => {e}",
                             "tool_call_id": tool_call.id,
                         }
                     )
@@ -439,7 +439,7 @@ class T2T_DS_Core(Core, DeepSeekCore, ToolSupport):
                     output.append(
                         {
                             "role": CreatorRole.TOOL.value,
-                            "content": str(e),
+                            "content": f"{tool_call.function_name}({args}) => {e}",
                             "tool_call_id": tool_call.id,
                         }
                     )
