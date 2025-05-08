@@ -27,6 +27,7 @@ class GeminiCore:
         try:
             client = genai.Client(api_key=os.environ["GEMINI_API_KEY"])
             response = client.models.list()
+            model_name = model_name.replace("models/", "")
             padded_name = f"models/{model_name}"
             for m in response.page:
                 if padded_name == m.name:
