@@ -331,81 +331,43 @@ class GeminiCore:
         return warning_message
 
     @staticmethod
-    def get_function_call(
-        response: types.GenerateContentResponse,
-    ) -> Optional[dict[str, Any]]:
+    def get_functs(content: types.Content) -> Optional[list[dict[str, dict]]]:
         try:
-            candidates: Optional[list[types.Candidate]] = response.candidates
-            if not candidates:
-                return None
+            parts: Optional[list[types.Part]] = content.parts
+            if parts:
+                output: list[dict] = []
+                for part in parts:
+                    if part.function_call:
+                        output.append(
+                            {
+                                "id": part.function_call.id,
+                                "name": part.function_call.name,
+                                "arguments": part.function_call.args,
+                            }
+                        )
 
-            content: Optional[types.Candidate] = getattr(candidates[0], "content", None)
-            if not content:
+                if len(output) > 0:
+                    return output
                 return None
-
-            parts: Optional[list[types.Part]] = getattr(content, "parts", None)
-            if not parts:
-                return None
-
-            function_call: Optional[types.FunctionCall] = getattr(
-                parts[0],
-                "function_call",
-                None,
-            )
-            if not function_call:
-                return None
-
-            return {
-                "id": function_call.id,
-                "name": function_call.name,
-                "arguments": function_call.args,
-            }
+            raise ValueError("No parts found in the content.")
         except Exception as e:
-            # logger.warning("Function call not found: %s", str(e))
+            logger.error("Function call not found: %s", str(e))
             return None
 
     @staticmethod
-    def get_response_text(response: types.GenerateContentResponse) -> str | None:
+    def get_texts(content: types.Content) -> Optional[list[str]]:
         try:
-            candidates: Optional[list[types.Candidate]] = response.candidates
-            if not candidates:
-                return None
-
-            content: Optional[types.Candidate] = getattr(candidates[0], "content", None)
-            if content is None:
-                return None
-
-            parts: Optional[list[types.Part]] = getattr(content, "parts", None)
+            parts: Optional[list[types.Part]] = content.parts
             if parts is None:
                 return None
 
-            response_text = getattr(parts[0], "text", None)
-            if response_text is None:
-                return response.text
+            output: list[str] = [part.text for part in parts if part.text is not None]
 
-            return response_text
-        except Exception as e:
-            # logger.warning("Response text not found: %s", str(e))
+            if len(output) > 0:
+                return output
             return None
-
-    @staticmethod
-    def get_finish_reason(
-        response: types.GenerateContentResponse,
-    ) -> Optional[types.FinishReason]:
-        try:
-            candidates: Optional[list[types.Candidate]] = response.candidates
-            if not candidates:
-                return None
-
-            finish_reason: Optional[types.FinishReason] = getattr(
-                candidates[0], "finish_reason", None
-            )
-            if finish_reason is None:
-                return None
-
-            return finish_reason
         except Exception as e:
-            # logger.warning("Response text not found: %s", str(e))
+            logger.error("Response text not found: %s", str(e))
             return None
 
 
