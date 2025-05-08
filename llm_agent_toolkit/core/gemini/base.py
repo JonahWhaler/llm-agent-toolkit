@@ -1,7 +1,7 @@
 import os
 import logging
 from math import ceil
-from typing import Any, Optional
+from typing import Optional
 from PIL import Image
 from google import genai
 from google.genai import types
