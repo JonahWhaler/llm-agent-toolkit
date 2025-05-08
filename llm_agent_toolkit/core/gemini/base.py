@@ -284,12 +284,15 @@ class GeminiCore:
             parts: list[types.Part] | None = getattr(msg, "parts", None)
             assert role is not None
             assert parts is not None
-            content = parts[0].text
-            if content:
+            ptexts = []
+            for part in parts:
+                if part.text:
+                    ptexts.append(part.text)
+            if ptexts:
                 output_list.append(
                     MessageBlock(
                         role=CreatorRole.ASSISTANT.value if role == "model" else role,
-                        content=content,
+                        content="\n".join(ptexts),
                     )
                 )
             # Parts without the text attribute will be skipped.
