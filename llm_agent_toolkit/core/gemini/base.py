@@ -68,7 +68,7 @@ class GeminiCore:
                         try:
                             _ = int(value)
                         except ValueError:
-                            logger.warning(f"{name}.{column} must be an integer.")
+                            logger.warning("%s.%s must be an integer.", name, column)
                             raise
                     elif value:
                         assert value.lower() in [
