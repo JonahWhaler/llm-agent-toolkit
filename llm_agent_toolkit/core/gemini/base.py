@@ -19,7 +19,7 @@ class GeminiCore:
         # self.__model_name = model_name
         if not GeminiCore.__available(model_name):
             raise ValueError(
-                "%s is not available in Gemini's model listing.", model_name
+                f"{model_name} is not available in Gemini's model listing."
             )
 
     @staticmethod
