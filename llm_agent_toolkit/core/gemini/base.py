@@ -16,7 +16,7 @@ class GeminiCore:
     csv_path: str | None = None
 
     def __init__(self, model_name: str):
-        self.__model_name = model_name
+        # self.__model_name = model_name
         if not GeminiCore.__available(model_name):
             raise ValueError(
                 "%s is not available in Gemini's model listing.", model_name
