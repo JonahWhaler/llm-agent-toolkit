@@ -1,28 +1,24 @@
-# import os
-# import time
 import asyncio
 import logging
 
-# import json
-from dotenv import load_dotenv
-
-# from llm_agent_toolkit.core.gemini.t2t import T2T_GMN_Core
-from llm_agent_toolkit.core.gemini import GeminiCore
-from llm_agent_toolkit.core.gemini.t2t_w_tool import T2T_GMN_Core_W_Tool
-from llm_agent_toolkit.core.gemini.i2t_w_tool import I2T_GMN_Core_W_Tool
-# from llm_agent_toolkit.core.gemini.i2t import I2T_GMN_Core
-# from llm_agent_toolkit.core.gemini.so import GMN_StructuredOutput_Core
-
-from llm_agent_toolkit import ChatCompletionConfig, Tool  # , ResponseMode
-
-# from pydantic import BaseModel
 import json
-import requests
-from duckduckgo_search import DDGS
-from bs4 import BeautifulSoup
+from dotenv import load_dotenv
+from pydantic import BaseModel
+
+from llm_agent_toolkit import ChatCompletionConfig, ResponseMode
+from llm_agent_toolkit.core.gemini import (
+    GeminiCore,
+    Text_to_Text,
+    Text_to_Text_W_Tool,
+    StructuredOutput,
+    Image_to_Text,
+    Image_to_Text_W_Tool,
+    Thinking_Core,
+)
+from llm_agent_toolkit.tool import LazyTool
 
 logging.basicConfig(
-    filename="./dev/log/gemini.log",
+    filename="./dev/log/example-gemini.log",
     level=logging.INFO,
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     datefmt="%Y-%m-%d %H:%M:%S",
@@ -30,577 +26,939 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-def adder(number_a: int, number_b: int) -> int:
-    """Add number_a with number_b.
-
-    Args:
-        number_a (int): The first number.
-        number_b (int): The second number.
-
-    Returns:
-        int (int): Results
+def execute_t2t_wo_tool(model_name: str, prompt: str) -> None:
     """
-    return number_a + number_b
-
-
-async def divider(number_a: int, number_b: int) -> float:
-    """Divide number_a by number_b.
-
-    Args:
-        number_a (int): The first number.
-        number_b (int): The second number.
-
-    Returns:
-        float: Results
-
-    Raises:
-        ValueError: When number_b is 0
+    Code snippet of calling LLM without tools.
     """
-    if number_b == 0:
-        raise ValueError("Division by zero.")
-    return number_a / number_b
+    llm = Text_to_Text(
+        system_prompt="You are Whales, faithful AI assistant.",
+        config=ChatCompletionConfig(
+            name=model_name,
+            return_n=1,
+            max_iteration=1,
+            max_tokens=2048,
+            max_output_tokens=2048,
+            temperature=0.7,
+        ),
+    )
+    results, token_usage = llm.run(query=prompt, context=None)
+    logger.info("Token Usage: %s", token_usage)
+    logger.info("Prompt:\t\t%s", prompt)
+    for result in results:
+        output_string = f"{result['role']:15s}:\t{result['content']}"
+        logger.info(output_string)
 
 
-def exec_t2t(model_name: str):
-    from llm_agent_toolkit.tool import LazyTool
+async def async_t2t_wo_tool(model_name: str, prompt: str) -> None:
+    """
+    Code snippet of calling LLM without tools.
+    """
+    llm = Text_to_Text(
+        system_prompt="You are Whales, faithful AI assistant.",
+        config=ChatCompletionConfig(
+            name=model_name,
+            return_n=1,
+            max_iteration=1,
+            max_tokens=2048,
+            max_output_tokens=2048,
+            temperature=0.7,
+        ),
+    )
+    results, token_usage = await llm.run_async(query=prompt, context=None)
+    logger.info("Token Usage: %s", token_usage)
+    logger.info("Prompt:\t\t%s", prompt)
+    for result in results:
+        output_string = f"{result['role']:15s}:\t{result['content']}"
+        logger.info(output_string)
 
-    # time.sleep(5)
-    SYSTEM_PROMPT = "Be a faithful AI chatbot."
-    # PROMPT = "Solve 10 + 5 / 5 = ?"
-    # PROMPT = "Solve 10 / 5 + 5 = ?"
-    PROMPT = "Solve 37 + 20 / 5 + 43 = ?"
+
+def execute_t2t_w_tool(model_name: str, prompt: str) -> None:
+    """
+    Code snippet of calling LLM with tools.
+    """
+
+    def adder(a: int, b: int) -> int:
+        """Add a with b.
+
+        Args:
+            a (int): The first number.
+            b (int): The second number.
+
+        Returns:
+            int (int): The sum of a and b
+        """
+        return a + b
+
+    async def divider(a: int, b: int) -> float:
+        """Divide a by b.
+
+        Args:
+            a (int): The first number.
+            b (int): The second number.
+
+        Returns:
+            float: the division of a and b
+
+        Raises:
+            ValueError: When b is 0
+        """
+        if b == 0:
+            raise ValueError("Division by zero.")
+        return a / b
+
+    def multiplier(a: float, b: float) -> float:
+        """Multiply a by b.,
+
+        Args:
+            a (float): The first number.
+            b (float): The second number.
+
+        Returns:
+            float: The mulplication of a and b
+        """
+        return a * b
 
     add_tool = LazyTool(adder, is_coroutine_function=False)
     div_tool = LazyTool(divider, is_coroutine_function=True)
-    tools = [add_tool, div_tool]
-    config = ChatCompletionConfig(
-        name=model_name,
-        temperature=0.7,
-        max_tokens=8192,
-        max_output_tokens=2048,
-        max_iteration=5,
+    mul_tool = LazyTool(multiplier, is_coroutine_function=False)
+
+    llm = Text_to_Text_W_Tool(
+        system_prompt="You are Whales, faithful AI math assistant.",
+        config=ChatCompletionConfig(
+            name=model_name,
+            return_n=1,
+            max_iteration=7,
+            max_tokens=2048,
+            max_output_tokens=2048,
+            temperature=0.2,
+        ),
+        tools=[add_tool, div_tool, mul_tool],
     )
-    llm = T2T_GMN_Core_W_Tool(system_prompt=SYSTEM_PROMPT, config=config, tools=tools)  # type: ignore
-    responses, usage = llm.run(query=PROMPT, context=None)
-    for response in responses:
-        logger.info(">> %s", response["content"])
+    results, token_usage = llm.run(query=prompt, context=None)
+    logger.info("Token Usage: %s", token_usage)
+    logger.info("Prompt:\t\t%s", prompt)
+    for result in results:
+        output_string = f"{result['role']:15s}:\t{result['content']}"
+        logger.info(output_string)
 
 
-async def aexec_t2t(model_name: str) -> None:
-    from llm_agent_toolkit.tool import LazyTool
+async def async_t2t_w_tool(model_name: str, prompt: str) -> None:
+    """
+    Code snippet of calling LLM with tools.
+    """
 
-    # time.sleep(5)
-    # MODEL_NAME = "gemini-2.0-pro-exp-02-05"
-    SYSTEM_PROMPT = "Be a faithful AI chatbot."
-    # PROMPT = "Solve 10 + 5 / 5 = ?"
-    # PROMPT = "Solve 10 / 5 + 5 = ?"
-    PROMPT = "Solve 37 + 20 / 5 + 43 = ?"
+    def adder(a: int, b: int) -> int:
+        """Add a with b.
+
+        Args:
+            a (int): The first number.
+            b (int): The second number.
+
+        Returns:
+            int (int): The sum of a and b
+        """
+        return a + b
+
+    async def divider(a: int, b: int) -> float:
+        """Divide a by b.
+
+        Args:
+            a (int): The first number.
+            b (int): The second number.
+
+        Returns:
+            float: the division of a and b
+
+        Raises:
+            ValueError: When b is 0
+        """
+        if b == 0:
+            raise ValueError("Division by zero.")
+        return a / b
+
+    def multiplier(a: float, b: float) -> float:
+        """Multiply a by b.,
+
+        Args:
+            a (float): The first number.
+            b (float): The second number.
+
+        Returns:
+            float: The mulplication of a and b
+        """
+        return a * b
 
     add_tool = LazyTool(adder, is_coroutine_function=False)
     div_tool = LazyTool(divider, is_coroutine_function=True)
-    tools = [add_tool, div_tool]
-    config = ChatCompletionConfig(
-        name=model_name,
-        temperature=0.7,
-        max_tokens=8192,
-        max_output_tokens=2048,
-        max_iteration=5,
+    mul_tool = LazyTool(multiplier, is_coroutine_function=False)
+
+    llm = Text_to_Text_W_Tool(
+        system_prompt="You are Whales, faithful AI math assistant.",
+        config=ChatCompletionConfig(
+            name=model_name,
+            return_n=1,
+            max_iteration=7,
+            max_tokens=2048,
+            max_output_tokens=2048,
+            temperature=0.2,
+        ),
+        tools=[add_tool, div_tool, mul_tool],
     )
-    llm = T2T_GMN_Core_W_Tool(system_prompt=SYSTEM_PROMPT, config=config, tools=tools)  # type: ignore
-    responses, usage = await llm.run_async(query=PROMPT, context=None)
-    for response in responses:
-        logger.info(">> %s: %s", response["role"], response["content"])
+    results, token_usage = await llm.run_async(query=prompt, context=None)
+    logger.info("Token Usage: %s", token_usage)
+    logger.info("Prompt:\t\t%s", prompt)
+    for result in results:
+        output_string = f"{result['role']:15s}:\t{result['content']}"
+        logger.info(output_string)
 
 
-def character_counter(text: str) -> int:
+SPROMPT = """
+Task: Assist user in whatever he/she ask for.
+
+Response Schema:
+---
+{
+    'question': 'User\'s Question',
+    'answer': 'Assistant\'s reply'
+}
+---
+
+Note:
+Alway response in JSON format without additional comments or explanation.
+"""
+
+
+def execute_t2t_json(model_name: str, prompt: str) -> None:
     """
-    Calculate the number of character in the text without whitespace.
+    Code snippet of calling LLM and expect a structured output (JSON).
     """
-    logger.warning("text: %s", text)
-    text = text.strip()
-    return len(text.replace(" ", ""))
+    # max_iteration = 1
+    llm = StructuredOutput(
+        system_prompt=SPROMPT,
+        config=ChatCompletionConfig(
+            name=model_name,
+            return_n=1,
+            max_iteration=1,
+            max_tokens=4096,
+            max_output_tokens=2048,
+            temperature=0.7,
+        ),
+    )
+    results, token_usage = llm.run(query=prompt, context=None, mode=ResponseMode.JSON)
+    logger.info("Token Usage: %s", token_usage)
+    logger.info("Prompt:\t\t%s", prompt)
+
+    text_content = results[-1]["content"]
+    try:
+        json_content = json.loads(text_content)
+        for k, v in json_content.items():
+            logger.info("%s: %s", k, v)
+    except json.JSONDecodeError:
+        logger.error("JSONDecodeError: %s", text_content)
 
 
-class DuckDuckGoSearchTool(Tool):
-    def __init__(
-        self, safesearch: str = "off", region: str = "my-en", pause: float = 3.0
-    ):
-        Tool.__init__(self, DuckDuckGoSearchTool.function_info(), True)
-        self.safesearch = safesearch
-        self.region = region
-        self.pause = pause
+async def async_t2t_json(model_name: str, prompt: str) -> None:
+    """
+    Code snippet of calling LLM and expect a structured output (JSON).
+    """
+    # max_iteration = 1
+    llm = StructuredOutput(
+        system_prompt=SPROMPT,
+        config=ChatCompletionConfig(
+            name=model_name,
+            return_n=1,
+            max_iteration=1,
+            max_tokens=4096,
+            max_output_tokens=2048,
+            temperature=0.7,
+        ),
+    )
+    results, token_usage = await llm.run_async(
+        query=prompt, context=None, mode=ResponseMode.JSON
+    )
+    logger.info("Token Usage: %s", token_usage)
+    logger.info("Prompt:\t\t%s", prompt)
 
-    @staticmethod
-    def function_info():
-        from llm_agent_toolkit import (
-            FunctionInfo,
-            FunctionParameters,
-            FunctionProperty,
-            FunctionPropertyType,
-        )
+    text_content = results[-1]["content"]
+    try:
+        json_content = json.loads(text_content)
+        for k, v in json_content.items():
+            logger.info("%s: %s", k, v)
+    except json.JSONDecodeError:
+        logger.error("JSONDecodeError: %s", text_content)
 
-        return FunctionInfo(
-            name="DuckDuckGoSearchTool",
-            description="Search the internet via DuckDuckGO API.",
-            parameters=FunctionParameters(
-                properties=[
-                    FunctionProperty(
-                        name="query",
-                        type=FunctionPropertyType.STRING,
-                        description="Keyword that describe or define the query",
-                    )
-                ],
-                type="object",
-                required=["query"],
-            ),
-        )
 
-    @property
-    def random_user_agent(self) -> str:
-        import random
+def execute_t2t_structured_output(model_name: str, prompt: str) -> None:
+    """
+    Code snippet of calling LLM and expect a structured output.
+    """
 
-        user_agents = [
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120.0.0.0",
-            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) Safari/605.1.15",
-            "Mozilla/5.0 (X11; Linux x86_64) Firefox/120.0",
+    class ResponseModel(BaseModel):
+        question: str
+        answer: str
+        enhanced_prompt: str
+
+    system_prompt = """
+    You are a Whales, a faithful AI assistant.
+    When needed, you help the user to enhanced the prompt before providing an answer.
+    You provide response according to the provided structure.
+    """
+    # max_iteration = 1
+    llm = StructuredOutput(
+        system_prompt=system_prompt,
+        config=ChatCompletionConfig(
+            name=model_name,
+            return_n=1,
+            max_iteration=1,
+            max_tokens=4096,
+            max_output_tokens=2048,
+            temperature=0.7,
+        ),
+    )
+    results, token_usage = llm.run(
+        query=prompt,
+        context=None,
+        mode=ResponseMode.SO,
+        format=ResponseModel,
+    )
+    logger.info("Token Usage: %s", token_usage)
+    logger.info("Prompt:\t\t%s", prompt)
+
+    text_content = results[-1]["content"]
+    try:
+        json_content = json.loads(text_content)
+        for k, v in json_content.items():
+            logger.info("%s: %s", k, v)
+    except json.JSONDecodeError:
+        logger.error("JSONDecodeError: %s", text_content)
+
+
+async def async_t2t_structured_output(model_name: str, prompt: str) -> None:
+    """
+    Code snippet of calling LLM and expect a structured output.
+    """
+
+    class ResponseModel(BaseModel):
+        question: str
+        answer: str
+        enhanced_prompt: str
+
+    system_prompt = """
+    You are a Whales, a faithful AI assistant.
+    When needed, you help the user to enhanced the prompt before providing an answer.
+    You provide response according to the provided structure.
+    """
+    # max_iteration = 1
+    llm = StructuredOutput(
+        system_prompt=system_prompt,
+        config=ChatCompletionConfig(
+            name=model_name,
+            return_n=1,
+            max_iteration=1,
+            max_tokens=4096,
+            max_output_tokens=2048,
+            temperature=0.7,
+        ),
+    )
+    results, token_usage = await llm.run_async(
+        query=prompt,
+        context=None,
+        mode=ResponseMode.SO,
+        format=ResponseModel,
+    )
+    logger.info("Token Usage: %s", token_usage)
+    logger.info("Prompt:\t\t%s", prompt)
+
+    text_content = results[-1]["content"]
+    try:
+        json_content = json.loads(text_content)
+        for k, v in json_content.items():
+            logger.info("%s: %s", k, v)
+    except json.JSONDecodeError:
+        logger.error("JSONDecodeError: %s", text_content)
+
+
+def execute_i2t_json(model_name: str, prompt: str, filepath: str) -> None:
+    """
+    Code snippet of calling LLM for image interpretation and expect a structured output (JSON).
+    """
+    system_prompt = """You are a Whales, a faithful AI assistant.
+    You are good at interpreting images and return the text content in JSON format.
+
+    JSON Schema:
+    ---
+    {
+        'sentences': [
+            'sentence 1',
+            'sentence 2',
+            'sentence 3'
         ]
-        return random.choice(user_agents)
-
-    @property
-    def headers(self) -> dict:
-        return {
-            "User-Agent": self.random_user_agent,
-            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
-            "Accept-Language": "en-US,en;q=0.5",
-            "Accept-Encoding": "gzip, deflate, br",
-            "Connection": "keep-alive",
-            "Upgrade-Insecure-Requests": "1",
-            "Sec-Fetch-Dest": "document",
-            "Sec-Fetch-Mode": "navigate",
-            "Sec-Fetch-Site": "none",
-            "Sec-Fetch-User": "?1",
-            "Cache-Control": "max-age=0",
-        }
-
-    async def run_async(self, params: str) -> str:
-        import aiohttp
-
-        await asyncio.sleep(self.pause)
-        # Validate parameters
-        if not self.validate(params=params):
-            return json.dumps({"error": "Invalid parameters for DuckDuckGoSearchAgent"})
-        # Load parameters
-        params_dict: dict = json.loads(params)
-        query = params_dict.get("query", None)
-        logger.info("Query: %s", query)
-        top_n = 5
-
-        top_search = []
-        with DDGS() as ddgs:
-            for r in ddgs.text(
-                keywords=query,
-                region=self.region,
-                safesearch=self.safesearch,
-                max_results=top_n,
-            ):
-                top_search.append(r)
-
-        # async with aiohttp.ClientSession() as session:
-        #     tasks = [self.fetch_async(session, r["href"]) for r in top_search]
-        #     search_results = await asyncio.gather(*tasks)
-        #     for r, sr in zip(top_search, search_results):
-        #         if sr:
-        #             r["html"] = sr
-        web_search_result = "\n\n".join([json.dumps(r) for r in top_search])
-        # logger.info("web_search_result: %s", web_search_result)
-        return web_search_result
-
-    def run(self, params: str) -> str:
-        import time
-
-        time.sleep(self.pause)
-        # Validate parameters
-        if not self.validate(params=params):
-            return json.dumps({"error": "Invalid parameters for DuckDuckGoSearchAgent"})
-        # Load parameters
-        params_dict: dict = json.loads(params)
-        query = params_dict.get("query", None)
-        logger.info("Query: %s", query)
-        top_n = 5
-
-        top_search = []
-        with DDGS() as ddgs:
-            try:
-                for r in ddgs.text(
-                    keywords=query,
-                    region=self.region,
-                    safesearch=self.safesearch,
-                    max_results=top_n,
-                ):
-                    top_search.append(r)
-            except Exception as error:
-                logger.error(error)
-
-        # for r in top_search:
-        #     page = self.fetch(url=r["href"])
-        #     if page:
-        #         r["html"] = page
-
-        web_search_result = "\n\n".join([json.dumps(r) for r in top_search])
-        return web_search_result
-
-    async def fetch_async(self, session, url):
-        try:
-            await asyncio.sleep(self.pause)
-            async with session.get(url, headers=self.headers) as response:
-                data = await response.text()
-                soup = BeautifulSoup(data, "html.parser")
-                return self.remove_whitespaces(soup.find("body").text)  # type: ignore
-        except Exception as _:
-            return None
-
-    def fetch(self, url: str):
-        try:
-            page = requests.get(url=url, headers=self.headers, timeout=2, stream=False)
-            soup = BeautifulSoup(page.text, "html.parser")
-            body = soup.find("body")
-            if body:
-                t = body.text
-                t = self.remove_whitespaces(t)
-                return t
-            return None
-        except Exception as _:
-            return None
-
-    @staticmethod
-    def remove_whitespaces(document_content: str) -> str:
-        import re
-
-        # original_len = len(document_content)
-        cleaned_text = re.sub(r"\s+", " ", document_content)
-        cleaned_text = re.sub(r"\n{3,}", "\n", cleaned_text)
-        # updated_len = len(cleaned_text)
-        # logger.info("Reduce from %d to %d", original_len, updated_len)
-        return cleaned_text
-
-
-def exec_i2t(model_name: str):
-    from llm_agent_toolkit.tool import LazyTool
-
-    SYSTEM_PROMPT = "Be a faithful AI chatbot."
-    PROMPT = "Suggest URLs to look for similar images of this image."
-    FILEPATH = "./dev/image/wednesday-addams-00.jpg"
-
-    character_counter_tool = LazyTool(character_counter, is_coroutine_function=False)
-    tools = [character_counter_tool, DuckDuckGoSearchTool()]
-    config = ChatCompletionConfig(
-        name=model_name,
-        temperature=0.7,
-        max_tokens=8192,
-        max_output_tokens=4096,
-        max_iteration=5,
+    }
+    """
+    # max_iteration = 1
+    llm = StructuredOutput(
+        system_prompt=system_prompt,
+        config=ChatCompletionConfig(
+            name=model_name,
+            return_n=1,
+            max_iteration=1,
+            max_tokens=4096,
+            max_output_tokens=2048,
+            temperature=0.7,
+        ),
     )
-    llm = I2T_GMN_Core_W_Tool(system_prompt=SYSTEM_PROMPT, config=config, tools=tools)  # type: ignore
-    responses, token_usage = llm.run(query=PROMPT, context=None, filepath=FILEPATH)
-    logger.info("Token usage: %s", token_usage)
-    for response in responses:
-        logger.info(">> %s", response["content"])
-
-
-async def aexec_i2t(model_name: str):
-    from llm_agent_toolkit.tool import LazyTool
-
-    SYSTEM_PROMPT = "Be a faithful AI chatbot."
-    PROMPT = "Suggest some URLs to look for similar images of this image."
-    FILEPATH = "./dev/image/jonah-pixel-art.jpeg"
-
-    character_counter_tool = LazyTool(character_counter, is_coroutine_function=False)
-    tools = [character_counter_tool, DuckDuckGoSearchTool()]
-    config = ChatCompletionConfig(
-        name=model_name,
-        temperature=0.3,
-        max_tokens=8192,
-        max_output_tokens=4096,
-        max_iteration=5,
+    results, token_usage = llm.run(
+        query=prompt,
+        context=None,
+        mode=ResponseMode.JSON,
+        filepath=filepath,
     )
-    llm = I2T_GMN_Core_W_Tool(system_prompt=SYSTEM_PROMPT, config=config, tools=tools)  # type: ignore
-    responses, token_usage = await llm.run_async(
-        query=PROMPT, context=None, filepath=FILEPATH
+    logger.info("Token Usage: %s", token_usage)
+    logger.info("Prompt:\t\t%s", prompt)
+
+    text_content = results[-1]["content"]
+    try:
+        json_content = json.loads(text_content)
+        for k, v in json_content.items():
+            logger.info("%s: %s", k, v)
+    except json.JSONDecodeError:
+        logger.error("JSONDecodeError: %s", text_content)
+
+
+async def async_i2t_json(model_name: str, prompt: str, filepath: str) -> None:
+    """
+    Code snippet of calling LLM for image interpretation and expect a structured output (JSON).
+    """
+    system_prompt = """You are a Whales, a faithful AI assistant.
+    You are good at interpreting images and return the text content in JSON format.
+
+    JSON Schema:
+    ---
+    {
+        'sentences': [
+            'sentence 1',
+            'sentence 2',
+            'sentence 3'
+        ]
+    }
+    """
+    # max_iteration = 1
+    llm = StructuredOutput(
+        system_prompt=system_prompt,
+        config=ChatCompletionConfig(
+            name=model_name,
+            return_n=1,
+            max_iteration=1,
+            max_tokens=4096,
+            max_output_tokens=2048,
+            temperature=0.7,
+        ),
     )
-    logger.info("Token usage: %s", token_usage)
-    for response in responses:
-        logger.info(">> %s", response["content"])
+    results, token_usage = llm.run(
+        query=prompt,
+        context=None,
+        mode=ResponseMode.JSON,
+        filepath=filepath,
+    )
+    logger.info("Token Usage: %s", token_usage)
+    logger.info("Prompt:\t\t%s", prompt)
+
+    text_content = results[-1]["content"]
+    try:
+        json_content = json.loads(text_content)
+        for k, v in json_content.items():
+            logger.info("%s: %s", k, v)
+    except json.JSONDecodeError:
+        logger.error("JSONDecodeError: %s", text_content)
 
 
-# JSON_PROMPT = """
-# Generate N number of random game character according to JSON schema below.
+def execute_i2t_structured_output(model_name: str, prompt: str, filepath: str) -> None:
+    """
+    Code snippet of calling LLM for image interpretation and expect a structured output.
+    """
 
-# JSON Schema:
-# [
-#     {
-#         \"name\": {{Name:str}},
-#         \"attack\": {{Attack:int}},
-#         \"defense\": {{Defense:int}},
-#         \"career\": {{Warrior|Archer|NPC}}
-#     }
-# ]
-# """
+    class ResponseModel(BaseModel):
+        sentences: list[str]
 
+    system_prompt = """You are a Whales, a faithful AI assistant.
+    You are good at interpreting images.
+    You provide response according to the provided structure.
+    """
+    # max_iteration = 1
+    llm = StructuredOutput(
+        system_prompt=system_prompt,
+        config=ChatCompletionConfig(
+            name=model_name,
+            return_n=1,
+            max_iteration=1,
+            max_tokens=4096,
+            max_output_tokens=2048,
+            temperature=0.7,
+        ),
+    )
+    results, token_usage = llm.run(
+        query=prompt,
+        context=None,
+        mode=ResponseMode.SO,
+        format=ResponseModel,
+        filepath=filepath,
+    )
+    logger.info("Token Usage: %s", token_usage)
+    logger.info("Prompt:\t\t%s", prompt)
 
-# def exec_so_json():
-#     # await asyncio.sleep(5)
-#     MODEL_NAME = "gemini-2.0-flash"
-#     SYSTEM_PROMPT = JSON_PROMPT
-#     PROMPT = "Create 3 unique chracters."
-
-#     config = ChatCompletionConfig(
-#         name=MODEL_NAME,
-#         temperature=0.7,
-#         max_tokens=8192,
-#         max_output_tokens=2048,
-#     )
-#     llm = GMN_StructuredOutput_Core(system_prompt=SYSTEM_PROMPT, config=config)
-#     responses = llm.run(query=PROMPT, context=None, mode=ResponseMode.JSON)
-#     for response in responses:
-#         content = response["content"]
-#         logger.info(">> %s", content)
-#         jobj = json.loads(content)
-#         logger.info(jobj)
-
-
-# async def aexec_so_json():
-#     await asyncio.sleep(1)
-#     MODEL_NAME = "gemini-2.0-flash"
-#     SYSTEM_PROMPT = JSON_PROMPT
-#     PROMPT = "Create 3 unique chracters."
-
-#     config = ChatCompletionConfig(
-#         name=MODEL_NAME,
-#         temperature=0.7,
-#         max_tokens=8192,
-#         max_output_tokens=2048,
-#     )
-#     llm = GMN_StructuredOutput_Core(system_prompt=SYSTEM_PROMPT, config=config)
-#     responses = llm.run(query=PROMPT, context=None, mode=ResponseMode.JSON)
-#     for response in responses:
-#         content = response["content"]
-#         logger.info(">> %s", content)
-#         jobj = json.loads(content)
-#         logger.info(jobj)
+    text_content = results[-1]["content"]
+    try:
+        json_content = json.loads(text_content)
+        for k, v in json_content.items():
+            logger.info("%s: %s", k, v)
+    except json.JSONDecodeError:
+        logger.error("JSONDecodeError: %s", text_content)
 
 
-# class Character(BaseModel):
-#     name: str
-#     attack: int
-#     defense: int
-#     career: str
+async def async_i2t_structured_output(
+    model_name: str, prompt: str, filepath: str
+) -> None:
+    """
+    Code snippet of calling LLM for image interpretation and expect a structured output.
+    """
+
+    class ResponseModel(BaseModel):
+        sentences: list[str]
+
+    system_prompt = """You are a Whales, a faithful AI assistant.
+    You are good at interpreting images.
+    You provide response according to the provided structure.
+    """
+    # max_iteration = 1
+    llm = StructuredOutput(
+        system_prompt=system_prompt,
+        config=ChatCompletionConfig(
+            name=model_name,
+            return_n=1,
+            max_iteration=1,
+            max_tokens=4096,
+            max_output_tokens=2048,
+            temperature=0.7,
+        ),
+    )
+    results, token_usage = await llm.run_async(
+        query=prompt,
+        context=None,
+        mode=ResponseMode.SO,
+        format=ResponseModel,
+        filepath=filepath,
+    )
+    logger.info("Token Usage: %s", token_usage)
+    logger.info("Prompt:\t\t%s", prompt)
+
+    text_content = results[-1]["content"]
+    try:
+        json_content = json.loads(text_content)
+        for k, v in json_content.items():
+            logger.info("%s: %s", k, v)
+    except json.JSONDecodeError:
+        logger.error("JSONDecodeError: %s", text_content)
 
 
-# class CustomResponse(BaseModel):
-#     characters: list[Character]
+def execute_i2t_wo_tool(model_name: str, prompt: str, filepath: str) -> None:
+    """
+    Code snippet of calling LLM for image interpretation without tools.
+    """
+    system_prompt = """
+    You are a Whales, a faithful AI assistant.
+    You are good at interpreting images and solve math problems.
+    """
+    # max_iteration = 1
+    llm = Image_to_Text(
+        system_prompt=system_prompt,
+        config=ChatCompletionConfig(
+            name=model_name,
+            return_n=1,
+            max_iteration=1,
+            max_tokens=4096,
+            max_output_tokens=2048,
+            temperature=0.7,
+        ),
+    )
+    results, token_usage = llm.run(query=prompt, context=None, filepath=filepath)
+    logger.info("Token Usage: %s", token_usage)
+    logger.info("Prompt:\t\t%s", prompt)
+    for result in results:
+        output_string = f"{result['role']:15s}:\t{result['content']}"
+        logger.info(output_string)
 
 
-# def exec_so_so():
-#     # await asyncio.sleep(5)
-#     MODEL_NAME = "gemini-2.0-flash"
-#     SYSTEM_PROMPT = "Generate N number of random game character."
-#     PROMPT = "Create 3 unique chracters."
-
-#     config = ChatCompletionConfig(
-#         name=MODEL_NAME,
-#         temperature=0.7,
-#         max_tokens=8192,
-#         max_output_tokens=2048,
-#     )
-#     llm = GMN_StructuredOutput_Core(system_prompt=SYSTEM_PROMPT, config=config)
-#     responses = llm.run(
-#         query=PROMPT, context=None, mode=ResponseMode.SO, format=CustomResponse
-#     )
-#     for response in responses:
-#         content = response["content"]
-#         logger.info(">> %s", content)
-#         jobj = json.loads(content)
-#         logger.info(jobj)
-
-
-# async def aexec_so_so():
-#     await asyncio.sleep(1)
-#     MODEL_NAME = "gemini-2.0-flash"
-#     SYSTEM_PROMPT = "Generate N number of random game character."
-#     PROMPT = "Create 3 unique chracters."
-
-#     config = ChatCompletionConfig(
-#         name=MODEL_NAME,
-#         temperature=0.7,
-#         max_tokens=8192,
-#         max_output_tokens=2048,
-#     )
-#     llm = GMN_StructuredOutput_Core(system_prompt=SYSTEM_PROMPT, config=config)
-#     responses = await llm.run_async(
-#         query=PROMPT, context=None, mode=ResponseMode.SO, format=CustomResponse
-#     )
-#     for response in responses:
-#         content = response["content"]
-#         logger.info(">> %s", content)
-#         jobj = json.loads(content)
-#         logger.info(jobj)
+async def async_i2t_wo_tool(model_name: str, prompt: str, filepath: str) -> None:
+    """
+    Code snippet of calling LLM for image interpretation without tools.
+    """
+    system_prompt = """
+    You are a Whales, a faithful AI assistant.
+    You are good at interpreting images and solve math problems.
+    """
+    # max_iteration = 1
+    llm = Image_to_Text(
+        system_prompt=system_prompt,
+        config=ChatCompletionConfig(
+            name=model_name,
+            return_n=1,
+            max_iteration=1,
+            max_tokens=4096,
+            max_output_tokens=2048,
+            temperature=0.7,
+        ),
+    )
+    results, token_usage = await llm.run_async(
+        query=prompt, context=None, filepath=filepath
+    )
+    logger.info("Token Usage: %s", token_usage)
+    logger.info("Prompt:\t\t%s", prompt)
+    for result in results:
+        output_string = f"{result['role']:15s}:\t{result['content']}"
+        logger.info(output_string)
 
 
-# ImageDescriptionJSON = """
-# Describe the image using JSON Schema below.
+def execute_i2t_w_tool(model_name: str, prompt: str, filepath: str) -> None:
+    """
+    Code snippet of calling LLM for image interpretation with tools.
+    """
 
-# JSON Schema:
-# {
-#     \"title\": {{Title:str}},
-#     \"summary\": {{Summary:str}},
-#     \"narrative\": {{Narative:str}}
-# }
-# """
+    def adder(a: int, b: int) -> int:
+        """Add a with b.
 
+        Args:
+            a (int): The first number.
+            b (int): The second number.
 
-# def exec_so_json_ii():
-#     # await asyncio.sleep(5)
-#     MODEL_NAME = "gemini-2.0-flash"
-#     SYSTEM_PROMPT = "You are a faithful AI chatbot."
-#     PROMPT = ImageDescriptionJSON
-#     FILEPATH = "./dev/image/wednesday-addams-00.jpg"
+        Returns:
+            int (int): The sum of a and b
+        """
+        return a + b
 
-#     config = ChatCompletionConfig(
-#         name=MODEL_NAME,
-#         temperature=0.7,
-#         max_tokens=8192,
-#         max_output_tokens=2048,
-#     )
-#     llm = GMN_StructuredOutput_Core(system_prompt=SYSTEM_PROMPT, config=config)
-#     responses = llm.run(
-#         query=PROMPT, context=None, mode=ResponseMode.JSON, filepath=FILEPATH
-#     )
-#     for response in responses:
-#         content = response["content"]
-#         logger.info(">> %s", content)
-#         jobj = json.loads(content)
-#         logger.info(jobj)
+    async def divider(a: int, b: int) -> float:
+        """Divide a by b.
 
+        Args:
+            a (int): The first number.
+            b (int): The second number.
 
-# async def aexec_so_json_ii():
-#     await asyncio.sleep(1)
-#     MODEL_NAME = "gemini-2.0-flash"
-#     SYSTEM_PROMPT = "You are a faithful AI chatbot."
-#     PROMPT = ImageDescriptionJSON
-#     FILEPATH = "./dev/image/wednesday-addams-00.jpg"
+        Returns:
+            float: the division of a and b
 
-#     config = ChatCompletionConfig(
-#         name=MODEL_NAME,
-#         temperature=0.7,
-#         max_tokens=8192,
-#         max_output_tokens=2048,
-#     )
-#     llm = GMN_StructuredOutput_Core(system_prompt=SYSTEM_PROMPT, config=config)
-#     responses = await llm.run_async(
-#         query=PROMPT, context=None, mode=ResponseMode.JSON, filepath=FILEPATH
-#     )
-#     for response in responses:
-#         content = response["content"]
-#         logger.info(">> %s", content)
-#         jobj = json.loads(content)
-#         logger.info(jobj)
+        Raises:
+            ValueError: When b is 0
+        """
+        if b == 0:
+            raise ValueError("Division by zero.")
+        return a / b
 
+    def multiplier(a: float, b: float) -> float:
+        """Multiply a by b.,
 
-# class ImageDescriptionModel(BaseModel):
-#     title: str
-#     summary: str
-#     narrative: str
+        Args:
+            a (float): The first number.
+            b (float): The second number.
 
+        Returns:
+            float: The mulplication of a and b
+        """
+        return a * b
 
-# def exec_so_so_ii():
-#     # await asyncio.sleep(5)
-#     MODEL_NAME = "gemini-2.0-flash"
-#     SYSTEM_PROMPT = "You are a faithful AI chatbot."
-#     PROMPT = ImageDescriptionJSON
-#     FILEPATH = "./dev/image/wednesday-addams-00.jpg"
+    add_tool = LazyTool(adder, is_coroutine_function=False)
+    div_tool = LazyTool(divider, is_coroutine_function=True)
+    mul_tool = LazyTool(multiplier, is_coroutine_function=False)
 
-#     config = ChatCompletionConfig(
-#         name=MODEL_NAME,
-#         temperature=0.7,
-#         max_tokens=8192,
-#         max_output_tokens=2048,
-#     )
-#     llm = GMN_StructuredOutput_Core(system_prompt=SYSTEM_PROMPT, config=config)
-#     responses = llm.run(
-#         query=PROMPT,
-#         context=None,
-#         mode=ResponseMode.SO,
-#         format=ImageDescriptionModel,
-#         filepath=FILEPATH,
-#     )
-#     for response in responses:
-#         content = response["content"]
-#         logger.info(">> %s", content)
-#         jobj = json.loads(content)
-#         logger.info(jobj)
+    system_prompt = """
+    You are a Whales, a faithful AI assistant.
+    You are good at interpreting images and solve math problems.
+    """
+    llm = Image_to_Text_W_Tool(
+        system_prompt=system_prompt,
+        config=ChatCompletionConfig(
+            name=model_name,
+            return_n=1,
+            max_iteration=7,
+            max_tokens=4096,
+            max_output_tokens=2048,
+            temperature=0.7,
+        ),
+        tools=[add_tool, div_tool, mul_tool],
+    )
+    results, token_usage = llm.run(query=prompt, context=None, filepath=filepath)
+    logger.info("Token Usage: %s", token_usage)
+    logger.info("Prompt:\t\t%s", prompt)
+    for result in results:
+        output_string = f"{result['role']:15s}:\t{result['content']}"
+        logger.info(output_string)
 
 
-# async def aexec_so_so_ii():
-#     await asyncio.sleep(1)
-#     MODEL_NAME = "gemini-2.0-flash"
-#     SYSTEM_PROMPT = "You are a faithful AI chatbot."
-#     PROMPT = ImageDescriptionJSON
-#     FILEPATH = "./dev/image/wednesday-addams-00.jpg"
+async def async_i2t_w_tool(model_name: str, prompt: str, filepath: str) -> None:
+    """
+    Code snippet of calling LLM for image interpretation with tools.
+    """
 
-#     config = ChatCompletionConfig(
-#         name=MODEL_NAME,
-#         temperature=0.7,
-#         max_tokens=8192,
-#         max_output_tokens=2048,
-#     )
-#     llm = GMN_StructuredOutput_Core(system_prompt=SYSTEM_PROMPT, config=config)
-#     responses = llm.run(
-#         query=PROMPT,
-#         context=None,
-#         mode=ResponseMode.SO,
-#         format=ImageDescriptionModel,
-#         filepath=FILEPATH,
-#     )
-#     for response in responses:
-#         content = response["content"]
-#         logger.info(">> %s", content)
-#         jobj = json.loads(content)
-#         logger.info(jobj)
+    def adder(a: int, b: int) -> int:
+        """Add a with b.
+
+        Args:
+            a (int): The first number.
+            b (int): The second number.
+
+        Returns:
+            int (int): The sum of a and b
+        """
+        return a + b
+
+    async def divider(a: int, b: int) -> float:
+        """Divide a by b.
+
+        Args:
+            a (int): The first number.
+            b (int): The second number.
+
+        Returns:
+            float: the division of a and b
+
+        Raises:
+            ValueError: When b is 0
+        """
+        if b == 0:
+            raise ValueError("Division by zero.")
+        return a / b
+
+    def multiplier(a: float, b: float) -> float:
+        """Multiply a by b.,
+
+        Args:
+            a (float): The first number.
+            b (float): The second number.
+
+        Returns:
+            float: The mulplication of a and b
+        """
+        return a * b
+
+    add_tool = LazyTool(adder, is_coroutine_function=False)
+    div_tool = LazyTool(divider, is_coroutine_function=True)
+    mul_tool = LazyTool(multiplier, is_coroutine_function=False)
+
+    system_prompt = """
+    You are a Whales, a faithful AI assistant.
+    You are good at interpreting images and solve math problems.
+    """
+    llm = Image_to_Text_W_Tool(
+        system_prompt=system_prompt,
+        config=ChatCompletionConfig(
+            name=model_name,
+            return_n=1,
+            max_iteration=7,
+            max_tokens=4096,
+            max_output_tokens=2048,
+            temperature=0.7,
+        ),
+        tools=[add_tool, div_tool, mul_tool],
+    )
+    results, token_usage = await llm.run_async(
+        query=prompt, context=None, filepath=filepath
+    )
+    logger.info("Token Usage: %s", token_usage)
+    logger.info("Prompt:\t\t%s", prompt)
+    for result in results:
+        output_string = f"{result['role']:15s}:\t{result['content']}"
+        logger.info(output_string)
+
+
+def execute_thinking_core(model_name: str, prompt: str) -> None:
+    """
+    Code snippet of calling thinking LLM.
+    """
+    # max_iteration = 1
+    llm = Thinking_Core(
+        system_prompt="You are deep thinker.",
+        config=ChatCompletionConfig(
+            name=model_name,
+            return_n=1,
+            max_iteration=1,
+            max_tokens=8192,
+            max_output_tokens=4096,
+            temperature=1.0,
+        ),
+    )
+    results, token_usage = llm.run(query=prompt, context=None)
+    logger.info("Token Usage: %s", token_usage)
+    logger.info("Prompt:\t\t%s", prompt)
+    for result in results:
+        output_string = f"{result['role']:15s}:\t{result['content']}"
+        logger.info(output_string)
+
+
+async def async_thinking_core(model_name: str, prompt: str) -> None:
+    """
+    Code snippet of calling thinking LLM.
+    """
+    # max_iteration = 1
+    llm = Thinking_Core(
+        system_prompt="You are deep thinker.",
+        config=ChatCompletionConfig(
+            name=model_name,
+            return_n=1,
+            max_iteration=1,
+            max_tokens=8192,
+            max_output_tokens=4096,
+            temperature=1.0,
+        ),
+    )
+    results, token_usage = llm.run(query=prompt, context=None)
+    logger.info("Token Usage: %s", token_usage)
+    logger.info("Prompt:\t\t%s", prompt)
+    for result in results:
+        output_string = f"{result['role']:15s}:\t{result['content']}"
+        logger.info(output_string)
 
 
 def synchronous_tasks() -> None:
     logger.info("======= Synchronous tasks =======")
-    model_name = "gemini-2.0-flash"
-    # exec_t2t(model_name)
-    exec_i2t(model_name)
-    #     tasks = {
-    #         "default": [exec_t2t, exec_i2t],
-    #         "text-generation": [exec_so_json, exec_so_so],
-    #         "image-interpretation": [exec_so_json_ii, exec_so_so_ii],
-    #     }
+    CHAT_COMPLETION_MODELS = ["gemini-2.0-flash", "gemini-1.5-flash"]
+    THINKING_MODELS = [
+        "gemini-2.5-pro-preview-03-25",
+        "models/gemini-2.5-flash-preview-04-17",
+    ]
+    for model in CHAT_COMPLETION_MODELS:
+        logger.info("Chat completion model: %s", model)
+        execute_t2t_wo_tool(
+            model,
+            "What is expected when two object meet each other in infinite speed and force?",
+        )
+        execute_t2t_wo_tool(
+            model,
+            "What is expected when two object meet each other in infinite speed and force?",
+        )
+        execute_t2t_w_tool(model, "Solve 13 * 17 + 25 / 5 = ?")
+        execute_t2t_json(
+            model,
+            "Is DeepSeek V3 a suitable model for content moderation of social media platform?",
+        )
+        execute_t2t_json(model, "omo~")
+        execute_t2t_structured_output(
+            model,
+            "Is DeepSeek V3 a suitable model for content moderation of social media platform?",
+        )
+        execute_t2t_structured_output(
+            model, "Today is a great day! I should do something!"
+        )
+        execute_i2t_wo_tool(model, "Solve this", r"./dev/image/math_question.jpg")
+        execute_i2t_w_tool(model, "Solve this", r"./dev/image/math_question.jpg")
+        execute_i2t_json(
+            model, "Identify the text in the image", r"./dev/image/math_question.jpg"
+        )
+        execute_i2t_structured_output(
+            model, "Identify the text in the image", r"./dev/image/math_question.jpg"
+        )
 
-    #     for title, jobs in tasks.items():
-    #         logger.info("Title: %s", title)
-    #         for job in jobs:
-    #             job()
+    for model in THINKING_MODELS:
+        logger.info("Thinking model: %s", model)
+        try:
+            execute_thinking_core(
+                model,
+                "What is expected when two object meet each other in infinite speed and force?",
+            )
+            execute_i2t_w_tool(
+                model,
+                "List out the steps and solve this",
+                r"./dev/image/math_question.jpg",
+            )
+            execute_i2t_structured_output(
+                model,
+                "List out the steps and solve this",
+                r"./dev/image/math_question.jpg",
+            )
+        except Exception as e:
+            logger.error("Exception: %s", e)
 
 
 async def asynchronous_tasks() -> None:
     logger.info("======= Asynchronous tasks =======")
-    model_name = "gemini-2.0-flash"
-    # tasks = {
-    #     "default": [aexec_t2t(), aexec_i2t()],
-    #     "text-generation": [aexec_so_json(), aexec_so_so()],
-    #     "image-interpretation": [aexec_so_json_ii, aexec_so_so_ii()],
-    # }
-
-    # for title, jobs in tasks.items():
-    #     logger.info("Title: %s", title)
-    #     await asyncio.gather(*jobs)
-    tasks = [
-        # aexec_t2t(model_name),
-        aexec_i2t(model_name)
+    CHAT_COMPLETION_MODELS = ["gemini-2.0-flash", "gemini-1.5-flash"]
+    THINKING_MODELS = [
+        "gemini-2.5-pro-preview-03-25",
+        "models/gemini-2.5-flash-preview-04-17",
     ]
+    tasks = []
+    for model in CHAT_COMPLETION_MODELS:
+        logger.info("Chat completion model: %s", model)
+        tasks.append(
+            async_t2t_wo_tool(
+                model,
+                "What is expected when two object meet each other in infinite speed and force?",
+            )
+        )
+        tasks.append(async_t2t_w_tool(model, "Solve 13 * 17 + 25 / 5 = ?"))
+        tasks.append(
+            async_t2t_json(
+                model,
+                "Is DeepSeek V3 a suitable model for content moderation of social media platform?",
+            )
+        )
+        tasks.append(async_t2t_json(model, "Ulala~"))
+        tasks.append(
+            async_t2t_structured_output(
+                model,
+                "Is DeepSeek V3 a suitable model for content moderation of social media platform?",
+            )
+        )
+        tasks.append(
+            async_t2t_structured_output(
+                model,
+                "Today is a great day! I should do something!",
+            )
+        )
+        tasks.append(
+            async_i2t_wo_tool(model, "Solve this", r"./dev/image/math_question.jpg")
+        )
+        tasks.append(
+            async_i2t_w_tool(model, "Solve this", r"./dev/image/math_question.jpg")
+        )
+        tasks.append(
+            async_i2t_json(
+                model,
+                "Identify the text in the image",
+                r"./dev/image/math_question.jpg",
+            )
+        )
+        tasks.append(
+            async_i2t_structured_output(
+                model,
+                "Identify the text in the image",
+                r"./dev/image/math_question.jpg",
+            )
+        )
+
+    await asyncio.gather(*tasks)
+
+    tasks = []
+    for model in THINKING_MODELS:
+        logger.info("Thinking model: %s", model)
+        tasks.append(
+            async_thinking_core(
+                model,
+                "What is expected when two object meet each other in infinite speed and force?",
+            )
+        )
+        tasks.append(
+            async_i2t_w_tool(
+                model,
+                "List out the steps and solve this",
+                r"./dev/image/math_question.jpg",
+            )
+        )
+        tasks.append(
+            async_i2t_structured_output(
+                model,
+                "Identify the text in the image",
+                r"./dev/image/math_question.jpg",
+            )
+        )
+
     await asyncio.gather(*tasks)
 
 

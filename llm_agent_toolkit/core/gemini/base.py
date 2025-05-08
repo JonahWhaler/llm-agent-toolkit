@@ -1,7 +1,7 @@
 import os
 import logging
 from math import ceil
-from typing import Any, Optional
+from typing import Optional
 from PIL import Image
 from google import genai
 from google.genai import types
@@ -16,10 +16,10 @@ class GeminiCore:
     csv_path: str | None = None
 
     def __init__(self, model_name: str):
-        self.__model_name = model_name
+        # self.__model_name = model_name
         if not GeminiCore.__available(model_name):
             raise ValueError(
-                "%s is not available in Gemini's model listing.", model_name
+                f"{model_name} is not available in Gemini's model listing."
             )
 
     @staticmethod
@@ -27,6 +27,7 @@ class GeminiCore:
         try:
             client = genai.Client(api_key=os.environ["GEMINI_API_KEY"])
             response = client.models.list()
+            model_name = model_name.replace("models/", "")
             padded_name = f"models/{model_name}"
             for m in response.page:
                 if padded_name == m.name:
@@ -67,7 +68,7 @@ class GeminiCore:
                         try:
                             _ = int(value)
                         except ValueError:
-                            logger.warning(f"{name}.{column} must be an integer.")
+                            logger.warning("%s.%s must be an integer.", name, column)
                             raise
                     elif value:
                         assert value.lower() in [
@@ -283,12 +284,15 @@ class GeminiCore:
             parts: list[types.Part] | None = getattr(msg, "parts", None)
             assert role is not None
             assert parts is not None
-            content = parts[0].text
-            if content:
+            ptexts = []
+            for part in parts:
+                if part.text:
+                    ptexts.append(part.text)
+            if ptexts:
                 output_list.append(
                     MessageBlock(
                         role=CreatorRole.ASSISTANT.value if role == "model" else role,
-                        content=content,
+                        content="\n".join(ptexts),
                     )
                 )
             # Parts without the text attribute will be skipped.
@@ -330,81 +334,43 @@ class GeminiCore:
         return warning_message
 
     @staticmethod
-    def get_function_call(
-        response: types.GenerateContentResponse,
-    ) -> Optional[dict[str, Any]]:
+    def get_functs(content: types.Content) -> Optional[list[dict[str, dict]]]:
         try:
-            candidates: Optional[list[types.Candidate]] = response.candidates
-            if not candidates:
-                return None
+            parts: Optional[list[types.Part]] = content.parts
+            if parts:
+                output: list[dict] = []
+                for part in parts:
+                    if part.function_call:
+                        output.append(
+                            {
+                                "id": part.function_call.id,
+                                "name": part.function_call.name,
+                                "arguments": part.function_call.args,
+                            }
+                        )
 
-            content: Optional[types.Candidate] = getattr(candidates[0], "content", None)
-            if not content:
+                if len(output) > 0:
+                    return output
                 return None
-
-            parts: Optional[list[types.Part]] = getattr(content, "parts", None)
-            if not parts:
-                return None
-
-            function_call: Optional[types.FunctionCall] = getattr(
-                parts[0],
-                "function_call",
-                None,
-            )
-            if not function_call:
-                return None
-
-            return {
-                "id": function_call.id,
-                "name": function_call.name,
-                "arguments": function_call.args,
-            }
+            raise ValueError("No parts found in the content.")
         except Exception as e:
-            # logger.warning("Function call not found: %s", str(e))
+            logger.error("Function call not found: %s", str(e))
             return None
 
     @staticmethod
-    def get_response_text(response: types.GenerateContentResponse) -> str | None:
+    def get_texts(content: types.Content) -> Optional[list[str]]:
         try:
-            candidates: Optional[list[types.Candidate]] = response.candidates
-            if not candidates:
-                return None
-
-            content: Optional[types.Candidate] = getattr(candidates[0], "content", None)
-            if content is None:
-                return None
-
-            parts: Optional[list[types.Part]] = getattr(content, "parts", None)
+            parts: Optional[list[types.Part]] = content.parts
             if parts is None:
                 return None
 
-            response_text = getattr(parts[0], "text", None)
-            if response_text is None:
-                return response.text
+            output: list[str] = [part.text for part in parts if part.text is not None]
 
-            return response_text
-        except Exception as e:
-            # logger.warning("Response text not found: %s", str(e))
+            if len(output) > 0:
+                return output
             return None
-
-    @staticmethod
-    def get_finish_reason(
-        response: types.GenerateContentResponse,
-    ) -> Optional[types.FinishReason]:
-        try:
-            candidates: Optional[list[types.Candidate]] = response.candidates
-            if not candidates:
-                return None
-
-            finish_reason: Optional[types.FinishReason] = getattr(
-                candidates[0], "finish_reason", None
-            )
-            if finish_reason is None:
-                return None
-
-            return finish_reason
         except Exception as e:
-            # logger.warning("Response text not found: %s", str(e))
+            logger.error("Response text not found: %s", str(e))
             return None
 
 

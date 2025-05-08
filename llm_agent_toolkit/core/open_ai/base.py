@@ -138,7 +138,7 @@ class OpenAICore:
                         try:
                             _ = int(value)
                         except ValueError:
-                            logger.warning(f"{name}.{column} must be an integer.")
+                            logger.warning("%s.%s must be an integer.", name, column)
                             raise
                     elif value:
                         assert value.lower() in [
@@ -168,7 +168,15 @@ class OpenAICore:
             int: The token count.
         """
         text_token_count: int = 0
-        encoding = tiktoken.encoding_for_model(self.__model_name)
+
+        try:
+            encoding = tiktoken.encoding_for_model(self.__model_name)
+        except KeyError:
+            encoding = tiktoken.get_encoding("o200k_base")
+        except Exception as e:
+            logger.error("Exception: %s", str(e), exc_info=True, stack_info=True)
+            raise
+
         for msg in msgs:
             # Incase the dict does not comply with the MessageBlock format
             if "content" in msg and msg["content"]:

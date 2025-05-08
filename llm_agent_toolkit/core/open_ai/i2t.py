@@ -1,7 +1,14 @@
 import os
 import logging
+import json
 import base64
+import time
+import asyncio
+from copy import deepcopy
+
 import openai
+from openai import RateLimitError
+
 from ..._core import Core, ToolSupport, ImageInterpreter
 from ..._util import CreatorRole, ChatCompletionConfig, MessageBlock, TokenUsage
 from ..._tool import Tool, ToolMetadata
@@ -12,36 +19,43 @@ logger = logging.getLogger(__name__)
 
 class I2T_OAI_Core(Core, OpenAICore, ImageInterpreter, ToolSupport):
     """
-    `I2T_OAI_Core` is a concrete implementation of abstract base classes `TextGenerator`, `ImageInterpreter`, and `ToolSupport`.
-    `I2T_OAI_Core` is also a child class of `OpenAICore`.
+    `I2T_OAI_Core` is a multimodel LLM model that provide image interpretation and function calling support.
 
-    It facilitates synchronous and asynchronous communication with OpenAI's API to interpret images.
+    It is designed to work with OpenAI's API and supports various image formats.
+
+    It includes methods for running asynchronous and synchronous execution, and
+    handling retries with progressive backoff in case of errors.
+
+    Attributes:
+        SUPPORTED_IMAGE_FORMATS (tuple[str]): A tuple of supported image formats.
+        MAX_ATTEMPT (int): The maximum number of retry attempts for API calls.
+        DELAY_FACTOR (float): The factor by which the delay increases after each retry.
+        MAX_DELAY (float): The maximum delay between retries.
 
     **Methods:**
-    - run(query: str, context: list[MessageBlock | dict] | None, **kwargs) -> tuple[list[MessageBlock | dict], TokenUsage]:
-        Synchronously run the LLM model to interpret images.
-    - run_async(query: str, context: list[MessageBlock | dict] | None, **kwargs) -> tuple[list[MessageBlock | dict], TokenUsage]:
-        Asynchronously run the LLM model to interpret images.
-    - interpret(query: str, context: list[MessageBlock | dict] | None, filepath: str, **kwargs) -> tuple[list[MessageBlock | dict], TokenUsage]:
-        Synchronously interpret the given image.
-    - interpret_async(query: str, context: list[MessageBlock | dict] | None, filepath: str, **kwargs) -> tuple[list[MessageBlock | dict], TokenUsage]:
-        Asynchronously interpret the given image.
-    - get_image_url(filepath: str) -> str:
-        Returns the URL of the image from the specified file path.
-    - call_tools_async(selected_tools: list) -> list[MessageBlock | dict]:
-        Asynchronously call tools.
-    - call_tools(selected_tools: list) -> list[MessageBlock | dict]:
-        Synchronously call tools.
+        run(query: str, context: list[MessageBlock | dict] | None, **kwargs) -> tuple[list[MessageBlock | dict], TokenUsage]:
+            Synchronously run the LLM model to interpret images.
+        run_async(query: str, context: list[MessageBlock | dict] | None, **kwargs) -> tuple[list[MessageBlock | dict], TokenUsage]:
+            Asynchronously run the LLM model to interpret images.
+        interpret(query: str, context: list[MessageBlock | dict] | None, filepath: str, **kwargs) -> tuple[list[MessageBlock | dict], TokenUsage]:
+            Synchronously interpret the given image.
+        interpret_async(query: str, context: list[MessageBlock | dict] | None, filepath: str, **kwargs) -> tuple[list[MessageBlock | dict], TokenUsage]:
+            Asynchronously interpret the given image.
+        get_image_url(filepath: str) -> str:
+            Returns the URL of the image from the specified file path.
+        call_tools_async(selected_tools: list) -> tuple[list[MessageBlock | dict], TokenUsage]:
+            Asynchronously call tools.
+        call_tools(selected_tools: list) -> tuple[list[MessageBlock | dict], TokenUsage]:
+            Synchronously call tools.
 
     **Notes:**
-    - Supported image format: .png, .jpeg, .jpg, .gif, .webp
-    - The caller is responsible for memory management, output parsing and error handling.
-    - If model is not available under OpenAI's listing, raise ValueError.
-    - `context_length` is configurable.
-    - `max_output_tokens` is configurable.
+    - Backend URL: https://api.openai.com
     """
 
     SUPPORTED_IMAGE_FORMATS = (".png", ".jpeg", ".jpg", ".gif", ".webp")
+    MAX_ATTEMPT: int = 5
+    DELAY_FACTOR: float = 1.5
+    MAX_DELAY: float = 60.0
 
     def __init__(
         self,
@@ -62,24 +76,33 @@ class I2T_OAI_Core(Core, OpenAICore, ImageInterpreter, ToolSupport):
         self, query: str, context: list[MessageBlock | dict] | None, **kwargs
     ) -> tuple[list[MessageBlock | dict], TokenUsage]:
         """
-        Asynchronously run the LLM model to interpret images.
+        Asynchronously run the LLM model with the given query and context.
 
         Args:
-            query (str): The query to be interpreted.
-            context (list[MessageBlock | dict] | None): The context to be used for the query.
-            filepath (str): The path to the image file to be interpreted.
+            query (str): The query to be processed by the LLM model.
+            context (list[MessageBlock | dict] | None): The context to be used for the LLM model.
             **kwargs: Additional keyword arguments.
 
         Returns:
             list[MessageBlock | dict]: The list of messages generated by the LLM model.
             TokenUsage: The recorded token usage.
 
-        Notes:
-        * Early Termination Condition:
-                * If a solution is found.
-                * If the maximum iteration is reached.
-                * If the accumulated token count is greater than or equal to the maximum token count.
-                * If the maximum output tokens are less than or equal to zero.
+        **Rate Limit Error Handling**:
+        - If a RateLimitError occurs, the function will retry the request with an increasing delay.
+        - The delay will be multiplied by a factor (DELAY_FACTOR) after each attempt, up to a maximum delay (MAX_DELAY).
+
+        **Early Termination Condition**:
+        The function will terminate early if any of the following conditions are met:
+        - **finish_reason**:
+            - "stop": A solution is found.
+            - "tool_calls": The model is calling a tool. The function will call the tool and continue processing.
+            - "length": The model has reached the maximum token limit.
+                If the content is not empty, it will terminate and output the generated responses.
+                Otherwise, it will raise an error.
+            - "content_filter | function_call": Unexpected response. The function will raise an error.
+        - **iteration**: The maximum number of iterations is reached.
+        - **token_usage**: The accumulated token count is greater than or equal to the maximum token count.
+        - **max_output_tokens**: The maximum output tokens are less than or equal to zero.
         """
         msgs: list[MessageBlock | dict] = [
             MessageBlock(role=CreatorRole.SYSTEM.value, content=self.system_prompt)
@@ -107,132 +130,167 @@ class I2T_OAI_Core(Core, OpenAICore, ImageInterpreter, ToolSupport):
                             "type": "image_url",
                             "image_url": {"url": img_url, "detail": "high"},
                         },
-                    ],  # type: ignore
+                    ],
                 }
             )
         else:
             msgs.append(MessageBlock(role=CreatorRole.USER.value, content=query))
 
-        tools_metadata: list[ToolMetadata] | None = None
+        tools: list[ToolMetadata] | None = None
         if self.tools:
-            tools_metadata = [tool.info for tool in self.tools]
+            tools = [tool.info for tool in self.tools]
             msgs.append(
                 MessageBlock(role=CreatorRole.SYSTEM.value, content=TOOL_PROMPT)
             )
 
-        NUMBER_OF_PRIMERS = len(msgs)  # later use this to skip the preloaded messages
+        # later use this to skip the preloaded messages
+        number_of_inputs = len(msgs)
 
         MAX_TOKENS = min(self.config.max_tokens, self.context_length)
         MAX_OUTPUT_TOKENS = min(
             MAX_TOKENS, self.max_output_tokens, self.config.max_output_tokens
         )
-        prompt_token_count = self.calculate_token_count(
-            msgs,
-            tools_metadata,
-            images=[filepath] if filepath else None,
-            image_detail="high" if filepath else None,
-        )
-        max_output_tokens = min(
-            MAX_OUTPUT_TOKENS,
-            self.context_length - prompt_token_count,
-        )
 
-        token_usage = TokenUsage(input_tokens=0, output_tokens=0)
-        iteration, solved = 0, False
+        attempt: int = 1
+        delay: float = 5.0
 
-        try:
-            client = openai.AsyncOpenAI(api_key=os.environ["OPENAI_API_KEY"])
-            while (
-                not solved
-                and max_output_tokens > 0
-                and iteration < self.config.max_iteration
-                and token_usage.total_tokens < MAX_TOKENS
-            ):
-                # logger.debug("\n\nIteration: %d", iteration)
-                if tools_metadata and iteration + 1 == self.config.max_iteration:
-                    # Force the llm to provide answer
-                    tools_metadata = None
-                    msgs.remove(
-                        {"role": CreatorRole.SYSTEM.value, "content": TOOL_PROMPT}
-                    )
-                response = await client.chat.completions.create(
-                    model=self.model_name,
-                    messages=msgs,  # type: ignore
-                    frequency_penalty=0.5,
-                    max_tokens=max_output_tokens,
-                    temperature=self.config.temperature,
-                    n=self.config.return_n,
-                    tools=tools_metadata,  # type: ignore
-                )
+        while attempt < I2T_OAI_Core.MAX_ATTEMPT:
+            logger.debug("Attempt %d", attempt)
+            messages = deepcopy(msgs)
+            prompt_token_count = self.calculate_token_count(
+                messages,
+                tools,
+                images=[filepath] if filepath else None,
+                image_detail="high" if filepath else None,
+            )
+            max_output_tokens = min(
+                MAX_OUTPUT_TOKENS, self.context_length - prompt_token_count
+            )
 
-                choice = response.choices[0]
-                _content = getattr(choice.message, "content", "Not Available")
-                if _content:
-                    msgs.append(
-                        MessageBlock(role=CreatorRole.ASSISTANT.value, content=_content)
+            iteration, solved = 0, False
+            token_usage = TokenUsage(input_tokens=0, output_tokens=0)
+            try:
+                client = openai.AsyncOpenAI(api_key=os.environ["OPENAI_API_KEY"])
+                while (
+                    not solved
+                    and max_output_tokens > 0
+                    and iteration < self.config.max_iteration
+                    and token_usage.total_tokens < MAX_TOKENS
+                ):
+                    logger.debug("Iteration: [%d]", iteration)
+                    response = await client.chat.completions.create(
+                        model=self.model_name,
+                        messages=messages,  # type: ignore
+                        frequency_penalty=0.5,
+                        max_tokens=max_output_tokens,
+                        temperature=self.config.temperature,
+                        n=self.config.return_n,
+                        tools=tools,  # type: ignore
                     )
 
-                tool_calls = choice.message.tool_calls
-                if tool_calls:
-                    output, ttku = self.call_tools(tool_calls)
-                    msgs.extend(output)
-                    token_usage += ttku
+                    token_usage = self.update_usage(response.usage, token_usage)
 
-                solved = tool_calls is None
-                prompt_token_count = self.calculate_token_count(
-                    msgs,
-                    tools_metadata,
-                    images=[filepath] if filepath else None,
-                    image_detail="high" if filepath else None,
-                )
-                max_output_tokens = min(
-                    MAX_OUTPUT_TOKENS,
-                    self.context_length - prompt_token_count,
-                )
-                iteration += 1
-                token_usage = self.update_usage(response.usage, token_usage)
-            # End while
+                    choice = response.choices[0]
+                    finish_reason = choice.finish_reason
+                    content = choice.message.content
+                    tool_calls = choice.message.tool_calls
 
-            if not solved:
-                warning_message = "Warning: "
-                if iteration == self.config.max_iteration:
-                    warning_message += f"Maximum iteration reached. {iteration}/{self.config.max_iteration}\n"
-                elif token_usage.total_tokens >= MAX_TOKENS:
-                    warning_message += f"Maximum token count reached. {token_usage.total_tokens}/{MAX_TOKENS}\n"
-                elif max_output_tokens <= 0:
-                    warning_message += f"Maximum output tokens <= 0. {prompt_token_count}/{self.context_length}\n"
-                else:
-                    warning_message += "Unknown reason"
-                raise RuntimeError(warning_message)
-            return msgs[
-                NUMBER_OF_PRIMERS:
-            ], token_usage  # Return only the generated messages
-        except Exception as e:
-            logger.error("Exception: %s", e, exc_info=True, stack_info=True)
-            raise
+                    if finish_reason == "tool_calls" and tool_calls:
+                        output, ttku = await self.call_tools_async(tool_calls)
+                        if output:
+                            messages.extend(output)
+                            token_usage += ttku
+
+                        prompt_token_count = self.calculate_token_count(
+                            messages,
+                            tools,
+                            images=[filepath] if filepath else None,
+                            image_detail="high" if filepath else None,
+                        )
+                        max_output_tokens = min(
+                            MAX_OUTPUT_TOKENS, self.context_length - prompt_token_count
+                        )
+                        iteration += 1
+                    elif finish_reason == "stop" and content:
+                        messages.append(
+                            MessageBlock(
+                                role=CreatorRole.ASSISTANT.value, content=content
+                            )
+                        )
+                        solved = True
+                    elif finish_reason == "length" and content:
+                        logger.warning("Terminated due to length.")
+                        e = {"error": "Early Termination: Length", "text": content}
+                        messages.append(
+                            MessageBlock(
+                                role=CreatorRole.ASSISTANT.value,
+                                content=json.dumps(e, ensure_ascii=False),
+                            )
+                        )
+                        solved = True
+                    else:
+                        logger.warning("Malformed response: %s", response)
+                        logger.warning("Config: %s", self.config)
+                        raise RuntimeError(f"Terminated: {finish_reason}")
+
+                # End while
+
+                if not solved:
+                    warning_message = "Warning: "
+                    if iteration == self.config.max_iteration:
+                        warning_message += f"Maximum iteration reached. {iteration}/{self.config.max_iteration}\n"
+                    elif token_usage.total_tokens >= MAX_TOKENS:
+                        warning_message += f"Maximum token count reached. {token_usage.total_tokens}/{MAX_TOKENS}\n"
+                    elif max_output_tokens <= 0:
+                        warning_message += f"Maximum output tokens <= 0. {prompt_token_count}/{self.context_length}\n"
+                    else:
+                        warning_message += "Unknown reason"
+                    raise RuntimeError(warning_message)
+                return messages[number_of_inputs:], token_usage
+            except RateLimitError as rle:
+                logger.warning("RateLimitError: %s", rle)
+                warn_msg = f"[{attempt}] Retrying in {delay} seconds..."
+                logger.warning(warn_msg)
+                await asyncio.sleep(delay)
+                attempt += 1
+                delay = delay * I2T_OAI_Core.DELAY_FACTOR
+                delay = min(I2T_OAI_Core.MAX_DELAY, delay)
+                continue
+            except Exception as e:
+                logger.error("Exception: %s", e, exc_info=True, stack_info=True)
+                raise
 
     def run(
         self, query: str, context: list[MessageBlock | dict] | None, **kwargs
     ) -> tuple[list[MessageBlock | dict], TokenUsage]:
         """
-        Synchronously run the LLM model to interpret images.
+        Synchronously run the LLM model with the given query and context.
 
         Args:
-            query (str): The query to be interpreted.
-            context (list[MessageBlock | dict] | None): The context to be used for the query.
-            filepath (str): The path to the image file to be interpreted.
+            query (str): The query to be processed by the LLM model.
+            context (list[MessageBlock | dict] | None): The context to be used for the LLM model.
             **kwargs: Additional keyword arguments.
 
         Returns:
             list[MessageBlock | dict]: The list of messages generated by the LLM model.
             TokenUsage: The recorded token usage.
 
-        Notes:
-        * Early Termination Condition:
-                * If a solution is found.
-                * If the maximum iteration is reached.
-                * If the accumulated token count is greater than or equal to the maximum token count.
-                * If the maximum output tokens are less than or equal to zero.
+        **Rate Limit Error Handling**:
+        - If a RateLimitError occurs, the function will retry the request with an increasing delay.
+        - The delay will be multiplied by a factor (DELAY_FACTOR) after each attempt, up to a maximum delay (MAX_DELAY).
+
+        **Early Termination Condition**:
+        The function will terminate early if any of the following conditions are met:
+        - **finish_reason**:
+            - "stop": A solution is found.
+            - "tool_calls": The model is calling a tool. The function will call the tool and continue processing.
+            - "length": The model has reached the maximum token limit.
+                If the content is not empty, it will terminate and output the generated responses.
+                Otherwise, it will raise an error.
+            - "content_filter | function_call": Unexpected response. The function will raise an error.
+        - **iteration**: The maximum number of iterations is reached.
+        - **token_usage**: The accumulated token count is greater than or equal to the maximum token count.
+        - **max_output_tokens**: The maximum output tokens are less than or equal to zero.
         """
         msgs: list[MessageBlock | dict] = [
             MessageBlock(role=CreatorRole.SYSTEM.value, content=self.system_prompt)
@@ -260,109 +318,135 @@ class I2T_OAI_Core(Core, OpenAICore, ImageInterpreter, ToolSupport):
                             "type": "image_url",
                             "image_url": {"url": img_url, "detail": "high"},
                         },
-                    ],  # type: ignore
+                    ],
                 }
             )
         else:
             msgs.append(MessageBlock(role=CreatorRole.USER.value, content=query))
 
-        tools_metadata: list[ToolMetadata] | None = None
+        tools: list[ToolMetadata] | None = None
         if self.tools:
-            tools_metadata = [tool.info for tool in self.tools]
+            tools = [tool.info for tool in self.tools]
             msgs.append(
                 MessageBlock(role=CreatorRole.SYSTEM.value, content=TOOL_PROMPT)
             )
 
-        NUMBER_OF_PRIMERS = len(msgs)  # later use this to skip the preloaded messages
+        # later use this to skip the preloaded messages
+        number_of_inputs = len(msgs)
 
         MAX_TOKENS = min(self.config.max_tokens, self.context_length)
         MAX_OUTPUT_TOKENS = min(
             MAX_TOKENS, self.max_output_tokens, self.config.max_output_tokens
         )
-        prompt_token_count = self.calculate_token_count(
-            msgs,
-            tools_metadata,
-            images=[filepath] if filepath else None,
-            image_detail="high" if filepath else None,
-        )
-        max_output_tokens = min(
-            MAX_OUTPUT_TOKENS,
-            self.context_length - prompt_token_count,
-        )
 
-        iteration, solved = 0, False
-        token_usage = TokenUsage(input_tokens=0, output_tokens=0)
+        attempt: int = 1
+        delay: float = 5.0
 
-        try:
-            client = openai.OpenAI(api_key=os.environ["OPENAI_API_KEY"])
-            while (
-                not solved
-                and max_output_tokens > 0
-                and iteration < self.config.max_iteration
-                and token_usage.total_tokens < MAX_TOKENS
-            ):
-                # logger.debug("\n\nIteration: %d", iteration)
-                if tools_metadata and iteration + 1 == self.config.max_iteration:
-                    # Force the llm to provide answer
-                    tools_metadata = None
-                    msgs.remove(
-                        {"role": CreatorRole.SYSTEM.value, "content": TOOL_PROMPT}
-                    )
-                response = client.chat.completions.create(
-                    model=self.model_name,
-                    messages=msgs,  # type: ignore
-                    frequency_penalty=0.5,
-                    max_tokens=max_output_tokens,
-                    temperature=self.config.temperature,
-                    n=self.config.return_n,
-                    tools=tools_metadata,  # type: ignore
-                )
+        while attempt < I2T_OAI_Core.MAX_ATTEMPT:
+            logger.debug("Attempt %d", attempt)
+            messages = deepcopy(msgs)
+            prompt_token_count = self.calculate_token_count(
+                messages,
+                tools,
+                images=[filepath] if filepath else None,
+                image_detail="high" if filepath else None,
+            )
+            max_output_tokens = min(
+                MAX_OUTPUT_TOKENS, self.context_length - prompt_token_count
+            )
 
-                choice = response.choices[0]
-                _content = getattr(choice.message, "content", "Not Available")
-                if _content:
-                    msgs.append(
-                        MessageBlock(role=CreatorRole.ASSISTANT.value, content=_content)
+            iteration, solved = 0, False
+            token_usage = TokenUsage(input_tokens=0, output_tokens=0)
+            try:
+                client = openai.OpenAI(api_key=os.environ["OPENAI_API_KEY"])
+                while (
+                    not solved
+                    and max_output_tokens > 0
+                    and iteration < self.config.max_iteration
+                    and token_usage.total_tokens < MAX_TOKENS
+                ):
+                    logger.debug("Iteration: [%d]", iteration)
+                    response = client.chat.completions.create(
+                        model=self.model_name,
+                        messages=messages,  # type: ignore
+                        frequency_penalty=0.5,
+                        max_tokens=max_output_tokens,
+                        temperature=self.config.temperature,
+                        n=self.config.return_n,
+                        tools=tools,  # type: ignore
                     )
 
-                tool_calls = choice.message.tool_calls
-                if tool_calls:
-                    output, ttku = self.call_tools(tool_calls)
-                    msgs.extend(output)
-                    token_usage += ttku
+                    token_usage = self.update_usage(response.usage, token_usage)
 
-                solved = tool_calls is None
-                prompt_token_count = self.calculate_token_count(
-                    msgs,
-                    tools_metadata,
-                    images=[filepath] if filepath else None,
-                    image_detail="high" if filepath else None,
-                )
-                max_output_tokens = min(
-                    MAX_OUTPUT_TOKENS,
-                    self.context_length - prompt_token_count,
-                )
-                iteration += 1
-                token_usage = self.update_usage(response.usage, token_usage)
-            # End while
+                    choice = response.choices[0]
+                    finish_reason = choice.finish_reason
+                    content = choice.message.content
+                    tool_calls = choice.message.tool_calls
 
-            if not solved:
-                warning_message = "Warning: "
-                if iteration == self.config.max_iteration:
-                    warning_message += f"Maximum iteration reached. {iteration}/{self.config.max_iteration}\n"
-                elif token_usage.total_tokens >= MAX_TOKENS:
-                    warning_message += f"Maximum token count reached. {token_usage.total_tokens}/{MAX_TOKENS}\n"
-                elif max_output_tokens <= 0:
-                    warning_message += f"Maximum output tokens <= 0. {prompt_token_count}/{self.context_length}\n"
-                else:
-                    warning_message += "Unknown reason"
-                raise RuntimeError(warning_message)
-            return msgs[
-                NUMBER_OF_PRIMERS:
-            ], token_usage  # Return only the generated messages
-        except Exception as e:
-            logger.error("Exception: %s", e, exc_info=True, stack_info=True)
-            raise
+                    if finish_reason == "tool_calls" and tool_calls:
+                        output, ttku = self.call_tools(tool_calls)
+                        if output:
+                            messages.extend(output)
+                            token_usage += ttku
+
+                        prompt_token_count = self.calculate_token_count(
+                            messages,
+                            tools,
+                            images=[filepath] if filepath else None,
+                            image_detail="high" if filepath else None,
+                        )
+                        max_output_tokens = min(
+                            MAX_OUTPUT_TOKENS, self.context_length - prompt_token_count
+                        )
+                        iteration += 1
+                    elif finish_reason == "stop" and content:
+                        messages.append(
+                            MessageBlock(
+                                role=CreatorRole.ASSISTANT.value, content=content
+                            )
+                        )
+                        solved = True
+                    elif finish_reason == "length" and content:
+                        logger.warning("Terminated due to length.")
+                        e = {"error": "Early Termination: Length", "text": content}
+                        messages.append(
+                            MessageBlock(
+                                role=CreatorRole.ASSISTANT.value,
+                                content=json.dumps(e, ensure_ascii=False),
+                            )
+                        )
+                        solved = True
+                    else:
+                        logger.warning("Malformed response: %s", response)
+                        logger.warning("Config: %s", self.config)
+                        raise RuntimeError(f"Terminated: {finish_reason}")
+
+                # End while
+
+                if not solved:
+                    warning_message = "Warning: "
+                    if iteration == self.config.max_iteration:
+                        warning_message += f"Maximum iteration reached. {iteration}/{self.config.max_iteration}\n"
+                    elif token_usage.total_tokens >= MAX_TOKENS:
+                        warning_message += f"Maximum token count reached. {token_usage.total_tokens}/{MAX_TOKENS}\n"
+                    elif max_output_tokens <= 0:
+                        warning_message += f"Maximum output tokens <= 0. {prompt_token_count}/{self.context_length}\n"
+                    else:
+                        warning_message += "Unknown reason"
+                    raise RuntimeError(warning_message)
+                return messages[number_of_inputs:], token_usage
+            except RateLimitError as rle:
+                logger.warning("RateLimitError: %s", rle)
+                warn_msg = f"[{attempt}] Retrying in {delay} seconds..."
+                logger.warning(warn_msg)
+                time.sleep(delay)
+                attempt += 1
+                delay = delay * I2T_OAI_Core.DELAY_FACTOR
+                delay = min(I2T_OAI_Core.MAX_DELAY, delay)
+                continue
+            except Exception as e:
+                logger.error("Exception: %s", e, exc_info=True, stack_info=True)
+                raise
 
     @staticmethod
     def get_image_url(filepath: str):
@@ -415,7 +499,7 @@ class I2T_OAI_Core(Core, OpenAICore, ImageInterpreter, ToolSupport):
                     output.append(
                         MessageBlock(
                             role=CreatorRole.FUNCTION.value,
-                            content=f"({args}) => {result}",
+                            content=f"{tool_call.function.name}({args}) => {result}",
                             name=tool_call.function.name,
                         )
                     )
@@ -423,13 +507,14 @@ class I2T_OAI_Core(Core, OpenAICore, ImageInterpreter, ToolSupport):
                     output.append(
                         MessageBlock(
                             role=CreatorRole.FUNCTION.value,
-                            content=f"({args}) => {e}",
+                            content=f"{tool_call.function.name}({args}) => {e}",
                             name=tool_call.function.name,
                         )
                     )
                 finally:
                     token_usage = token_usage + tool.token_usage
-                    break
+
+                break
 
         return output, token_usage
 
@@ -467,7 +552,7 @@ class I2T_OAI_Core(Core, OpenAICore, ImageInterpreter, ToolSupport):
                     output.append(
                         MessageBlock(
                             role=CreatorRole.FUNCTION.value,
-                            content=f"({args}) => {result}",
+                            content=f"{tool_call.function.name}({args}) => {result}",
                             name=tool_call.function.name,
                         )
                     )
@@ -475,13 +560,14 @@ class I2T_OAI_Core(Core, OpenAICore, ImageInterpreter, ToolSupport):
                     output.append(
                         MessageBlock(
                             role=CreatorRole.FUNCTION.value,
-                            content=f"({args}) => {e}",
+                            content=f"{tool_call.function.name}({args}) => {e}",
                             name=tool_call.function.name,
                         )
                     )
                 finally:
                     token_usage = token_usage + tool.token_usage
-                    break
+
+                break
 
         return output, token_usage
 
