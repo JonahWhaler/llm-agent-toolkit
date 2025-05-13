@@ -6,7 +6,7 @@ import json
 from typing import Any, Optional
 from copy import deepcopy
 from concurrent.futures import ThreadPoolExecutor
-
+from random import random
 from google import genai
 from google.genai import types
 from ..._core import Core, ToolSupport
@@ -109,6 +109,12 @@ class T2T_GMN_Core_W_Tool(Core, GeminiCore, ToolSupport):
             tools=tools if use_tool else None,
         )
         return config
+
+    def __update_delay(self, delay: float) -> float:
+        new_delay = delay * self.DELAY_FACTOR
+        # Add some randomness to allow bulk requests to retry at a slightly different timing
+        new_delay += random() * 5.0
+        return min(new_delay, self.MAX_DELAY)
 
     def run(
         self, query: str, context: list[MessageBlock | dict] | None, **kwargs
@@ -281,18 +287,22 @@ class T2T_GMN_Core_W_Tool(Core, GeminiCore, ToolSupport):
                 # Return only the generated messages messages
                 output = self.postprocessing(messages[number_of_inputs:])
                 return output, token_usage
-            except Exception as e:
-                if "502 Bad Gateway" in str(e):
-                    logger.warning("RateLimitError: %s", e)
-                    warn_msg = f"[{attempt}] Retrying in {delay} seconds..."
-                    logger.warning(warn_msg)
-                    time.sleep(delay)
-                    attempt += 1
-                    delay = delay * T2T_GMN_Core_W_Tool.DELAY_FACTOR
-                    delay = min(T2T_GMN_Core_W_Tool.MAX_DELAY, delay)
-                    continue
-
+            except RuntimeError:
                 raise
+            except Exception as e:
+                error_object = e.__dict__
+                error_code = error_object["code"]
+                if error_code not in [429, 500, 503]:
+                    raise
+
+                error_message = error_object["message"]
+                logger.warning(
+                    "%s\n[%d] Retrying in %.2f seconds", error_message, attempt, delay
+                )
+                time.sleep(delay)
+                attempt += 1
+                delay = self.__update_delay(delay)
+                continue
 
         raise RuntimeError("Max re-attempt reached")
 
@@ -478,18 +488,22 @@ class T2T_GMN_Core_W_Tool(Core, GeminiCore, ToolSupport):
                 output = self.postprocessing(messages[number_of_inputs:])
                 # Return only the generated messages messages
                 return output, token_usage
-            except Exception as e:
-                if "502 Bad Gateway" in str(e):
-                    logger.warning("RateLimitError: %s", e)
-                    warn_msg = f"[{attempt}] Retrying in {delay} seconds..."
-                    logger.warning(warn_msg)
-                    time.sleep(delay)
-                    attempt += 1
-                    delay = delay * T2T_GMN_Core_W_Tool.DELAY_FACTOR
-                    delay = min(T2T_GMN_Core_W_Tool.MAX_DELAY, delay)
-                    continue
-
+            except RuntimeError:
                 raise
+            except Exception as e:
+                error_object = e.__dict__
+                error_code = error_object["code"]
+                if error_code not in [429, 500, 503]:
+                    raise
+
+                error_message = error_object["message"]
+                logger.warning(
+                    "%s\n[%d] Retrying in %.2f seconds", error_message, attempt, delay
+                )
+                await asyncio.sleep(delay)
+                attempt += 1
+                delay = self.__update_delay(delay)
+                continue
 
         raise RuntimeError("Max re-attempt reached")
 
@@ -592,6 +606,13 @@ class T2T_GMN_Core_W_Tool(Core, GeminiCore, ToolSupport):
                             role=CreatorRole.USER.value,
                             content=output_string,
                         )
+                    )
+                except json.JSONDecodeError as jde:
+                    output.append(
+                        {
+                            "role": CreatorRole.USER.value,
+                            "content": f"Function {tool_call['name']} called. Failed: JSONDecodeError|{str(jde)}",
+                        }
                     )
                 except Exception as e:
                     output.append(
