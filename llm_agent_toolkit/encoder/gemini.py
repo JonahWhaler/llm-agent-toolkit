@@ -2,7 +2,7 @@ import os
 import logging
 import time
 import asyncio
-from typing import Optional
+from random import random
 from concurrent.futures import ThreadPoolExecutor
 from google import genai
 from google.genai import types
@@ -19,9 +19,7 @@ class GeminiEncoder(Encoder):
     """
 
     SUPPORTED_MODELS = (
-        EncoderProfile(
-            name="models/embedding-001", dimension=768, ctx_length=2048
-        ),
+        EncoderProfile(name="models/embedding-001", dimension=768, ctx_length=2048),
         EncoderProfile(
             name="models/text-embedding-004", dimension=768, ctx_length=2048
         ),
@@ -41,16 +39,17 @@ class GeminiEncoder(Encoder):
         "FACT_VERIFICATION",
     )
 
+    MAX_ATTEMPT: int = 5
+    DELAY_FACTOR: float = 1.5
+    MAX_DELAY: float = 60.0
+
     def __init__(self, model_name: str, dimension: int, task_type: str):
         for profile in GeminiEncoder.SUPPORTED_MODELS:
-            if model_name == profile["name"] and dimension == profile[
-                "dimension"]:
+            if model_name == profile["name"] and dimension == profile["dimension"]:
                 ctx_length = profile["ctx_length"]
                 break
         else:
-            raise ValueError(
-                "Either model name or dimension are not supported."
-            )
+            raise ValueError("Either model name or dimension are not supported.")
         super().__init__(model_name, dimension, ctx_length)
 
         if task_type not in GeminiEncoder.SUPPORTED_TASK_TYPES:
@@ -73,48 +72,52 @@ class GeminiEncoder(Encoder):
             return len(text) // 4
         return len(text) // 2
 
+    def __update_delay(self, delay: float) -> float:
+        new_delay = delay * self.DELAY_FACTOR
+        # Add some randomness to allow bulk requests to retry at a slightly different timing
+        new_delay += random() * 5.0
+        return min(new_delay, self.MAX_DELAY)
+
     def encode(self, text: str, **kwargs) -> list[float]:
-        try:
-            client = genai.Client(api_key=os.environ["GEMINI_API_KEY"])
-            response = client.models.embed_content(
-                model=self.model_name,
-                contents=text,
-                config=self.config,
-            )
-            if (
-                response.embeddings and response.embeddings[0]
-                and response.embeddings[0].values
-            ):
-                return response.embeddings[0].values
-            raise ValueError(
-                f"Failed to extract embeddings from response. Response: {response}"
-            )
-        except Exception as e:
-            logger.error(
-                msg=f"{self.model_name}.encode failed. Error: {str(e)}",
-                exc_info=True,
-                stack_info=True,
-            )
-            if "502 Bad Gateway" in str(e):
-                delay: Optional[float] = kwargs.get("delay", None)
-                attempt: Optional[int] = kwargs.get("attempt", None)
-                if delay is None:
-                    delay = 5.0
-
-                if attempt is None:
-                    attempt = 1
-
-                if attempt > 5:
-                    logger.warning("Max attempts reached. Raising error.")
+        attempt: int = 0
+        delay: float = 5.0
+        while attempt < self.MAX_ATTEMPT:
+            try:
+                client = genai.Client(api_key=os.environ["GEMINI_API_KEY"])
+                response = client.models.embed_content(
+                    model=self.model_name,
+                    contents=text,
+                    config=self.config,
+                )
+                if (
+                    response.embeddings
+                    and response.embeddings[0]
+                    and response.embeddings[0].values
+                ):
+                    if attempt > 0:
+                        logger.debug("[%d] Request resolved!", attempt)
+                    return response.embeddings[0].values
+                raise ValueError(
+                    f"Failed to extract embeddings from response. Response: {response}"
+                )
+            except RuntimeError:
+                raise
+            except Exception as e:
+                error_object = e.__dict__
+                error_code = error_object["code"]
+                if error_code not in [429, 500, 503]:
                     raise
 
+                error_message = error_object["message"]
                 logger.warning(
-                    "[%d] 502 Bad Gateway. Retrying in %.2f seconds.", attempt,
-                    delay
+                    "%s\n[%d] Retrying in %.2f seconds", error_message, attempt, delay
                 )
                 time.sleep(delay)
-                return self.encode(text, delay=delay * 1.5, attempt=attempt + 1)
-            raise
+                attempt += 1
+                delay = self.__update_delay(delay)
+                continue
+
+        raise RuntimeError("Max re-attempt reached")
 
     @staticmethod
     async def acall(
@@ -133,47 +136,42 @@ class GeminiEncoder(Encoder):
             return response
 
     async def encode_async(self, text: str, **kwargs) -> list[float]:
-        try:
-            response = await self.acall(
-                model_name=self.model_name, config=self.config, text=text
-            )
-            if (
-                response.embeddings and response.embeddings[0]
-                and response.embeddings[0].values
-            ):
-                return response.embeddings[0].values
-            raise ValueError(
-                f"Failed to extract embeddings from response. Response: {response}"
-            )
-        except Exception as e:
-            logger.error(
-                msg=f"{self.model_name}.encode failed. Error: {str(e)}",
-                exc_info=True,
-                stack_info=True,
-            )
-            if "502 Bad Gateway" in str(e):
-                delay: Optional[float] = kwargs.get("delay", None)
-                attempt: Optional[int] = kwargs.get("attempt", None)
-                if delay is None:
-                    delay = 5.0
-
-                if attempt is None:
-                    attempt = 1
-
-                if attempt > 5:
-                    logger.warning("Max attempts reached. Raising error.")
+        attempt: int = 0
+        delay: float = 5.0
+        while attempt < self.MAX_ATTEMPT:
+            try:
+                response = await self.acall(
+                    model_name=self.model_name, config=self.config, text=text
+                )
+                if (
+                    response.embeddings
+                    and response.embeddings[0]
+                    and response.embeddings[0].values
+                ):
+                    if attempt > 0:
+                        logger.info("[%d] Request resolved!", attempt)
+                    return response.embeddings[0].values
+                raise RuntimeError(
+                    f"Failed to extract embeddings from response. Response: {response}"
+                )
+            except RuntimeError:
+                raise
+            except Exception as e:
+                error_object = e.__dict__
+                error_code = error_object["code"]
+                if error_code not in [429, 500, 503]:
                     raise
 
+                error_message = error_object["message"]
                 logger.warning(
-                    "[%d] 502 Bad Gateway. Retrying in %.2f seconds.", attempt,
-                    delay
+                    "%s\n[%d] Retrying in %.2f seconds", error_message, attempt, delay
                 )
                 await asyncio.sleep(delay)
-                return await self.encode_async(
-                    text, delay=delay * 1.5, attempt=attempt + 1
-                )
+                attempt += 1
+                delay = self.__update_delay(delay)
+                continue
 
-            raise
+        raise RuntimeError("Max re-attempt reached")
 
     def encode_v2(self, text: str, **kwargs) -> tuple[list[float], int]:
         try:
@@ -186,12 +184,9 @@ class GeminiEncoder(Encoder):
             )
             raise
 
-    async def encode_v2_async(self, text: str,
-                              **kwargs) -> tuple[list[float], int]:
+    async def encode_v2_async(self, text: str, **kwargs) -> tuple[list[float], int]:
         try:
-            return (
-                await self.encode_async(text), self.estimate_token_count(text)
-            )
+            return (await self.encode_async(text), self.estimate_token_count(text))
         except Exception as e:
             logger.error(
                 msg=f"{self.model_name}.encode failed. Error: {str(e)}",
