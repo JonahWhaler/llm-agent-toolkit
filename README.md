@@ -31,6 +31,10 @@ For developers requiring full-range customization or access to the latest featur
   - [Chunkers:](#chunkers)
   - [Thinking/Reasoning](#thinkingreasoning)
     - [Tested models:](#tested-models)
+  - [Text-To-Speech (TTS)](#text-to-speech-tts)
+    - [Supported models:](#supported-models)
+      - [OpenAITTS](#openaitts)
+      - [ElevenLabsTTS](#elevenlabstts)
 - [License](#license)
 
 # Dependecies
@@ -346,6 +350,65 @@ Call chat completion API with thinking/reasoning equiped models.
 - **OpenAI**: `o1-mini`, `o3-mini`
 - **gemini**: `gemini-2.5-pro-exp-03-25`, `gemini-2.0-flash-thinking-exp-01-21`
 - **DeepSeek**: `deepseek-reasoner`
+
+## Text-To-Speech (TTS)
+Generate audio from text with tts models.
+
+### Supported models:
+- **OpenAI**: `gpt-4o-mini-tts`, `tts-1`, `tts-1-hd`
+- **ElevenLabs**: `eleven_multiplingual_v2`, `eleven_flash_v2_5`, `eleven_flash_v2`, `eleven_turbo_v2_5`, `eleven_turbo_v2`.
+
+#### OpenAITTS
+```python
+from llm_agent_toolkit.tts import OpenAITTS
+from llm_agent_toolkit.chunkers import SectionChunker
+
+
+INPUT_PATH = "sample.md"
+
+oai_tts = OpenAITTS(
+    model="gpt-4o-mini-tts",
+    voice="nova",
+    speed=1.0,
+    response_format="mp3",
+)
+
+with open(INPUT_PATH, "r", encoding="utf-8") as f:
+    content = f.read()
+    oai_tts.generate(text=content, output_path=f"generated_audio.mp3")
+```
+
+#### ElevenLabsTTS
+```python
+from llm_agent_toolkit.tts import ElevenLabsTTS
+from llm_agent_toolkit.chunkers import SectionChunker
+
+
+INPUT_PATH = "sample.md"
+# View supported voices
+print(ElevenLabsTTS.SUPPORTED_VOICES)
+# Use other voices?
+ElevenLabsTTS.SUPPORTED_VOICES["voice-name"] = ("voice-id", "language-code")
+
+# View supported models
+print(ElevenLabsTTS.SUPPORTED_MODELS)
+# Use other models?
+ElevenLabs.TTS.SUPPORTED_MODELS["model-name"] = -1 # maximum input length
+
+elevenlabs_tts = ElevenLabsTTS(
+    model="eleven_multilingual_v2",
+    voice="alloy",
+    speed=1.0,
+    response_format="mp3",
+    sampling_rate_hz=44100,
+    bitrate=128
+)
+
+with open(INPUT_PATH, "r", encoding="utf-8") as f:
+    content = f.read()
+    elevenlabs_tts.generate(text=content, output_path=f"generated_audio.mp3")
+```
+
 
 # License
 This project is licensed under the GNU General Public License v3.0 License. See the [LICENSE](LICENSE) file for details.
