@@ -1,5 +1,6 @@
 from abc import abstractmethod, ABC
 from dataclasses import dataclass
+from typing import runtime_checkable, Protocol
 
 
 @dataclass
@@ -36,26 +37,29 @@ class ToolOutput:
 
 class BaseTool(ABC):
     def __init__(
-        self, tool_name: str, description: str,
-        priority: int = 1, next_func: str | None = None
+        self,
+        tool_name: str,
+        description: str,
+        priority: int = 1,
+        next_func: str | None = None,
     ):
         self._name = tool_name
         self._description = description
         self._priority = priority
         self._next_func = next_func
-        
+
     @property
     def name(self) -> str:
         return self._name
-    
+
     @property
     def description(self) -> str:
         return self._description
-    
+
     @property
     def priority(self) -> int:
         return self._priority
-    
+
     @property
     def next_tool_name(self) -> str | None:
         return self._next_func
@@ -66,4 +70,23 @@ class BaseTool(ABC):
 
     @abstractmethod
     async def __call__(self, params: str) -> ToolOutput:
+        raise NotImplementedError
+
+
+@runtime_checkable
+class TTS(Protocol):
+    """
+    Unified interface for text-to-speech (TTS) task.
+    """
+
+    def generate(self, text: str, output_path: str) -> None:
+        """
+        Generate speech from text.
+        """
+        raise NotImplementedError
+
+    async def async_generate(self, text: str, output_path: str) -> None:
+        """
+        Asynchronously generate speech from text.
+        """
         raise NotImplementedError

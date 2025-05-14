@@ -14,20 +14,19 @@ from ._util import (
     TokenUsage,
 )
 
-from ._chunkers import Splitter, ChunkerMetrics, RandomInitializer, UniformInitializer, AsyncSplitter
+from ._chunkers import (
+    Splitter,
+    ChunkerMetrics,
+    RandomInitializer,
+    UniformInitializer,
+    AsyncSplitter,
+)
 from ._core import Core, ToolSupport, ImageInterpreter
 from ._memory import VectorMemory, ShortTermMemory, AsyncVectorMemory
 from ._encoder import Encoder
 from ._loader import BaseLoader
-from . import (
-    core,
-    tool,
-    loader,
-    encoder,
-    memory,
-    chunkers,
-    image_generator,
-)
+from ._base import TTS
+from . import core, tool, loader, encoder, memory, chunkers, image_generator, tts
 
 __all__ = [
     "core",
@@ -61,6 +60,8 @@ __all__ = [
     "BaseLoader",
     "image_generator",
     "TokenUsage",
+    "TTS",
+    "tts",
 ]
 
 # transcriber
