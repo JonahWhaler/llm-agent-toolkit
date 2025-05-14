@@ -80,7 +80,7 @@ class ElevenLabsTTS:
 
     def __init__(
         self,
-        model: str = "elevenlabs",
+        model: str = "eleven_multilingual_v2",
         voice: str = "alloy",
         speed: float = 1.0,
         response_format: str = "mp3",
