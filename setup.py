@@ -23,7 +23,7 @@ core_dependencies = [
     "python-docx==1.1.2",
 ]
 transformers_dependencies = [
-    "torch==2.6.0",
+    "torch==2.7.1",
     "transformers==4.50.0",
 ]
 transcriber_dependencies = [
