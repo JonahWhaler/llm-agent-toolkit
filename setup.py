@@ -17,7 +17,7 @@ core_dependencies = [
     "tiktoken==0.9.0",
     "chromadb==0.5.11",
     "faiss-cpu==1.9.0.post1",
-    "aiohttp==3.10.11",
+    "aiohttp==3.12.14",
     "pdfplumber==0.11.4",
     "PyMuPDF==1.24.11",
     "python-docx==1.1.2",
