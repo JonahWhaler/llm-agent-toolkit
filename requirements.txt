@@ -1,5 +1,5 @@
 # This file outlines the dependencies needed to execute the core components.
-wheel==0.45.1
+wheel==0.46.2
 twine==5.1.1
 python-dotenv==0.21.0
 charade==1.0.3
