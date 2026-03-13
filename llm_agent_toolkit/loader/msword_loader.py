@@ -1,12 +1,14 @@
 import os
 import io
 import logging
+import mimetypes
 from typing import Optional, Tuple, List, Any
 from contextlib import contextmanager
 
 # python-docx
 import docx
 from docx.document import Document as DocxDocument
+
 # from docx.image.exceptions import UnrecognizedImageError
 from docx.oxml.table import CT_Tbl
 from docx.oxml.text.paragraph import CT_P
@@ -15,11 +17,16 @@ from docx.text.paragraph import Paragraph as DocxParagraph
 
 from .._loader import BaseLoader
 from .._core import ImageInterpreter, Core as TextModel, MessageBlock, TokenUsage
+from .utils import CustomCSVHandler, DefinedTask, DefinedTaskAsync
 
 logger = logging.getLogger(__name__)
 
 
 class MsWordLoader(BaseLoader):
+    SUPPORTED_MIMETYPES = (
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    )
+
     def __init__(
         self,
         text_only: bool = True,
@@ -46,81 +53,19 @@ class MsWordLoader(BaseLoader):
                 )
                 os.makedirs(tmp_directory)
 
-    @contextmanager
-    def temporary_file(self, image_bytes: bytes, filename: str):
-        tmp_path = f"{self.__tmp_directory}/{filename}"
-        try:
-            image_stream = io.BytesIO(image_bytes)
-            image_stream.seek(0)
-            with open(tmp_path, "wb") as f:
-                f.write(image_bytes)
-            yield tmp_path
-        finally:
-            if os.path.exists(tmp_path):
-                os.remove(tmp_path)
+    @classmethod
+    def pre_load(cls, input_path: Optional[str] = None):
+        if input_path is None:
+            raise ValueError("File path is not set.")
 
-    def extract_img_description(self, image_bytes: bytes, image_name: str) -> str:
-        if self.__image_interpreter is None:
-            return "Image description not available"
+        if not os.path.exists(input_path):
+            raise FileNotFoundError(f"File {input_path} does not exist.")
 
-        image_caption = (
-            f"filename={image_name}. This is an attachment found in a pdf file."
-        )
-        with self.temporary_file(image_bytes, image_name) as tmp_path:
-            ai_response: Tuple[List[MessageBlock | dict[str, Any]], TokenUsage] = (
-                self.__image_interpreter.interpret(
-                    query=image_caption, context=None, filepath=tmp_path
-                )
-            )
-            responses, usage = ai_response
-            if responses:
-                return responses[0]["content"]
+        mt = mimetypes.guess_type(input_path)
+        mime_type, encoding = mt
+        if mime_type not in cls.SUPPORTED_MIMETYPES:
+            raise ValueError(f"Expect *.docx file.")
 
-            raise RuntimeError("Expect at least one response on image interpretation.")
-        
-    async def extract_img_description_async(self, image_bytes: bytes, image_name: str) -> str:
-        if self.__image_interpreter is None:
-            return "Image description not available"
-
-        image_caption = (
-            f"filename={image_name}. This is an attachment found in a pdf file."
-        )
-        with self.temporary_file(image_bytes, image_name) as tmp_path:
-            ai_response: Tuple[List[MessageBlock | dict[str, Any]], TokenUsage] = (
-                await self.__image_interpreter.interpret_async(
-                    query=image_caption, context=None, filepath=tmp_path
-                )
-            )
-            responses, usage = ai_response
-            if responses:
-                return responses[0]["content"]
-
-            raise RuntimeError("Expect at least one response on image interpretation.")
-        
-    def retrieve_site_summary(self, url: str) -> str:
-        if self.__web_interpreter is None:
-            return "Web page summary not available"
-
-        query = f"site={url}"
-        ai_response = self.__web_interpreter.run(query, None)
-        responses, usage = ai_response
-        if responses:
-            return responses[0]["content"]
-
-        raise RuntimeError("Expect at least one response on site summarization.")
-    
-    async def retrieve_site_summary_async(self, url: str) -> str:
-        if self.__web_interpreter is None:
-            return "Web page summary not available"
-
-        query = f"site={url}"
-        ai_response = await self.__web_interpreter.run_async(query, None)
-        responses, usage = ai_response
-        if responses:
-            return responses[0]["content"]
-
-        raise RuntimeError("Expect at least one response on site summarization.")
-    
     @staticmethod
     def iter_block_items(document):
         """
@@ -142,6 +87,7 @@ class MsWordLoader(BaseLoader):
                 yield DocxTable(child, document)
 
     def load(self, input_path: str) -> str:
+        MsWordLoader.pre_load(input_path)
         assert input_path
         assert self.__tmp_directory
 
@@ -180,7 +126,12 @@ class MsWordLoader(BaseLoader):
                                 paragraph_text = paragraph_text.replace(
                                     link_text, f"[{link_text}]({url})", 1
                                 )
-                                site_summary = self.retrieve_site_summary(url)
+                                if self.__web_interpreter:
+                                    site_summary = DefinedTask.summarize_site(
+                                        self.__web_interpreter, url
+                                    )
+                                else:
+                                    site_summary = "Web page summary not available"
                                 link_lines.append(f"### URL: {url}")
                                 link_lines.append(f"**Summary**: \n{site_summary}\n")
 
@@ -203,9 +154,15 @@ class MsWordLoader(BaseLoader):
 
                         md_lines.append(f"![{image_filename}](#)")
 
-                        image_description = self.extract_img_description(
-                            image_bytes, image_name=image_filename
-                        )
+                        if self.__image_interpreter is None:
+                            image_description = "Image description not available"
+                        else:
+                            image_description = DefinedTask.interpret_image(
+                                self.__image_interpreter,
+                                image_bytes,
+                                image_filename,
+                                self.__tmp_directory,
+                            )
 
                         img_lines.append(f"### {image_filename}")
                         img_lines.append(f"**Description**: \n{image_description}\n")
@@ -231,6 +188,7 @@ class MsWordLoader(BaseLoader):
         return output_string
 
     async def load_async(self, input_path: str) -> str:
+        MsWordLoader.pre_load(input_path)
         assert input_path
         assert self.__tmp_directory
 
@@ -269,7 +227,14 @@ class MsWordLoader(BaseLoader):
                                 paragraph_text = paragraph_text.replace(
                                     link_text, f"[{link_text}]({url})", 1
                                 )
-                                site_summary = await self.retrieve_site_summary_async(url)
+                                if self.__web_interpreter is None:
+                                    site_summary = "Web page summary not available"
+                                else:
+                                    site_summary = (
+                                        await DefinedTaskAsync.summarize_site(
+                                            self.__web_interpreter, url
+                                        )
+                                    )
                                 link_lines.append(f"### URL: {url}")
                                 link_lines.append(f"**Summary**: \n{site_summary}\n")
 
@@ -292,10 +257,15 @@ class MsWordLoader(BaseLoader):
 
                         md_lines.append(f"![{image_filename}](#)")
 
-                        image_description = await self.extract_img_description_async(
-                            image_bytes, image_name=image_filename
-                        )
-
+                        if self.__image_interpreter is None:
+                            image_description = "Image description not available"
+                        else:
+                            image_description = await DefinedTaskAsync.interpret_image(
+                                self.__image_interpreter,
+                                image_bytes,
+                                image_filename,
+                                self.__tmp_directory,
+                            )
                         img_lines.append(f"### {image_filename}")
                         img_lines.append(f"**Description**: \n{image_description}\n")
 
@@ -318,4 +288,3 @@ class MsWordLoader(BaseLoader):
             output_string += "\n".join(link_lines)
 
         return output_string
-    
