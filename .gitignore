@@ -167,3 +167,4 @@ snippet/output/
 models/
 
 .pypirc
+.aiexclude
