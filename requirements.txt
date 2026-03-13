@@ -15,7 +15,7 @@ aiohttp==3.13.3
 pdfplumber==0.11.4
 PyMuPDF==1.24.11
 # Microsoft Word - Docx
-python-docx==1.1.2
+python-docx==1.2.0
 
 # chromadb failed to installed: https://stackoverflow.com/a/77578119/13928599
 # error: Microsoft Visual C++ 14.0 or greater is required. 

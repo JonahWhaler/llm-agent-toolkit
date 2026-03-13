@@ -1,25 +1,22 @@
 import os
+import io
 import logging
-import zipfile
-from io import StringIO, BytesIO
-import re
+from typing import Optional, Tuple, List, Any
 from contextlib import contextmanager
 
-from docx import Document
-from docx.document import Document as _Document
-from docx.table import Table
+# python-docx
+import docx
+from docx.document import Document as DocxDocument
+# from docx.image.exceptions import UnrecognizedImageError
+from docx.oxml.table import CT_Tbl
+from docx.oxml.text.paragraph import CT_P
+from docx.table import Table as DocxTable
+from docx.text.paragraph import Paragraph as DocxParagraph
 
 from .._loader import BaseLoader
-from .._core import ImageInterpreter
-# from .._util import MessageBlock
-
+from .._core import ImageInterpreter, Core as TextModel, MessageBlock, TokenUsage
 
 logger = logging.getLogger(__name__)
-"""
-Dependencies:
-----------
-- python-docx==1.1.2
-"""
 
 
 class MsWordLoader(BaseLoader):
@@ -28,9 +25,11 @@ class MsWordLoader(BaseLoader):
         text_only: bool = True,
         tmp_directory: str | None = None,
         image_interpreter: ImageInterpreter | None = None,
-    ):
-        self.__text_only = text_only
+        text_model: TextModel | None = None,
+    ) -> None:
+        # self.__text_only = text_only
         self.__image_interpreter = image_interpreter
+        self.__web_interpreter = text_model
         self.__tmp_directory = tmp_directory
         if not text_only:
             assert isinstance(tmp_directory, str)
@@ -47,332 +46,11 @@ class MsWordLoader(BaseLoader):
                 )
                 os.makedirs(tmp_directory)
 
-    @staticmethod
-    def raise_if_invalid(input_path: str) -> None:
-        if not all(
-            [input_path is not None, isinstance(input_path, str), input_path != ""]
-        ):
-            raise ValueError("Invalid input path: Path must be a non-empty string.")
-
-        if input_path[-5:] != ".docx":
-            raise ValueError("Unsupported file format: Must be a DOCX file.")
-
-        if not os.path.exists(input_path):
-            raise FileNotFoundError(f"File not found: '{input_path}'.")
-
-    def load(self, input_path: str) -> str:
-        MsWordLoader.raise_if_invalid(input_path)
-
-        markdown_content = []
-
-        doc = Document(input_path)
-
-        # Handle text content
-        markdown_content.extend(self.extract_text_content(doc))
-
-        # Handle tables
-        markdown_content.extend(self.extract_tables_content(doc))
-
-        # Handle images
-        markdown_content.extend(self.extract_image_content(input_path))
-
-        return "\n".join(markdown_content)
-
-    async def load_async(self, input_path: str) -> str:
-        MsWordLoader.raise_if_invalid(input_path)
-
-        markdown_content = []
-
-        doc = Document(input_path)
-
-        # Handle text content
-        markdown_content.extend(self.extract_text_content(doc))
-
-        # Handle tables
-        markdown_content.extend(self.extract_tables_content(doc))
-
-        # Handle images
-        markdown_content.extend(await self.extract_image_content_async(input_path))
-
-        return "\n".join(markdown_content)
-
-    @staticmethod
-    def extract_text_content(doc: _Document) -> list[str]:
-        markdown_content = []
-
-        # Iterate through all elements in the document
-        for para in doc.paragraphs:
-            p = para._element
-            pstyle_match = re.search(r'<w:pStyle w:val="([^"]+)"/>', p.xml)
-            style_name = pstyle_match.group(1) if pstyle_match else "Normal"
-            text = para.text.strip()
-            if style_name == "Title":
-                content = f"\n# {text}"
-            elif style_name.startswith("Heading"):
-                level = min(int(style_name[len("Heading") :]) + 1, 6)
-                content = f"\n{'#' * level} {text}"
-            elif style_name == "ListParagraph":
-                content = f"* {text}"
-            else:
-                content = f"{text}"
-
-            markdown_content.append(content)
-
-        return markdown_content
-
-    @staticmethod
-    def extract_tables_content(doc: _Document) -> list[str]:
-        """
-        Iteratively extract tables from the document.
-
-        Args:
-            doc (_Document): The document to extract tables from.
-
-        Returns:
-            list[str]: A list of Markdown-formatted table content.
-
-        Notes:
-            - Ignore content formatting/styles.
-            - Markdown syntax is used for the main table, nested tables are presented in HTML.
-            - Exact location of the tables in the document is not guaranteed.
-        """
-
-        markdown_content = []
-
-        # Extract tables
-        for table_index, table in enumerate(doc.tables, start=1):
-            markdown_content.append(f"## Table {table_index}\n")
-            markdown_content.append(MsWordLoader.extract_table_content(table))
-            # markdown_content.append("\n")
-
-        if len(markdown_content) > 0:
-            markdown_content.insert(0, "\n# Tables\n")
-
-        return markdown_content
-
-    @staticmethod
-    def extract_table_content(table: Table):
-        """
-        Extract table content, support nested table.
-
-        Args:
-            table (Table): The table to extract content from.
-
-        Returns:
-            str: The extracted table content in Markdown format.
-
-        Notes:
-            - Ignore content formatting/styles.
-            - Markdown syntax is used for the main table, nested tables are presented in HTML.
-        """
-        markdown_content = []
-
-        header_row = table.rows[0]
-        headers = [f"| {cell.text.strip()} " for cell in header_row.cells]
-        markdown_content.append("".join(headers) + "|")
-        markdown_content.append(
-            f"|{'---|' * len(headers)}"
-        )  # Markdown header separator
-
-        for row in table.rows[1:]:
-            row_content = []
-            for cell in row.cells:
-                if cell.tables:  # Check if the cell contains a nested table
-                    nested_table_md = []
-                    for nested_table in cell.tables:
-                        nested_table_md.append(
-                            MsWordLoader.extract_subtable_content(nested_table)
-                        )
-                    row_content.append(
-                        f"{cell.text.strip()} {''.join(nested_table_md)}"
-                    )
-                else:
-                    row_content.append(f"{cell.text.strip()}")
-            row_string = f"| {' | '.join(row_content)} |"
-            markdown_content.append(row_string)
-
-        return "\n".join(markdown_content)
-
-    @staticmethod
-    def extract_subtable_content(table: Table) -> str:
-        """
-        Recursively extract table content.
-
-        Args:
-            table (Table): The table to extract content from.
-
-        Returns:
-            str: The extracted content.
-
-        Notes:
-            - This function is used to extract content from nested tables.
-            - It is called recursively for each nested table.
-            - Ignore content formatting/styles.
-            - HTML table structure is used to represent the extracted content.
-        """
-        content = StringIO()
-        content.write("<table>")
-        for row in table.rows:
-            content.write("<tr>")
-            for cell in row.cells:
-                content.write(f"<td>{cell.text.strip()}")
-                if cell.tables:
-                    for nested_table in cell.tables:
-                        content.write(
-                            MsWordLoader.extract_subtable_content(nested_table)
-                        )
-                content.write("</td>")
-            content.write("</tr>")
-        content.write("</table>")
-        return content.getvalue()
-
-    # @staticmethod
-    # def get_cell_content_with_formatting(cell: _Cell):
-    #     """
-    #     Extracts the content of a cell with formatting.
-
-    #     Notes:
-    #     * Tables in
-    #     """
-    #     content = StringIO()
-    #     for para in cell.paragraphs:
-    #         for run in para.runs:
-    #             if run.bold:
-    #                 content.write(f"**{run.text}**")
-    #             elif run.italic:
-    #                 content.write(f"*{run.text}*")
-    #             else:
-    #                 content.write(run.text)
-    #         content.write("\n")
-    #     return content.getvalue().strip()
-
-    @staticmethod
-    def extract_alt_text_dict(docx: zipfile.ZipFile) -> dict[str, str]:
-        """
-        Extracts alt text for images in a DOCX file.
-
-        Parameters:
-        ----------
-        - docx: zipfile.ZipFile: The ZipFile object representing the DOCX file
-
-        Returns:
-        ----------
-        * dict[str, str]: Dictionary mapping image file names to their alt text
-
-        """
-        from xml.etree import ElementTree as ET
-
-        image_alt_texts = {}
-        # Parse the XML document to get image alt text
-        if "word/document.xml" in docx.namelist():
-            document_xml = docx.read("word/document.xml")
-            root = ET.fromstring(document_xml)
-
-            # Find all elements with cNvPr to identify inserted images
-
-            for elem in root.iter():
-                if elem.tag.endswith("cNvPr"):
-                    r_id = elem.attrib.get("id")
-                    alt_text = elem.attrib.get("descr", "Alt text not available")
-                    ele_name = elem.attrib.get("name", str(r_id))  # Picture {index}
-                    if ele_name and alt_text:
-                        image_alt_texts[ele_name] = (
-                            alt_text  # Add alt text if available
-                        )
-
-        return image_alt_texts
-
-    @staticmethod
-    def get_alt_by_name(d: dict[str, str], key1: str, key2: str) -> str:
-        # This is needed because `extract_alt_text_dict` keys follow the pattern `Picture {index}` or `{index}`
-        # key1: `Picture {index}`
-        # key2: `{index}`
-        return d.get(key1, d.get(key2, "Alt text not available"))
-
-    def extract_image_content(self, input_path: str) -> list[str]:
-        markdown_content = []
-
-        with zipfile.ZipFile(input_path, "r") as docx:
-            image_alt_texts: dict[str, str] = self.extract_alt_text_dict(docx)
-
-            # Iterate through the files in the archive
-            file_startswith_word_media_lst = list(
-                filter(lambda f: f.startswith("word/media/"), docx.namelist())
-            )
-            for counter, file in enumerate(file_startswith_word_media_lst, start=1):
-                # Extract the corresponding alt text
-                # Assumption: Images are captured in the same order as `extract_alt_text_dict`
-                alt_text = self.get_alt_by_name(
-                    image_alt_texts, key1=f"Picture {counter}", key2=str(counter)
-                )
-
-                if self.__text_only or self.__image_interpreter is None:
-                    image_description = "Image description not available"
-                else:
-                    image_data = docx.read(file)
-                    image_name = os.path.basename(file)  # image{index}.png
-                    with self.temporary_file(image_data, image_name) as image_path:
-                        responses, usage = self.__image_interpreter.interpret(
-                            query="Describe this image",
-                            context=None,
-                            filepath=image_path,
-                        )
-                        image_description = responses[0]["content"]
-
-                markdown_content.append(
-                    f"## {os.path.basename(file)}\nDescription: {image_description}\n\nAlt Text: {alt_text}\n"
-                )
-        if len(markdown_content) > 0:
-            markdown_content.insert(0, "\n# Images\n")
-
-        return markdown_content
-
-    async def extract_image_content_async(self, input_path: str) -> list[str]:
-        markdown_content = []
-
-        with zipfile.ZipFile(input_path, "r") as docx:
-            image_alt_texts: dict[str, str] = self.extract_alt_text_dict(docx)
-
-            # Iterate through the files in the archive
-            file_startswith_word_media_lst = list(
-                filter(lambda f: f.startswith("word/media/"), docx.namelist())
-            )
-            for counter, file in enumerate(file_startswith_word_media_lst, start=1):
-                # Extract the corresponding alt text
-                # Assumption: Images are captured in the same order as `extract_alt_text_dict`
-                alt_text = self.get_alt_by_name(
-                    image_alt_texts, key1=f"Picture {counter}", key2=str(counter)
-                )
-
-                if self.__text_only or self.__image_interpreter is None:
-                    image_description = "Image description not available"
-                else:
-                    image_data = docx.read(file)
-                    image_name = os.path.basename(file)  # image{index}.png
-                    with self.temporary_file(image_data, image_name) as image_path:
-                        (
-                            responses,
-                            usage,
-                        ) = await self.__image_interpreter.interpret_async(
-                            query="Describe this image",
-                            context=None,
-                            filepath=image_path,
-                        )
-                        image_description = responses[0]["content"]
-
-                markdown_content.append(
-                    f"## {os.path.basename(file)}\nDescription: {image_description}\n\nAlt Text: {alt_text}\n"
-                )
-        if len(markdown_content) > 0:
-            markdown_content.insert(0, "\n# Images\n")
-
-        return markdown_content
-
     @contextmanager
     def temporary_file(self, image_bytes: bytes, filename: str):
         tmp_path = f"{self.__tmp_directory}/{filename}"
         try:
-            image_stream = BytesIO(image_bytes)
+            image_stream = io.BytesIO(image_bytes)
             image_stream.seek(0)
             with open(tmp_path, "wb") as f:
                 f.write(image_bytes)
@@ -381,7 +59,263 @@ class MsWordLoader(BaseLoader):
             if os.path.exists(tmp_path):
                 os.remove(tmp_path)
 
-    @contextmanager
-    def increment_later(self, counter: int):
-        yield counter
-        return counter + 1
+    def extract_img_description(self, image_bytes: bytes, image_name: str) -> str:
+        if self.__image_interpreter is None:
+            return "Image description not available"
+
+        image_caption = (
+            f"filename={image_name}. This is an attachment found in a pdf file."
+        )
+        with self.temporary_file(image_bytes, image_name) as tmp_path:
+            ai_response: Tuple[List[MessageBlock | dict[str, Any]], TokenUsage] = (
+                self.__image_interpreter.interpret(
+                    query=image_caption, context=None, filepath=tmp_path
+                )
+            )
+            responses, usage = ai_response
+            if responses:
+                return responses[0]["content"]
+
+            raise RuntimeError("Expect at least one response on image interpretation.")
+        
+    async def extract_img_description_async(self, image_bytes: bytes, image_name: str) -> str:
+        if self.__image_interpreter is None:
+            return "Image description not available"
+
+        image_caption = (
+            f"filename={image_name}. This is an attachment found in a pdf file."
+        )
+        with self.temporary_file(image_bytes, image_name) as tmp_path:
+            ai_response: Tuple[List[MessageBlock | dict[str, Any]], TokenUsage] = (
+                await self.__image_interpreter.interpret_async(
+                    query=image_caption, context=None, filepath=tmp_path
+                )
+            )
+            responses, usage = ai_response
+            if responses:
+                return responses[0]["content"]
+
+            raise RuntimeError("Expect at least one response on image interpretation.")
+        
+    def retrieve_site_summary(self, url: str) -> str:
+        if self.__web_interpreter is None:
+            return "Web page summary not available"
+
+        query = f"site={url}"
+        ai_response = self.__web_interpreter.run(query, None)
+        responses, usage = ai_response
+        if responses:
+            return responses[0]["content"]
+
+        raise RuntimeError("Expect at least one response on site summarization.")
+    
+    async def retrieve_site_summary_async(self, url: str) -> str:
+        if self.__web_interpreter is None:
+            return "Web page summary not available"
+
+        query = f"site={url}"
+        ai_response = await self.__web_interpreter.run_async(query, None)
+        responses, usage = ai_response
+        if responses:
+            return responses[0]["content"]
+
+        raise RuntimeError("Expect at least one response on site summarization.")
+    
+    @staticmethod
+    def iter_block_items(document):
+        """
+        Generate a sequence of Paragraph and Table objects in document order.
+        This is the key to iterating through the document's content blocks
+        from top to bottom.
+        """
+        # The document's body element contains all the block-level content.
+        parent_elm = document.element.body
+        if parent_elm is None:
+            return
+        # Iterate through the children of the body element.
+        for child in parent_elm.iterchildren():
+            # A child can be a paragraph...
+            if isinstance(child, CT_P):
+                yield DocxParagraph(child, document)
+            # ...or a table.
+            elif isinstance(child, CT_Tbl):
+                yield DocxTable(child, document)
+
+    def load(self, input_path: str) -> str:
+        assert input_path
+        assert self.__tmp_directory
+
+        mydoc: DocxDocument = docx.Document(input_path)
+
+        image_counter = 1
+
+        md_lines = []
+        img_lines: list[str] = []
+        link_lines: list[str] = []
+
+        rels = mydoc.part.rels
+        for block in self.iter_block_items(mydoc):
+            if isinstance(block, DocxParagraph):
+                # Extract inlinne hyperlinks via xml xpath
+                paragraph_text = block.text
+
+                for hyperlink in block._p.xpath(".//w:hyperlink"):
+                    rId = hyperlink.get(
+                        "{http://schemas.openxmlformats.org/officeDocument/2006/relationships}id"
+                    )
+                    if rId and rId in rels:
+                        rel = rels[rId]
+                        # Ensure it's an external URL, not an internal document bookmark
+                        if "hyperlink" in rel.reltype:
+                            url = rel.target_ref
+                            # Extract the visible text inside the hyperlink tag
+                            link_text = "".join(
+                                node.text
+                                for node in hyperlink.xpath(".//w:t")
+                                if node.text
+                            )
+
+                            if link_text and url:
+                                # Pragmatic inline replacement: swap the raw text for Markdown
+                                paragraph_text = paragraph_text.replace(
+                                    link_text, f"[{link_text}]({url})", 1
+                                )
+                                site_summary = self.retrieve_site_summary(url)
+                                link_lines.append(f"### URL: {url}")
+                                link_lines.append(f"**Summary**: \n{site_summary}\n")
+
+                md_lines.append(f"\n{paragraph_text}\n")
+                # Images are contained within paragraphs as inline shapes within runs
+                for run in block.runs:
+                    # Find all blips (which contain image references) in the run
+                    for rId in run.element.xpath(".//a:blip/@r:embed"):
+                        # Get the image part from the document's part
+                        image_part = mydoc.part.related_parts[rId]
+
+                        # The image part has the image data and content type
+                        image_bytes = image_part.blob
+                        content_type = image_part.content_type
+
+                        # Determine the file extension and create a filename
+                        extension = content_type.split("/")[-1]
+                        image_filename = f"image{image_counter}.{extension}"
+                        image_counter += 1
+
+                        md_lines.append(f"![{image_filename}](#)")
+
+                        image_description = self.extract_img_description(
+                            image_bytes, image_name=image_filename
+                        )
+
+                        img_lines.append(f"### {image_filename}")
+                        img_lines.append(f"**Description**: \n{image_description}\n")
+
+            elif isinstance(block, DocxTable):
+                md_lines.append("TABLE:")
+                for i, row in enumerate(block.rows):
+                    row_text = " | ".join(cell.text.strip() for cell in row.cells)
+
+                    md_lines.append(row_text)
+                    if i == 0:
+                        md_lines.append("| --- " * len(row.cells) + "|")
+
+        output_string = "\n".join(md_lines)
+        if len(img_lines):
+            output_string += "\n## Image Reference Appendix\n"
+            output_string += "\n".join(img_lines)
+
+        if len(link_lines):
+            output_string += "\n## Link Reference Appendix\n"
+            output_string += "\n".join(link_lines)
+
+        return output_string
+
+    async def load_async(self, input_path: str) -> str:
+        assert input_path
+        assert self.__tmp_directory
+
+        mydoc: DocxDocument = docx.Document(input_path)
+
+        image_counter = 1
+
+        md_lines = []
+        img_lines: list[str] = []
+        link_lines: list[str] = []
+
+        rels = mydoc.part.rels
+        for block in self.iter_block_items(mydoc):
+            if isinstance(block, DocxParagraph):
+                # Extract inlinne hyperlinks via xml xpath
+                paragraph_text = block.text
+
+                for hyperlink in block._p.xpath(".//w:hyperlink"):
+                    rId = hyperlink.get(
+                        "{http://schemas.openxmlformats.org/officeDocument/2006/relationships}id"
+                    )
+                    if rId and rId in rels:
+                        rel = rels[rId]
+                        # Ensure it's an external URL, not an internal document bookmark
+                        if "hyperlink" in rel.reltype:
+                            url = rel.target_ref
+                            # Extract the visible text inside the hyperlink tag
+                            link_text = "".join(
+                                node.text
+                                for node in hyperlink.xpath(".//w:t")
+                                if node.text
+                            )
+
+                            if link_text and url:
+                                # Pragmatic inline replacement: swap the raw text for Markdown
+                                paragraph_text = paragraph_text.replace(
+                                    link_text, f"[{link_text}]({url})", 1
+                                )
+                                site_summary = await self.retrieve_site_summary_async(url)
+                                link_lines.append(f"### URL: {url}")
+                                link_lines.append(f"**Summary**: \n{site_summary}\n")
+
+                md_lines.append(f"\n{paragraph_text}\n")
+                # Images are contained within paragraphs as inline shapes within runs
+                for run in block.runs:
+                    # Find all blips (which contain image references) in the run
+                    for rId in run.element.xpath(".//a:blip/@r:embed"):
+                        # Get the image part from the document's part
+                        image_part = mydoc.part.related_parts[rId]
+
+                        # The image part has the image data and content type
+                        image_bytes = image_part.blob
+                        content_type = image_part.content_type
+
+                        # Determine the file extension and create a filename
+                        extension = content_type.split("/")[-1]
+                        image_filename = f"image{image_counter}.{extension}"
+                        image_counter += 1
+
+                        md_lines.append(f"![{image_filename}](#)")
+
+                        image_description = await self.extract_img_description_async(
+                            image_bytes, image_name=image_filename
+                        )
+
+                        img_lines.append(f"### {image_filename}")
+                        img_lines.append(f"**Description**: \n{image_description}\n")
+
+            elif isinstance(block, DocxTable):
+                md_lines.append("TABLE:")
+                for i, row in enumerate(block.rows):
+                    row_text = " | ".join(cell.text.strip() for cell in row.cells)
+
+                    md_lines.append(row_text)
+                    if i == 0:
+                        md_lines.append("| --- " * len(row.cells) + "|")
+
+        output_string = "\n".join(md_lines)
+        if len(img_lines):
+            output_string += "\n## Image Reference Appendix\n"
+            output_string += "\n".join(img_lines)
+
+        if len(link_lines):
+            output_string += "\n## Link Reference Appendix\n"
+            output_string += "\n".join(link_lines)
+
+        return output_string
+    
