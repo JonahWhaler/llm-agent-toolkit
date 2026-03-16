@@ -1,17 +1,18 @@
 import os
-import io
+import mimetypes
 import logging
-from contextlib import contextmanager
+from typing import Optional, Tuple, List
+from functools import reduce
 
 # PyMuPDF
 import fitz  # type: ignore
 
-# from fitz import Page, Document
-import pdfplumber
+from fitz import Page, Document
 
 from .._loader import BaseLoader
-from .._core import ImageInterpreter
-# from .._util import MessageBlock
+from .._core import Core as TextModel, ImageInterpreter
+from .._util import TokenUsage, UsagePurpose
+from .utils import CustomCSVHandler, DefinedTask, DefinedTaskAsync
 
 logger = logging.getLogger(__name__)
 
@@ -25,48 +26,58 @@ Dependencies:
 
 class PDFLoader(BaseLoader):
     """
-    A loader for parsing PDF files and extracting text, links, images, and tables.
+    A loader for parsing PDF files and extracting text, tables, images, and links.
 
-    `PDFLoader` is a concrete implementation of the `BaseLoader` abstract base class.
-    It provides both synchronous (`load`) and asynchronous (`load_async`) methods to process PDF files
-    and return their parsed text content.
+    `PDFLoader` uses the `PyMuPDF` library to process PDF files, offering both synchronous (`load`)
+    and asynchronous (`load_async`) methods to extract content into a Markdown format.
 
-    When the `text_only` flag is set to False, it uses the `core` to interpret the textual description of images
-    in the PDF file.
+    It preserves the document structure by ordering text blocks and tables based on their
+    vertical position on the page.
+
+    ## Sub-features:
+    - **Image Interpretation**: If an `ImageInterpreter` is provided, the loader extracts images,
+      generates descriptions using the interpreter, and appends them in a reference section.
+      Image locations are marked with anchors in the main text.
+    - **Web Page Summarization**: If a `TextModel` (acting as a `web_interpreter`) is provided,
+      it summarizes external links found in the PDF and includes the summaries in a
+      reference section.
+    - **Table Extraction**: Tables are detected and converted into Markdown format.
 
     Attributes:
     ----------
-    - SUPPORTED_EXTENSIONS (tuple): A tuple of supported image file extensions.
-    - __prompt (str): The prompt used to guide the image processing (e.g., "What's in the image?").
-    - __image_interpreter (ImageInterpreter): The core processing unit responsible for converting images to text.
+    - tmp_directory (str | None, optional): A path to a temporary directory for storing
+      intermediate files, such as extracted images. Required if `text_only` is False.
+      Defaults to None.
+    - image_interpreter (ImageInterpreter | None, optional): An AI model for generating
+      descriptions from images. Required for image processing. Defaults to None.
+    - web_interpreter (TextModel | None, optional): An AI model for summarizing web pages
+      from links. Required for link summarization. Defaults to None.
 
     Methods:
     ----------
-    - load(input_path: str) -> str: Synchronously processes the specified image file and returns its textual description.
-    - load_async(input_path: str) -> str: Asynchronously processes the specified image file and returns its textual description.
-    - raise_if_invalid(input_path: str) -> None: Validates the input file path and raises appropriate exceptions if invalid.
-
-    Raises:
-    ----------
-    - InvalidInputPathError: If the input path is invalid (e.g., not a non-empty string).
-    - UnsupportedFileFormatError: If the file format is unsupported.
-    - FileNotFoundError: If the specified file does not exist.
-    - Exception: Propagates any unexpected exceptions raised during processing.
+    - load(input_path: str) -> str: Synchronously processes the specified PDF file and returns its
+      content as a Markdown string.
+    - load_async(input_path: str) -> str: Asynchronously processes the specified PDF file and
+      returns its content as a Markdown string.
 
     Notes:
     ----------
-    - Ensure that the `ImageInterpreter` core is properly configured and initialized before using this loader.
+    - This loader relies on `PyMuPDF` (`fitz`). Ensure it is installed.
+    - For image and link processing, the corresponding interpreter models (`ImageInterpreter`, `TextModel`)
+      must be properly configured and provided during initialization.
     """
 
-    SUPPORTED_EXTENSIONS = (".pdf",)
+    SUPPORTED_MIMETYPES: Tuple[str] = ("application/pdf",)
 
     def __init__(
         self,
         text_only: bool = True,
         tmp_directory: str | None = None,
         image_interpreter: ImageInterpreter | None = None,
+        web_interpreter: TextModel | None = None,
     ):
         self.__image_interpreter = image_interpreter
+        self.__web_interpreter = web_interpreter
         self.__tmp_directory = tmp_directory
         if not text_only:
             assert isinstance(tmp_directory, str)
@@ -82,237 +93,414 @@ class PDFLoader(BaseLoader):
                     tmp_directory,
                 )
                 os.makedirs(tmp_directory)
+        self.__token_usage_list: List[TokenUsage] = []
 
-    @staticmethod
-    def raise_if_invalid(input_path: str) -> None:
-        if not all(
-            [input_path is not None, isinstance(input_path, str), input_path != ""]
-        ):
-            raise ValueError("Invalid input path: Path must be a non-empty string.")
+    def log_usage(self, value: TokenUsage):
+        self.__token_usage_list.append(value)
 
-        if input_path[-4:] != ".pdf":
-            raise ValueError("Unsupported file format: Must be a PDF file.")
+    def show_usage(self) -> dict[str, TokenUsage]:
+
+        output = {}
+        for p in UsagePurpose:
+            xp_list = list(filter(lambda x: x.purpose is p, self.__token_usage_list))
+            xp_total = reduce(lambda a, b: a + b, xp_list)
+            output[p.value] = xp_total
+        return output
+
+    @classmethod
+    def pre_load(cls, input_path: Optional[str] = None):
+        if input_path is None:
+            raise ValueError("File path is not set.")
 
         if not os.path.exists(input_path):
-            raise FileNotFoundError(f"File not found: '{input_path}'.")
+            raise FileNotFoundError(f"File {input_path} does not exist.")
 
-    def load(self, input_path: str) -> str:
-        PDFLoader.raise_if_invalid(input_path)
+        mt = mimetypes.guess_type(input_path)
+        mime_type, encoding = mt
+        if mime_type not in cls.SUPPORTED_MIMETYPES:
+            raise ValueError(f"Expect *.docx file.")
 
-        try:
-            # Elegant way
-            # return asyncio.run(self.load_async(input_path))
-            markdown_content = []
-
-            # Extract text, links, and images using PyMuPDF
-            with fitz.open(input_path) as doc:
-                for page_number, page in enumerate(doc, start=1):  # type: ignore
-                    markdown_content.append(f"# Page {page_number}\n")
-                    markdown_content.append(page.get_text())
-
-                    # Extract links if available
-                    links_content = self.handle_links(page.get_links(), page_number)
-                    markdown_content.extend(links_content)
-
-                    # Extract images and their alt text if available
-                    images_content = self.handle_images(
-                        doc, page, page.get_images(), page_number
-                    )
-                    markdown_content.extend(images_content)
-
-            tables_content = self.handle_tables(input_path)
-            markdown_content.extend(tables_content)
-            return "\n".join(markdown_content)
-        except Exception as e:
-            raise e
-
-    async def load_async(self, input_path: str) -> str:
-        PDFLoader.raise_if_invalid(input_path)
-
-        try:
-            markdown_content = []
-
-            # Extract text, links, and images using PyMuPDF
-            with fitz.open(input_path) as doc:
-                for page_number, page in enumerate(doc, start=1):  # type: ignore
-                    markdown_content.append(f"# Page {page_number}\n")
-                    markdown_content.append(page.get_text())
-
-                    # Extract links if available
-                    links_content = self.handle_links(page.get_links(), page_number)
-                    markdown_content.extend(links_content)
-
-                    # Extract images and their alt text if available
-                    images_content = await self.handle_images_async(
-                        doc, page, page.get_images(), page_number
-                    )
-                    markdown_content.extend(images_content)
-
-            tables_content = self.handle_tables(input_path)
-            markdown_content.extend(tables_content)
-            return "\n".join(markdown_content)
-        except Exception as e:
-            raise e
-
-    def extract_img_description(self, image_bytes: bytes, image_name: str) -> str:
-        if self.__image_interpreter is None:
-            return "Image description not available"
-
-        image_caption = (
-            f"filename={image_name}. This is an attachment found in a pdf file."
-        )
-        with self.temporary_file(image_bytes, image_name) as tmp_path:
-            responses, usage = self.__image_interpreter.interpret(
-                query=image_caption, context=None, filepath=tmp_path
-            )
-            response = responses[0]
-            if "content" in response:
-                return response["content"]
-            raise RuntimeError("content not found in MessageBlock.")
-
-    async def extract_img_description_async(
-        self, image_bytes: bytes, image_name: str
-    ) -> str:
-        if self.__image_interpreter is None:
-            return "Image description not available"
-
-        image_caption = (
-            f"filename={image_name}. This is an attachment found in a pdf file."
-        )
-        with self.temporary_file(image_bytes, image_name) as tmp_path:
-            responses, usage = await self.__image_interpreter.interpret_async(
-                query=image_caption, context=None, filepath=tmp_path
-            )
-            response = responses[0]
-            if "content" in response:
-                return response["content"]
-            raise RuntimeError("content not found in MessageBlock.")
-
-    @contextmanager
-    def temporary_file(self, image_bytes: bytes, filename: str):
-        tmp_path = f"{self.__tmp_directory}/{filename}"
-        try:
-            image_stream = io.BytesIO(image_bytes)
-            image_stream.seek(0)
-            with open(tmp_path, "wb") as f:
-                f.write(image_bytes)
-            yield tmp_path
-        finally:
-            if os.path.exists(tmp_path):
-                os.remove(tmp_path)
-
-    @staticmethod
-    def handle_links(links: list, page_number: int) -> list[str]:
+    def handle_links(self, links: list[dict]) -> list[str]:
+        markdown_content = []
         if links is None:
-            return []
-
-        markdown_content = ["\n## Links\n"]
+            return markdown_content
 
         for link in links:
             if "uri" in link:
-                markdown_content.append(
-                    f"- [Link on Page {page_number}]({link['uri']})\n"
-                )
-
+                markdown_content.append(f"### {link['uri']}")
+                if self.__web_interpreter:
+                    site_summary, usage = DefinedTask.summarize_site(
+                        self.__web_interpreter, link["uri"]
+                    )
+                    self.log_usage(usage)
+                else:
+                    site_summary = "Web page summary not available"
+                markdown_content.append(f"**Summary**: {site_summary}\n")
         return markdown_content
 
-    def handle_images(self, doc, page, images: list, page_number: int) -> list[str]:
-        if images is None:
+    async def handle_links_async(self, links: list[dict]) -> list[str]:
+        markdown_content = []
+        if links is None:
+            return markdown_content
+
+        for link in links:
+            if "uri" in link:
+                markdown_content.append(f"### {link['uri']}")
+                if self.__web_interpreter:
+                    site_summary, usage = await DefinedTaskAsync.summarize_site(
+                        self.__web_interpreter, link["uri"]
+                    )
+                    self.log_usage(usage)
+                else:
+                    site_summary = "Web page summary not available"
+                markdown_content.append(f"**Summary**: {site_summary}\n")
+
+        return markdown_content if len(markdown_content) > 0 else []
+
+    def handle_images(self, doc: Document, images: list, page_number: int) -> list[str]:
+        if not images:
             return []
 
-        markdown_content = ["\n## Images\n"]
+        """
+        # Validation Step
+        """
+        if self.__image_interpreter:
+            if not isinstance(self.__tmp_directory, str):
+                raise ValueError(
+                    "Invalid temporary directory: Must be a non-empty string."
+                )
+
+            if not os.path.exists(self.__tmp_directory):
+                raise FileNotFoundError(
+                    f"Temporary directory not exists: {self.__tmp_directory}"
+                )
+
+            if not os.path.isdir(self.__tmp_directory):
+                raise ValueError(f"Invalid temporary directory: {self.__tmp_directory}")
+
+        def handle_image(image_bytes, image_name) -> str:
+            """Custom handler for getting the image description synchrounously."""
+            if self.__image_interpreter is None:
+                return "Image description not available"
+
+            assert self.__tmp_directory
+
+            image_description, usage = DefinedTask.interpret_image(
+                self.__image_interpreter,
+                image_bytes,
+                image_name,
+                self.__tmp_directory,
+            )
+            self.log_usage(usage)
+            return f"**Description**: \n{image_description}\n"
+
+        """
+        # Actual Processing            
+        """
+        markdown_content = []
         for img_index, img in enumerate(images, start=1):
-            xref = img[0]
-            base_image = doc.extract_image(xref)
-            if base_image:
-                image_name = f"image_{page_number}_{img_index}.{base_image['ext']}"
-                markdown_content.extend(
-                    self.handle_image(
-                        base_image["image"],
+            # Determine if we have an xref or raw block data
+            # get_images() usually provides a tuple/list where index 0 is xref
+            # get_text("dict") provides a dict where "image" is bytes
+
+            image_data = None
+            ext = "png"  # default
+
+            if isinstance(img, dict) and "image" in img:
+                # Case: From get_text("dict") -> it's already bytes
+                if isinstance(img["image"], bytes):
+                    image_data = img["image"]
+                    ext = img.get("ext", "png")
+                # Case: It might be a dict with an xref key
+                elif isinstance(img["image"], int):
+                    base_image = doc.extract_image(img["image"])
+                    image_data = base_image["image"]
+                    ext = base_image["ext"]
+
+            elif isinstance(img, (list, tuple)):
+                # Case: From page.get_images() -> first element is xref
+                xref = img[0]
+                base_image = doc.extract_image(xref)
+                image_data = base_image["image"]
+                ext = base_image["ext"]
+
+            if image_data:
+                image_name = f"image_{page_number}_{img_index}.{ext}"
+                # Pass the extracted bytes to your sub-handler
+                markdown_content.append(
+                    handle_image(
+                        image_data,
                         image_name,
-                        img_index,
-                        page_number,
                     )
                 )
 
         return markdown_content
 
     async def handle_images_async(
-        self, doc, page, images: list, page_number: int
+        self, doc: Document, images: list, page_number: int
     ) -> list[str]:
-        if images is None:
+        if not images:
             return []
 
-        markdown_content = ["\n## Images\n"]
+        """
+        # Validation Step
+        """
+        if self.__image_interpreter:
+            if not isinstance(self.__tmp_directory, str):
+                raise ValueError(
+                    "Invalid temporary directory: Must be a non-empty string."
+                )
+
+            if not os.path.exists(self.__tmp_directory):
+                raise FileNotFoundError(
+                    f"Temporary directory not exists: {self.__tmp_directory}"
+                )
+
+            if not os.path.isdir(self.__tmp_directory):
+                raise ValueError(f"Invalid temporary directory: {self.__tmp_directory}")
+
+        async def handle_image(image_bytes, image_name) -> str:
+            """Custom handler for getting the image description asynchrounously."""
+            if self.__image_interpreter is None:
+                return "Image description not available"
+
+            assert self.__tmp_directory
+
+            image_description, usage = await DefinedTaskAsync.interpret_image(
+                self.__image_interpreter,
+                image_bytes,
+                image_name,
+                self.__tmp_directory,
+            )
+            self.log_usage(usage)
+            return f"**Description**: \n{image_description}\n"
+
+        """
+        # Actual Processing            
+        """
+        markdown_content = []
         for img_index, img in enumerate(images, start=1):
-            xref = img[0]
-            base_image = doc.extract_image(xref)
-            if base_image:
-                image_name = f"image_{page_number}_{img_index}.{base_image['ext']}"
-                markdown_content.extend(
-                    await self.handle_image_async(
-                        base_image["image"],
+            # Determine if we have an xref or raw block data
+            # get_images() usually provides a tuple/list where index 0 is xref
+            # get_text("dict") provides a dict where "image" is bytes
+
+            image_data = None
+            ext = "png"  # default
+
+            if isinstance(img, dict) and "image" in img:
+                # Case: From get_text("dict") -> it's already bytes
+                if isinstance(img["image"], bytes):
+                    image_data = img["image"]
+                    ext = img.get("ext", "png")
+                # Case: It might be a dict with an xref key
+                elif isinstance(img["image"], int):
+                    base_image = doc.extract_image(img["image"])
+                    image_data = base_image["image"]
+                    ext = base_image["ext"]
+
+            elif isinstance(img, (list, tuple)):
+                # Case: From page.get_images() -> first element is xref
+                xref = img[0]
+                base_image = doc.extract_image(xref)
+                image_data = base_image["image"]
+                ext = base_image["ext"]
+
+            if image_data:
+                image_name = f"image_{page_number}_{img_index}.{ext}"
+                # Pass the extracted bytes to your sub-handler
+                markdown_content.append(
+                    await handle_image(
+                        image_data,
                         image_name,
-                        img_index,
-                        page_number,
                     )
                 )
 
         return markdown_content
 
-    def handle_image(
-        self, image_bytes, image_name, img_index, page_number
-    ) -> list[str]:
-        markdown_content = []
+    def load(self, input_path: Optional[str] = None) -> str:
+        PDFLoader.pre_load(input_path)
+        assert input_path
 
-        if self.__image_interpreter:
-            image_description = self.extract_img_description(image_bytes, image_name)
-        else:
-            image_description = "Image description not available"
-        markdown_content.append(
-            f"- Image {img_index} on Page {page_number}: {image_name}\n"
-        )
-        markdown_content.append(f"  Description: \n{image_description}\n")
-        markdown_content.append(f"  [IMAGE ATTACHED: {image_name}]\n")
+        page_number = 0
+        doc_content = []
+        table_counter = 1
+        try:
+            page_content = []
+            image_metadata = []
+            markdown_content: list[tuple[tuple[float, float, float, float], str]] = []
+            rects = []
+            with fitz.open(input_path) as doc:
+                for page in doc:
+                    page_number += 1
+                    page_content.append(f"# Page {page_number}\n")
 
-        return markdown_content
-
-    async def handle_image_async(
-        self, image_bytes, image_name, img_index, page_number
-    ) -> list[str]:
-        markdown_content = []
-
-        if self.__image_interpreter:
-            image_description = await self.extract_img_description_async(
-                image_bytes, image_name
-            )
-        else:
-            image_description = "Image description not available"
-        markdown_content.append(
-            f"- Image {img_index} on Page {page_number}: {image_name}\n"
-        )
-        markdown_content.append(f"  Description: \n{image_description}\n")
-        markdown_content.append(f"  [IMAGE ATTACHED: {image_name}]\n")
-
-        return markdown_content
-
-    @staticmethod
-    def handle_tables(input_path: str) -> list[str]:
-        markdown_content = []
-
-        # Extract tables using pdfplumber
-        with pdfplumber.open(input_path) as pdf:
-            for page_number, page in enumerate(pdf.pages, start=1):
-                tables = page.extract_tables()
-                for table_index, table in enumerate(tables, start=1):
-                    if table:
-                        markdown_content.append(
-                            f"\n## Table {table_index} on Page {page_number}\n"
+                    # Handle tables in the page
+                    tables = page.find_tables()  # type: ignore
+                    for table in tables.tables:
+                        data = table.extract()
+                        table_content = CustomCSVHandler._rows_to_csv_string(data, ",")
+                        table_content = (
+                            f"\n*Table {table_counter}*\n\n"
+                            + CustomCSVHandler.csv_to_markdown(table_content)
+                            + "\n"
                         )
-                        for row in table[:]:
-                            markdown_content.append(
-                                "| " + " | ".join(str(cell) for cell in row) + " |"
-                            )
-                        markdown_content.append("\n")
+                        markdown_content.append((table.bbox, table_content))
+                        rects.append(fitz.Rect(table.bbox))
+                        table_counter += 1
 
-        return markdown_content
+                    # Extract structured blocks (Text = 0, Image = 1)
+                    page_dict = page.get_text("dict")  # type: ignore
+                    blocks = page_dict.get("blocks", [])
+                    for b_idx, block in enumerate(blocks):
+                        block_rect = fitz.Rect(block["bbox"])
+                        if any([block_rect.intersects(rect) for rect in rects]):
+                            continue
+
+                        # CASE 1: BLOCK IS TEXT
+                        if block["type"] == 0:
+                            block_content = f""
+                            for line in block["lines"]:
+                                for span in line["spans"]:
+                                    block_content += span["text"]
+                                block_content += "\n"
+                            # Break after block - paragraph
+                            block_content += "\n"
+                            markdown_content.append((block["bbox"], block_content))
+                            continue
+
+                        # CASE 2: BLOCK IS AN IMAGE
+                        if block["type"] == 1:
+                            anchor_id = f"img_p{page_number}_b{b_idx}"
+
+                            # Insert Anchor exactly where the image sits in the flow
+                            markdown_content.append(
+                                (block["bbox"], f"> [image@{anchor_id}](#{anchor_id})")
+                            )
+
+                            # Store the metadata for the end of the file
+                            # Note: block contains image binary/bbox info
+                            desc = self.handle_images(doc, [block], page_number)
+                            image_metadata.append(f"### {anchor_id}\n")
+                            desc = [f"{d}\n\n" for d in desc]
+                            image_metadata.extend(desc)
+                            continue
+
+                    # Arrange markdown content
+                    markdown_content.sort(key=lambda x: x[0][1], reverse=False)  # type: ignore
+                    content: list[str] = list(map(lambda x: x[1], markdown_content))
+                    markdown_content.clear()
+                    page_content.extend(content)
+
+                    # Append Image Descriptions at the Footer
+                    if image_metadata:
+                        page_content.append(f"## Image Reference Appendix\n")
+                        page_content.extend(image_metadata)
+                        image_metadata.clear()
+
+                    # Handle Links separately (links usually don't have block types in dict)
+                    links = self.handle_links(page.get_links())  # type: ignore
+                    if links:
+                        page_content.append(f"## Link Reference Appendix\n")
+                        page_content.extend(links)
+
+                doc_content.append("\n".join(page_content))
+                page_content.clear()
+            return "".join(doc_content)
+        except Exception as e:
+            logger.error(f"[PDFLoader.load] => {str(e)}")
+            raise e
+
+    async def load_async(self, input_path: Optional[str] = None) -> str:
+        PDFLoader.pre_load(input_path)
+        assert input_path
+
+        page_number = 0
+        doc_content = []
+        table_counter = 1
+        try:
+            page_content = []
+            image_metadata = []
+            markdown_content: list[tuple[tuple[float, float, float, float], str]] = []
+            rects = []
+            with fitz.open(input_path) as doc:
+                for page in doc:
+                    page_number += 1
+                    page_content.append(f"# Page {page_number}\n")
+
+                    # Handle tables in the page
+                    tables = page.find_tables()  # type: ignore
+                    for table in tables.tables:
+                        data = table.extract()
+                        table_content = CustomCSVHandler._rows_to_csv_string(data, ",")
+                        table_content = (
+                            f"\n*Table {table_counter}*\n\n"
+                            + CustomCSVHandler.csv_to_markdown(table_content)
+                            + "\n"
+                        )
+                        markdown_content.append((table.bbox, table_content))
+                        rects.append(fitz.Rect(table.bbox))
+                        table_counter += 1
+
+                    # Extract structured blocks (Text = 0, Image = 1)
+                    page_dict = page.get_text("dict")  # type: ignore
+                    blocks = page_dict.get("blocks", [])
+                    for b_idx, block in enumerate(blocks):
+                        block_rect = fitz.Rect(block["bbox"])
+                        if any([block_rect.intersects(rect) for rect in rects]):
+                            continue
+
+                        # CASE 1: BLOCK IS TEXT
+                        if block["type"] == 0:
+                            block_content = f""
+                            for line in block["lines"]:
+                                for span in line["spans"]:
+                                    block_content += span["text"]
+                                block_content += "\n"
+                            # Break after block - paragraph
+                            block_content += "\n"
+                            markdown_content.append((block["bbox"], block_content))
+                            continue
+
+                        # CASE 2: BLOCK IS AN IMAGE
+                        if block["type"] == 1:
+                            anchor_id = f"img_p{page_number}_b{b_idx}"
+
+                            # Insert Anchor exactly where the image sits in the flow
+                            markdown_content.append(
+                                (block["bbox"], f"> [image@{anchor_id}](#{anchor_id})")
+                            )
+
+                            # Store the metadata for the end of the file
+                            # Note: block contains image binary/bbox info
+                            desc = await self.handle_images_async(
+                                doc, [block], page_number
+                            )
+                            image_metadata.append(f"### {anchor_id}\n")
+                            desc = [f"{d}\n\n" for d in desc]
+                            image_metadata.extend(desc)
+                            continue
+
+                    # Arrange markdown content
+                    markdown_content.sort(key=lambda x: x[0][1], reverse=False)  # type: ignore
+                    content: list[str] = list(map(lambda x: x[1], markdown_content))
+                    markdown_content.clear()
+                    page_content.extend(content)
+
+                    # Append Image Descriptions at the Footer
+                    if image_metadata:
+                        page_content.append(f"## Image Reference Appendix\n")
+                        page_content.extend(image_metadata)
+                        image_metadata.clear()
+
+                    # Handle Links separately (links usually don't have block types in dict)
+                    links = await self.handle_links_async(page.get_links())  # type: ignore
+                    if links:
+                        page_content.append(f"## Link Reference Appendix\n")
+                        page_content.extend(links)
+
+                doc_content.append("\n".join(page_content))
+                page_content.clear()
+            return "".join(doc_content)
+        except Exception as e:
+            logger.error(f"[PDFLoader.load_async] => {str(e)}")
+            raise e
