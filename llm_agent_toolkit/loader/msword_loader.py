@@ -16,8 +16,10 @@ from docx.table import Table as DocxTable
 from docx.text.paragraph import Paragraph as DocxParagraph
 
 from .._loader import BaseLoader
-from .._core import ImageInterpreter, Core as TextModel, MessageBlock, TokenUsage
-from .utils import CustomCSVHandler, DefinedTask, DefinedTaskAsync
+from .._core import ImageInterpreter, Core as TextModel
+from .._util import TokenUsage, UsagePurpose
+from .utils import DefinedTask, DefinedTaskAsync
+from functools import reduce
 
 logger = logging.getLogger(__name__)
 
@@ -96,6 +98,19 @@ class MsWordLoader(BaseLoader):
                     tmp_directory,
                 )
                 os.makedirs(tmp_directory)
+        self.__token_usage_list: List[TokenUsage] = []
+
+    def log_usage(self, value: TokenUsage):
+        self.__token_usage_list.append(value)
+
+    def show_usage(self) -> dict[str, TokenUsage]:
+
+        output = {}
+        for p in UsagePurpose:
+            xp_list = list(filter(lambda x: x.purpose is p, self.__token_usage_list))
+            xp_total = reduce(lambda a, b: a + b, xp_list)
+            output[p.value] = xp_total
+        return output
 
     @classmethod
     def pre_load(cls, input_path: Optional[str] = None):
@@ -140,8 +155,8 @@ class MsWordLoader(BaseLoader):
         image_counter = 1
 
         md_lines = []
-        img_lines: list[str] = []
-        link_lines: list[str] = []
+        img_lines: List[str] = []
+        link_lines: List[str] = []
 
         rels = mydoc.part.rels
         for block in self.iter_block_items(mydoc):
@@ -171,9 +186,10 @@ class MsWordLoader(BaseLoader):
                                     link_text, f"[{link_text}]({url})", 1
                                 )
                                 if self.__web_interpreter:
-                                    site_summary = DefinedTask.summarize_site(
+                                    site_summary, usage = DefinedTask.summarize_site(
                                         self.__web_interpreter, url
                                     )
+                                    self.log_usage(usage)
                                 else:
                                     site_summary = "Web page summary not available"
                                 link_lines.append(f"### URL: {url}")
@@ -201,12 +217,13 @@ class MsWordLoader(BaseLoader):
                         if self.__image_interpreter is None:
                             image_description = "Image description not available"
                         else:
-                            image_description = DefinedTask.interpret_image(
+                            image_description, usage = DefinedTask.interpret_image(
                                 self.__image_interpreter,
                                 image_bytes,
                                 image_filename,
                                 self.__tmp_directory,
                             )
+                            self.log_usage(usage)
 
                         img_lines.append(f"### {image_filename}")
                         img_lines.append(f"**Description**: \n{image_description}\n")
@@ -241,8 +258,8 @@ class MsWordLoader(BaseLoader):
         image_counter = 1
 
         md_lines = []
-        img_lines: list[str] = []
-        link_lines: list[str] = []
+        img_lines: List[str] = []
+        link_lines: List[str] = []
 
         rels = mydoc.part.rels
         for block in self.iter_block_items(mydoc):
@@ -274,11 +291,13 @@ class MsWordLoader(BaseLoader):
                                 if self.__web_interpreter is None:
                                     site_summary = "Web page summary not available"
                                 else:
-                                    site_summary = (
+                                    site_summary, usage = (
                                         await DefinedTaskAsync.summarize_site(
                                             self.__web_interpreter, url
                                         )
                                     )
+                                    self.log_usage(usage)
+
                                 link_lines.append(f"### URL: {url}")
                                 link_lines.append(f"**Summary**: \n{site_summary}\n")
 
@@ -304,12 +323,15 @@ class MsWordLoader(BaseLoader):
                         if self.__image_interpreter is None:
                             image_description = "Image description not available"
                         else:
-                            image_description = await DefinedTaskAsync.interpret_image(
-                                self.__image_interpreter,
-                                image_bytes,
-                                image_filename,
-                                self.__tmp_directory,
+                            image_description, usage = (
+                                await DefinedTaskAsync.interpret_image(
+                                    self.__image_interpreter,
+                                    image_bytes,
+                                    image_filename,
+                                    self.__tmp_directory,
+                                )
                             )
+                            self.log_usage(usage)
                         img_lines.append(f"### {image_filename}")
                         img_lines.append(f"**Description**: \n{image_description}\n")
 
