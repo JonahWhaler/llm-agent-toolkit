@@ -79,9 +79,9 @@ class DefinedTask:
     @staticmethod
     def interpret_image(
         model: ImageInterpreter, image_bytes: bytes, image_name: str, tmp_directory: str
-    ) -> str:
+    ) -> Tuple[str, TokenUsage]:
         if model is None:
-            return "Image description not available"
+            return "Image description not available", TokenUsage()
 
         query = f"Please describe this attached image."
         with DefinedTask.temporary_file(
@@ -92,12 +92,12 @@ class DefinedTask:
             )
             responses, usage = ai_response
             if responses:
-                return responses[0]["content"]
+                return responses[0]["content"], usage
 
             raise RuntimeError("Expect at least one response on image interpretation.")
 
     @staticmethod
-    def summarize_site(model: TextModel, url: str) -> str:
+    def summarize_site(model: TextModel, url: str) -> Tuple[str, TokenUsage]:
         if model is None:
             return "Web page summary not available"
 
@@ -105,7 +105,7 @@ class DefinedTask:
         ai_response = model.run(query, None)
         responses, usage = ai_response
         if responses:
-            return responses[0]["content"]
+            return responses[0]["content"], usage
 
         raise RuntimeError("Expect at least one response on site summarization.")
 
@@ -129,9 +129,9 @@ class DefinedTaskAsync:
     @staticmethod
     async def interpret_image(
         model, image_bytes: bytes, image_name: str, tmp_directory: str
-    ) -> str:
+    ) -> Tuple[str, TokenUsage]:
         if model is None:
-            return "Image description not available"
+            return "Image description not available", TokenUsage()
 
         query = f"Please describe this attached image."
         with DefinedTaskAsync.temporary_file(
@@ -144,19 +144,19 @@ class DefinedTaskAsync:
             )
             responses, usage = ai_response
             if responses:
-                return responses[0]["content"]
+                return responses[0]["content"], usage
 
             raise RuntimeError("Expect at least one response on image interpretation.")
 
     @staticmethod
-    async def summarize_site(model: TextModel, url: str) -> str:
+    async def summarize_site(model: TextModel, url: str) -> Tuple[str, TokenUsage]:
         if model is None:
-            return "Web page summary not available"
+            return "Web page summary not available", TokenUsage()
 
         query = f"site={url}"
         ai_response = await model.run_async(query, None)
         responses, usage = ai_response
         if responses:
-            return responses[0]["content"]
+            return responses[0]["content"], usage
 
         raise RuntimeError("Expect at least one response on site summarization.")
