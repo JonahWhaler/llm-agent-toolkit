@@ -83,7 +83,13 @@ class ResponseMode(str, Enum):
     DEFAULT = "default"
 
 
+class UsagePurpose(str, Enum):
+    CHAT = "chat"
+    EMBEDDING = "embedding"
+
+
 class TokenUsage(BaseModel):
+    purpose: UsagePurpose = UsagePurpose.CHAT
     input_tokens: int = 0
     output_tokens: int = 0
 
