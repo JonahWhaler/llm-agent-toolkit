@@ -23,7 +23,51 @@ logger = logging.getLogger(__name__)
 
 
 class MsWordLoader(BaseLoader):
-    SUPPORTED_MIMETYPES = (
+    """
+    A loader for parsing MS Word files and extracting text, tables, images, and links.
+
+    `MsWordLoader` uses the `python-docx` library to process MS Word files, offering both synchronous (`load`)
+    and asynchronous (`load_async`) methods to extract content into a Markdown format.
+
+    It preserves the document structure by iterating through every children objects.
+    Followed by rendering them according to their type.
+
+    ## Sub-features:
+    - **Image Interpretation**: If an `ImageInterpreter` is provided, the loader extracts images,
+      generates descriptions using the interpreter, and appends them in a reference section.
+      Image locations are marked with anchors in the main text.
+
+    - **Web Page Summarization**: If a `TextModel` (acting as a `web_interpreter`) is provided,
+      it summarizes external links found in the MS Word document and includes the summaries in a
+      reference section.
+
+    - **Table Extraction**: Tables are detected and converted into Markdown format.
+
+    Attributes:
+    ----------
+    - tmp_directory (str | None, optional): A path to a temporary directory for storing
+      intermediate files, such as extracted images. Required if `text_only` is False.
+      Defaults to None.
+    - image_interpreter (ImageInterpreter | None, optional): An AI model for generating
+      descriptions from images. Required for image processing. Defaults to None.
+    - web_interpreter (TextModel | None, optional): An AI model for summarizing web pages
+      from links. Required for link summarization. Defaults to None.
+
+    Methods:
+    ----------
+    - load(input_path: str) -> str: Synchronously processes the specified MS Word file and returns its
+      content as a Markdown string.
+    - load_async(input_path: str) -> str: Asynchronously processes the specified MS Word file and
+      returns its content as a Markdown string.
+
+    Notes:
+    ----------
+    - This loader relies on `python-docx` (`docx`). Ensure it is installed.
+    - For image and link processing, the corresponding interpreter models (`ImageInterpreter`, `TextModel`)
+      must be properly configured and provided during initialization.
+    """
+
+    SUPPORTED_MIMETYPES: Tuple[str] = (
         "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
     )
 
