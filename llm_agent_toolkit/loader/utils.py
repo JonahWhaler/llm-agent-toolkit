@@ -92,7 +92,7 @@ class DefinedTask:
             )
             responses, usage = ai_response
             if responses:
-                return responses[0]["content"], usage
+                return responses[-1]["content"], usage
 
             raise RuntimeError("Expect at least one response on image interpretation.")
 
@@ -105,7 +105,7 @@ class DefinedTask:
         ai_response = model.run(query, None)
         responses, usage = ai_response
         if responses:
-            return responses[0]["content"], usage
+            return responses[-1]["content"], usage
 
         raise RuntimeError("Expect at least one response on site summarization.")
 
@@ -144,7 +144,7 @@ class DefinedTaskAsync:
             )
             responses, usage = ai_response
             if responses:
-                return responses[0]["content"], usage
+                return responses[-1]["content"], usage
 
             raise RuntimeError("Expect at least one response on image interpretation.")
 
@@ -157,6 +157,6 @@ class DefinedTaskAsync:
         ai_response = await model.run_async(query, None)
         responses, usage = ai_response
         if responses:
-            return responses[0]["content"], usage
+            return responses[-1]["content"], usage
 
         raise RuntimeError("Expect at least one response on site summarization.")
