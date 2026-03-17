@@ -41,6 +41,7 @@ class ReasoningBudget(BaseModel):
     enable_reasoning: bool = False
     reasoning_effort: ReasoningEffort = ReasoningEffort.NONE
     max_reasonging_tokens: int = 0
+    include_reasoning_in_output: bool = True
 
 
 class ChatCompletionConfig(ModelConfig):
