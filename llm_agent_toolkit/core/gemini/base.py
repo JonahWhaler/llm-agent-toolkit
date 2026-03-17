@@ -108,7 +108,10 @@ class GeminiCore:
         # Assign default values
         if "context_length" not in profile:
             # Most supported context length
-            profile["context_length"] = 2048
+            profile["context_length"] = 4096
+        if "max_output_tokens" not in profile:
+            # Most supported max_output_tokens
+            profile["max_output_tokens"] = 2048
         if "tool" not in profile:
             # Assume supported
             profile["tool"] = True
