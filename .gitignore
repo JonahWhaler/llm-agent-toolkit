@@ -165,6 +165,8 @@ cython_debug/
 dev/
 snippet/output/
 models/
+samples/
+output/
 
 .pypirc
 .aiexclude
