@@ -106,12 +106,12 @@ class ChatCompletionConfig(ModelConfig):
             )
 
         if (
-            self.name.startswith("gemini-3.")
+            self.name.startswith("gemini-3")
             and self.reasoning_budget.enable_reasoning
             and self.reasoning_budget.reasoning_effort is ReasoningEffort.NONE
         ):
             raise ValueError(
-                "gemini-3.x models's reasoning budget is controlled by setting the reasoning effort."
+                "gemini-3x models's reasoning budget is controlled by setting the reasoning effort."
             )
 
         return self
