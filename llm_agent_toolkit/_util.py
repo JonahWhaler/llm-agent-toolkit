@@ -64,13 +64,14 @@ class ChatCompletionConfig(ModelConfig):
         max_output_tokens (int): The maximum number of tokens a generation is allowed to generate.
         temperature (float): Controls the randomness of the generated text.
         reasoning_budget (ReasoningBudget): Configuration for models with reasoning/thinking capabilities.
+        vision_budget (VisionBudget): Configuration for models with vision capabilities.
     """
 
     max_tokens: int = 4096
     max_output_tokens: int = 2048
     temperature: float = 0.7
     reasoning_budget: ReasoningBudget = ReasoningBudget()
-    vision_budget = VisionBudget()
+    vision_budget: VisionBudget = VisionBudget()
 
     @field_validator("max_tokens")
     def max_tokens_must_be_positive(cls, v):  # pylint: disable=no-self-argument
