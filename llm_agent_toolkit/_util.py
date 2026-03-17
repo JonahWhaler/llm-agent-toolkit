@@ -44,6 +44,19 @@ class ReasoningBudget(BaseModel):
     include_reasoning_in_output: bool = True
 
 
+class InterpretationEffort(Enum):
+    NONE = "none"
+    LOW = "low"
+    MEDIUM = "medium"
+    HIGH = "high"
+    AUTO = "auto"
+
+
+class VisionBudget(BaseModel):
+    enabled: bool = False
+    effort: InterpretationEffort = InterpretationEffort.LOW
+
+
 class ChatCompletionConfig(ModelConfig):
     """
     Attributes:
@@ -57,6 +70,7 @@ class ChatCompletionConfig(ModelConfig):
     max_output_tokens: int = 2048
     temperature: float = 0.7
     reasoning_budget: ReasoningBudget = ReasoningBudget()
+    vision_budget = VisionBudget()
 
     @field_validator("max_tokens")
     def max_tokens_must_be_positive(cls, v):  # pylint: disable=no-self-argument
