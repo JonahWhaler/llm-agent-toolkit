@@ -1,8 +1,10 @@
 import os
 import logging
 import mimetypes
+import asyncio
 from math import ceil
 from typing import Optional, Tuple
+from concurrent.futures import ThreadPoolExecutor
 
 from PIL import Image
 from google import genai
@@ -388,6 +390,22 @@ class GeminiCore:
         except Exception as e:
             logger.error("Response text not found: %s", str(e))
             return None
+
+    @staticmethod
+    async def acall(
+        model_name: str, config: types.GenerateContentConfig, msgs: list[types.Content]
+    ):
+        """Use this to make the `generate_content` method asynchronous."""
+        client = genai.Client(api_key=os.environ["GEMINI_API_KEY"])
+        with ThreadPoolExecutor() as executor:
+            future = executor.submit(
+                client.models.generate_content,
+                model=model_name,
+                contents=msgs,  # type: ignore
+                config=config,
+            )
+            response = await asyncio.wrap_future(future)  # Makes the future awaitable
+            return response
 
 
 TOOL_PROMPT = """
