@@ -1,3 +1,4 @@
+import json
 from enum import Enum
 from typing import TypedDict
 from pydantic import BaseModel, field_validator, ValidationError, model_validator
@@ -175,3 +176,12 @@ class TokenUsage(BaseModel):
             input_tokens=self.input_tokens + other.input_tokens,
             output_tokens=self.output_tokens + other.output_tokens,
         )
+
+    def model_dump_json(self, **kwargs) -> str:
+        tmp = {
+            "purpose": self.purpose.value,
+            "input_tokens": self.input_tokens,
+            "output_tokens": self.output_tokens,
+            "total_tokens": self.total_tokens,
+        }
+        return json.dumps(tmp, ensure_ascii=False)
