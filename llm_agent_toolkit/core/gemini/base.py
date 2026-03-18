@@ -1,5 +1,6 @@
 import os
 import logging
+import mimetypes
 from math import ceil
 from typing import Optional
 from PIL import Image
@@ -255,20 +256,19 @@ class GeminiCore:
                 )
 
         if filepath:
-            ext = os.path.splitext(filepath)[-1][1:]
-            ext = "jpeg" if ext == "jpg" else ext
-            mime_type = f"image/{ext}"  # Assume image file only.
+            mime_type = mimetypes.guess_type(filepath)[0]
+            assert mime_type is not None
             with open(filepath, "rb") as f:
-                data_bytes = f.read()
-            output.append(
-                types.Content(
-                    role="user",
-                    parts=[
-                        types.Part.from_bytes(data=data_bytes, mime_type=mime_type),
-                        types.Part.from_text(text=query),
-                    ],
+                # data_bytes = f.read()
+                output.append(
+                    types.Content(
+                        role="user",
+                        parts=[
+                            types.Part.from_bytes(data=f.read(), mime_type=mime_type),
+                            types.Part.from_text(text=query),
+                        ],
+                    )
                 )
-            )
         else:
             output.append(
                 types.Content(
