@@ -2,7 +2,8 @@ import os
 import logging
 import mimetypes
 from math import ceil
-from typing import Optional
+from typing import Optional, Tuple
+
 from PIL import Image
 from google import genai
 from google.genai import types
@@ -239,6 +240,7 @@ class GeminiCore:
         query: str,
         context: Optional[list[MessageBlock | dict]],
         filepath: Optional[str] = None,
+        supported_mimetypes: Optional[Tuple[str, ...]] = None,
     ) -> list[types.Content]:
         """Adapter function to transform MessageBlock to types.Content."""
         output: list[types.Content] = []
@@ -256,19 +258,30 @@ class GeminiCore:
                 )
 
         if filepath:
-            mime_type = mimetypes.guess_type(filepath)[0]
-            assert mime_type is not None
-            with open(filepath, "rb") as f:
-                # data_bytes = f.read()
-                output.append(
-                    types.Content(
-                        role="user",
-                        parts=[
-                            types.Part.from_bytes(data=f.read(), mime_type=mime_type),
-                            types.Part.from_text(text=query),
-                        ],
+            mime_type: Optional[str] = mimetypes.guess_type(filepath)[0]
+            if mime_type is None:
+                raise ValueError("Unexpected mime type.")
+
+            if supported_mimetypes is None:
+                raise ValueError("Arg supported_mimetypes is not provided.")
+
+            if mime_type not in supported_mimetypes:
+                raise ValueError(f"Unsupported mime type: {mime_type}")
+
+            if mime_type.startswith("text/"):
+                with open(filepath, "r", encoding="utf-8") as f:
+                    file_part = types.Part.from_text(text=f.read())
+            else:
+                with open(filepath, "rb") as f:
+                    file_part = types.Part.from_bytes(
+                        data=f.read(), mime_type=mime_type
                     )
+            output.append(
+                types.Content(
+                    role="user",
+                    parts=[file_part, types.Part.from_text(text=query)],
                 )
+            )
         else:
             output.append(
                 types.Content(
