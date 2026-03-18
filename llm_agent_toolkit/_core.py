@@ -222,3 +222,43 @@ class ImageInterpreter(ABC):
         Use this method to explicitly express the intention to interpret an image.
         """
         raise NotImplementedError
+
+
+class AudioTranscriber(ABC):
+    """
+    Abstract class for audio-to-text LLM models.
+
+    Abstract methods:
+    - transcribe_async(query: str, context: list[ContextMessage | dict] | None, filepath: str, **kwargs) -> tuple[list[MessageBlock | dict], TokenUsage]:
+        Asynchronously run the LLM model to transcribe the audio track in `filepath`.
+    - transcribe(query: str, context: list[ContextMessage | dict] | None, filepath: str, **kwargs) -> tuple[list[MessageBlock | dict], TokenUsage]:
+        Synchronously run the LLM model to transcribe the audio track in `filepath`.
+    """
+
+    @abstractmethod
+    async def transcribe_async(
+        self,
+        query: str,
+        context: list[MessageBlock | dict[str, Any]] | None,
+        filepath: str,
+        **kwargs,
+    ) -> tuple[list[MessageBlock | dict[str, Any]], TokenUsage]:
+        """Asynchronously run the LLM model to transcribe the audio track in `filepath`.
+
+        Use this method to explicitly express the intention to transcribe a piece of audio file.
+        """
+        raise NotImplementedError
+
+    @abstractmethod
+    def transcribe(
+        self,
+        query: str,
+        context: list[MessageBlock | dict[str, Any]] | None,
+        filepath: str,
+        **kwargs,
+    ) -> tuple[list[MessageBlock | dict[str, Any]], TokenUsage]:
+        """Synchronously run the LLM model to transcribe the audio track in `filepath`.
+
+        Use this method to explicitly express the intention to transcribe a piece of audio file.
+        """
+        raise NotImplementedError
