@@ -268,7 +268,7 @@ class GeminiCore:
             if mime_type not in supported_mimetypes:
                 raise ValueError(f"Unsupported mime type: {mime_type}")
 
-            if mime_type.startswith("text/"):
+            if mime_type.startswith("text/") or mime_type == "application/json":
                 with open(filepath, "r", encoding="utf-8") as f:
                     file_part = types.Part.from_text(text=f.read())
             else:
